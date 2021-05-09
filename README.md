@@ -34,7 +34,7 @@ You can find more options in the options/base_option.py and option/train_options
 Please report all issues on the public forum.
 
 ## License
-© [Nadeem Lab](http://www.nadeemlab.org) - This code is made available under the GPLv3 License and is available for non-commercial academic purposes. 
+© This code is made available under the GPLv3 License and is available for non-commercial academic purposes. 
 
 ## Reference
 If you find our work useful in your research or if you use parts of this code please consider citing our paper:
