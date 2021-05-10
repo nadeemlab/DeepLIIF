@@ -33,7 +33,7 @@ python preprocessing.py --input_dir /path/to/input/images
                         --output_dir /path/to/output/images 
                         --tile_size size_of_each_cropped_tile 
                         --overlap_size overlap_size_between_crops 
-                        --resize_self if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set 
+                        --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
                         --resize_size
 ```
 
@@ -45,7 +45,7 @@ python postprocessing.py --input_dir /path/to/preprocessed/images
                          --input_orig_dir /path/to/original/input/images 
                          --tile_size size_of_each_cropped_tile 
                          --overlap_size overlap_size_between_crops 
-                         --resize_self if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set 
+                         --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
                          --resize_size resizing_size
 ```
 
