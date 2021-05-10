@@ -27,6 +27,7 @@ See training and test tips at: https://github.com/junyanz/pytorch-CycleGAN-and-p
 See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md
 """
 import os
+import time
 from options.test_options import TestOptions
 from data import create_dataset
 from models import create_model
@@ -56,6 +57,9 @@ if __name__ == '__main__':
     # For [CycleGAN]: It should not affect CycleGAN as CycleGAN uses instancenorm without dropout.
     if opt.eval:
         model.eval()
+
+    _start_time = time.time()
+
     for i, data in enumerate(dataset):
         if i >= opt.num_test:  # only apply our model to opt.num_test images.
             break
@@ -66,4 +70,9 @@ if __name__ == '__main__':
         if i % 5 == 0:  # save images to an HTML file
             print('processing (%04d)-th image... %s' % (i, img_path))
         save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize)
+
+    t_sec = round(time.time() - _start_time)
+    (t_min, t_sec) = divmod(t_sec, 60)
+    (t_hour, t_min) = divmod(t_min, 60)
+    print('Time passed: {}hour:{}min:{}sec'.format(t_hour, t_min, t_sec))
     webpage.save()  # save the HTML

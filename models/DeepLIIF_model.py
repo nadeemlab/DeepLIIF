@@ -140,15 +140,15 @@ class DeepLIIFModel(BaseModel):
         fake_AB_3 = torch.cat((self.real_A, self.fake_B_3), 1)  # Conditional GANs; feed IHC input and mpIF Lap2 output to the discriminator
         fake_AB_4 = torch.cat((self.real_A, self.fake_B_4), 1)  # Conditional GANs; feed IHC input and mpIF Ki67 output to the discriminator
 
-        fake_AB_5_1 = torch.cat((self.real_A, self.fake_B_5), 1)    # Conditional GANs; feed IHC input and Segmentation mask output to the discriminator
-        fake_AB_5_2 = torch.cat((self.real_B_1, self.fake_B_5), 1)  # Conditional GANs; feed Hematoxylin input and Segmentation mask output to the discriminator
-        fake_AB_5_3 = torch.cat((self.real_B_2, self.fake_B_5), 1)  # Conditional GANs; feed mpIF DAPI input and Segmentation mask output to the discriminator
-        fake_AB_5_4 = torch.cat((self.real_B_3, self.fake_B_5), 1)  # Conditional GANs; feed mpIF Lap2 input and Segmentation mask output to the discriminator
-
         pred_fake_1 = self.netD1(fake_AB_1.detach())
         pred_fake_2 = self.netD2(fake_AB_2.detach())
         pred_fake_3 = self.netD3(fake_AB_3.detach())
         pred_fake_4 = self.netD4(fake_AB_4.detach())
+
+        fake_AB_5_1 = torch.cat((self.real_A, self.fake_B_5), 1)    # Conditional GANs; feed IHC input and Segmentation mask output to the discriminator
+        fake_AB_5_2 = torch.cat((self.real_B_1, self.fake_B_5), 1)  # Conditional GANs; feed Hematoxylin input and Segmentation mask output to the discriminator
+        fake_AB_5_3 = torch.cat((self.real_B_2, self.fake_B_5), 1)  # Conditional GANs; feed mpIF DAPI input and Segmentation mask output to the discriminator
+        fake_AB_5_4 = torch.cat((self.real_B_3, self.fake_B_5), 1)  # Conditional GANs; feed mpIF Lap2 input and Segmentation mask output to the discriminator
 
         pred_fake_5_1 = self.netD51(fake_AB_5_1.detach())
         pred_fake_5_2 = self.netD52(fake_AB_5_2.detach())
@@ -173,15 +173,16 @@ class DeepLIIFModel(BaseModel):
         real_AB_3 = torch.cat((self.real_A, self.real_B_3), 1)
         real_AB_4 = torch.cat((self.real_A, self.real_B_4), 1)
 
+        pred_real_1 = self.netD1(real_AB_1)
+        pred_real_2 = self.netD2(real_AB_2)
+        pred_real_3 = self.netD3(real_AB_3)
+        pred_real_4 = self.netD4(real_AB_4)
+
         real_AB_5_1 = torch.cat((self.real_A, self.real_B_5), 1)
         real_AB_5_2 = torch.cat((self.real_B_1, self.real_B_5), 1)
         real_AB_5_3 = torch.cat((self.real_B_2, self.real_B_5), 1)
         real_AB_5_4 = torch.cat((self.real_B_3, self.real_B_5), 1)
 
-        pred_real_1 = self.netD1(real_AB_1)
-        pred_real_2 = self.netD2(real_AB_2)
-        pred_real_3 = self.netD3(real_AB_3)
-        pred_real_4 = self.netD4(real_AB_4)
         pred_real_5_1 = self.netD51(real_AB_5_1)
         pred_real_5_2 = self.netD52(real_AB_5_2)
         pred_real_5_3 = self.netD53(real_AB_5_3)
