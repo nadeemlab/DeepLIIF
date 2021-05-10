@@ -29,19 +29,32 @@ XXX_Dataset
 ## Pre-processing:
 Using this function, you can prepare images for testing purposes. This function breaks large images into tiles of size 512x512 and create a 3072x512 image for each tile. Then, stores the generated tiles in the given directory.
 ```
-python preprocessing.py **--input_dir** /path/to/input/images **--output_dir** /path/to/output/images **--tile_size** size_of_each_cropped_tile **--overlap_size** overlap_size_between_crops **--resize_self** if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set **--resize_size**
+python preprocessing.py --input_dir /path/to/input/images 
+                        --output_dir /path/to/output/images 
+                        --tile_size size_of_each_cropped_tile 
+                        --overlap_size overlap_size_between_crops 
+                        --resize_self if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set 
+                        --resize_size
 ```
 
 ## Post-processing:
 This function is used for testing purposes. This function can be used to post-process the results of the model. It saves the generated images with the proper postfixes in the given directory. If the input images are the tiles from a larger image, it also stitches them to create the inferred images for the original images. 
 ```
-python postprocessing.py **--input_dir** /path/to/preprocessed/images **--output_dir** /path/to/output/images **--input_orig_dir** /path/to/original/input/images --tile_size size_of_each_cropped_tile **--overlap_size** overlap_size_between_crops **--resize_self** if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set **--resize_size**
+python postprocessing.py --input_dir /path/to/preprocessed/images 
+                         --output_dir /path/to/output/images 
+                         --input_orig_dir /path/to/original/input/images 
+                         --tile_size size_of_each_cropped_tile 
+                         --overlap_size overlap_size_between_crops 
+                         --resize_self if_True_resizes_to_the_closest_rectangle_if_False_resize_size_need_to_be_set 
+                         --resize_size resizing_size
 ```
 
 ## Training:
 To train a model:
 ```
-python train.py **--dataroot** /path/to/input/images **--name** Model_Name **--model** DeepLIIF **--netG** resnet_9blocks 
+python train.py --dataroot /path/to/input/images 
+                --name Model_Name 
+                --model DeepLIIF
 ```
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
 * To epoch-wise intermediate training results, /DeepLIIF/checkpoints/Model_Name/web/index.html
@@ -50,7 +63,9 @@ python train.py **--dataroot** /path/to/input/images **--name** Model_Name **--m
 ## Testing:
 To test the model:
 ```
-python test.py **--dataroot** /path/to/input/images **--name** Model_Name **--model** DeepLIIF **--netG** resnet_9blocks 
+python test.py --dataroot /path/to/input/images 
+               --name Model_Name 
+               --model DeepLIIF
 ```
 * The test results will be by default saved to /DeepLIIF/results/Model_Name/test_latest/images.
 * Pretrained models can be downloaded here. Place the pretrained model in /DeepLIIF/checkpoints/deepLIIF_model and set the Model_Name as deepLIIF_model.
