@@ -77,6 +77,7 @@ Change the DeepLIIF_path to the path of DeepLIIF project. Set input_path to the 
 You can use the docker file to create the docker image for running the model.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
+* Download the pretrained model and place them in /DeepLIIF/checkpoints/deepLIIF_model.
 * Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
 * To create a docker image from the docker file:
 ```
