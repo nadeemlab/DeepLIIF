@@ -21,7 +21,7 @@ class ProcessingOptions():
         parser.add_argument('--image_size', required=False, default=None, help='size of the original whole slide image')
         parser.add_argument('--tile_size', required=False, type=int, default=500, help='size of the tiles')
         parser.add_argument('--overlap_size', required=False, type=int, default=50, help='size of the overlapping area between tiles')
-        parser.add_argument('--resize_self', required=True, type=bool, default=True, help='if want to resize the whole slide to a specific size')
+        parser.add_argument('--resize_self', required=False, type=bool, default=True, help='if want to resize the whole slide to a specific size')
         parser.add_argument('--gpu_ids', required=False, type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
 
         self.initialized = True

@@ -54,6 +54,8 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
     images_size = {}
     original_image_sizes = {}
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     img_types = {'fake_B_1':'Hema', 'fake_B_2':'DAPI', 'fake_B_3':'DAPILap2', 'fake_B_4':'Ki67', 'fake_B_5': 'Seg'}
     for img_name in images:

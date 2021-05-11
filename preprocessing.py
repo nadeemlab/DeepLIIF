@@ -2,7 +2,6 @@ import os
 import shutil
 import cv2
 import numpy as np
-
 from options.processing_options import ProcessingOptions
 
 # Postfixes not to consider for segmentation

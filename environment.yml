@@ -1,62 +1,142 @@
 name: pytorch_env
 channels:
   - pytorch
+  - bioconda
   - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=1_llvm
+  - anyio=2.2.0=py38h578d9bd_0
+  - argon2-cffi=20.1.0=py38h497a2fe_2
+  - async_generator=1.10=py_0
+  - attrs=21.2.0=pyhd8ed1ab_0
+  - babel=2.9.1=pyh44b312d_0
+  - backcall=0.2.0=pyh9f0ad1d_0
+  - backports=1.0=py_2
+  - backports.functools_lru_cache=1.6.4=pyhd8ed1ab_0
   - blas=1.0=mkl
+  - bleach=3.3.0=pyh44b312d_0
+  - boto3=1.17.64=pyhd8ed1ab_0
+  - botocore=1.20.64=pyhd8ed1ab_0
+  - brotlipy=0.7.0=py38h497a2fe_1001
   - ca-certificates=2020.12.5=ha878542_0
   - certifi=2020.12.5=py38h578d9bd_1
+  - cffi=1.14.5=py38ha65f79e_0
+  - chardet=4.0.0=py38h578d9bd_1
+  - cryptography=3.4.7=py38ha5dfef3_0
   - cudatoolkit=10.1.243=h036e899_8
+  - decorator=5.0.7=pyhd8ed1ab_0
+  - defusedxml=0.7.1=pyhd8ed1ab_0
+  - deprecation=2.1.0=pyh9f0ad1d_0
+  - entrypoints=0.3=pyhd8ed1ab_1003
   - freetype=2.10.4=h0708190_1
+  - future=0.18.2=py38h578d9bd_3
+  - idna=2.10=pyh9f0ad1d_0
+  - importlib-metadata=4.0.1=py38h578d9bd_0
+  - ipykernel=5.5.4=py38hd0cf306_0
+  - ipython=7.23.1=py38hd0cf306_0
+  - ipython_genutils=0.2.0=py_1
+  - jedi=0.18.0=py38h578d9bd_2
+  - jinja2=2.11.3=pyh44b312d_0
+  - jmespath=0.10.0=pyh9f0ad1d_0
   - jpeg=9d=h36c2ea0_0
+  - json5=0.9.5=pyh9f0ad1d_0
+  - jsonschema=3.2.0=pyhd8ed1ab_3
+  - jupyter-packaging=0.10.1=pyhd8ed1ab_0
+  - jupyter_client=6.1.12=pyhd8ed1ab_0
+  - jupyter_core=4.7.1=py38h578d9bd_0
+  - jupyter_server=1.6.4=py38h578d9bd_0
+  - jupyterlab=3.0.14=pyhd8ed1ab_0
+  - jupyterlab_pygments=0.1.2=pyh9f0ad1d_0
+  - jupyterlab_server=2.5.0=pyhd8ed1ab_0
   - lcms2=2.12=hddcbb42_0
   - ld_impl_linux-64=2.35.1=hea4e1c9_2
   - libffi=3.3=h58526e2_2
   - libgcc-ng=9.3.0=h2828fa1_18
   - libpng=1.6.37=h21135ba_2
+  - libsodium=1.0.18=h36c2ea0_1
   - libstdcxx-ng=9.3.0=h6de172a_18
   - libtiff=4.2.0=hdc55705_0
   - libwebp-base=1.2.0=h7f98852_2
   - llvm-openmp=11.1.0=h4bd325d_0
   - lz4-c=1.9.3=h9c3ff4c_0
+  - markupsafe=1.1.1=py38h497a2fe_3
+  - matplotlib-inline=0.1.2=pyhd8ed1ab_2
+  - mistune=0.8.4=py38h497a2fe_1003
   - mkl=2020.4=h726a3e6_304
   - mkl-service=2.3.0=py38h1e0a361_2
   - mkl_fft=1.3.0=py38h5c078b8_1
   - mkl_random=1.2.0=py38hc5bc63f_1
+  - nbclassic=0.2.7=pyhd8ed1ab_0
+  - nbclient=0.5.3=pyhd8ed1ab_0
+  - nbconvert=6.0.7=py38h578d9bd_3
+  - nbformat=5.1.3=pyhd8ed1ab_0
   - ncurses=6.2=h58526e2_4
+  - nest-asyncio=1.5.1=pyhd8ed1ab_0
   - ninja=1.10.2=h4bd325d_0
+  - notebook=6.3.0=pyha770c72_1
   - numpy=1.19.2=py38h54aff64_0
   - numpy-base=1.19.2=py38hfa32c7d_0
   - olefile=0.46=pyh9f0ad1d_1
+  - openjdk=10.0.2=h14c3975_1015
   - openssl=1.1.1k=h7f98852_0
+  - packaging=20.9=pyh44b312d_0
+  - pandoc=2.12=h7f98852_0
+  - pandocfilters=1.4.2=py_1
+  - parso=0.8.2=pyhd8ed1ab_0
+  - pexpect=4.8.0=pyh9f0ad1d_2
+  - pickleshare=0.7.5=py_1003
   - pillow=8.1.2=py38ha0e1e83_0
   - pip=21.0.1=pyhd8ed1ab_0
+  - prometheus_client=0.10.1=pyhd8ed1ab_0
+  - prompt-toolkit=3.0.18=pyha770c72_0
+  - ptyprocess=0.7.0=pyhd3deb0d_0
+  - pycparser=2.20=pyh9f0ad1d_2
+  - pygments=2.9.0=pyhd8ed1ab_0
+  - pyopenssl=20.0.1=pyhd8ed1ab_0
+  - pyparsing=2.4.7=pyh9f0ad1d_0
+  - pyrsistent=0.17.3=py38h497a2fe_2
+  - pysocks=1.7.1=py38h578d9bd_3
   - python=3.8.8=hffdb5ce_0_cpython
+  - python-bioformats=4.0.4=pyh3252c3a_0
+  - python-dateutil=2.8.1=py_0
+  - python-javabridge=4.0.0=py38h1e0a361_3
   - python_abi=3.8=1_cp38
   - pytorch=1.5.1=py3.8_cuda10.1.243_cudnn7.6.3_0
+  - pytz=2021.1=pyhd8ed1ab_0
+  - pyzmq=22.0.3=py38h2035c66_1
   - readline=8.0=he28a2e2_2
+  - requests=2.25.1=pyhd3deb0d_0
+  - s3transfer=0.4.2=pyhd8ed1ab_0
+  - send2trash=1.5.0=py_0
   - setuptools=49.6.0=py38h578d9bd_3
   - six=1.15.0=pyh9f0ad1d_0
+  - sniffio=1.2.0=py38h578d9bd_1
   - sqlite=3.35.3=h74cdb3f_0
+  - terminado=0.9.4=py38h578d9bd_0
+  - testpath=0.4.4=py_0
   - tk=8.6.10=h21135ba_1
+  - tomlkit=0.7.0=py38h578d9bd_3
   - torchvision=0.6.1=py38_cu101
+  - tornado=6.1=py38h497a2fe_1
+  - traitlets=5.0.5=py_0
+  - urllib3=1.26.4=pyhd8ed1ab_0
+  - wcwidth=0.2.5=pyh9f0ad1d_2
+  - webencodings=0.5.1=py_1
   - wheel=0.36.2=pyhd3deb0d_0
   - xz=5.2.5=h516909a_1
+  - zeromq=4.3.4=h9c3ff4c_0
+  - zipp=3.4.1=pyhd8ed1ab_0
   - zlib=1.2.11=h516909a_1010
   - zstd=1.4.9=ha95c52a_0
   - pip:
-    - chardet==4.0.0
     - dominate==2.6.0
-    - idna==2.10
+    - javabridge==1.0.19
     - jsonpatch==1.32
     - jsonpointer==2.1
-    - requests==2.25.1
     - scipy==1.6.2
     - torchfile==0.1.0
-    - urllib3==1.26.4
     - visdom==0.1.8.9
     - websocket-client==0.58.0
-prefix: /home/parmida/miniconda3/envs/pytorch_env
+    - opencv-python

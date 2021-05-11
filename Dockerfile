@@ -6,7 +6,7 @@ RUN chsh -s /bin/bash
 
 # install anaconda
 RUN apt-get update
-RUN apt-get install -y wget bzip2 ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git mercurial subversion && \
+RUN apt-get install -y wget bzip2 ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 libgl1-mesa-dev git mercurial subversion && \
         apt-get clean
 RUN wget --quiet https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh -O ~/anaconda.sh && \
         /bin/bash ~/anaconda.sh -b -p /opt/conda && \
@@ -29,3 +29,6 @@ RUN conda update conda \
 RUN echo "conda activate pytorch_env" >> ~/.bashrc
 ENV PATH /opt/conda/envs/pytorch_env/bin:$PATH
 ENV CONDA_DEFAULT_ENV $pytorch_env
+
+WORKDIR /media/parmida/Work/DeepLIIF
+COPY . .
