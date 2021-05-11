@@ -73,6 +73,29 @@ python test.py --dataroot /path/to/input/images
 ## Demo:
 Change the DeepLIIF_path to the path of DeepLIIF project. Set input_path to the directory containing the input images and python_run_path to the path of python run file. It saves the modalities to the input directory next to each image.
 
+## Docker File:
+You can use the docker file to create the docker image for running the model.
+First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
+After installing the Docker, you need to follow these steps:
+* Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
+* To create a docker image from the docker file:
+```
+docker build -t DeepLIIF_Image .
+```
+The image is then used as a base. You can copy and use it to run an application. The application needs an isolated environment in which to run, referred to as a container.
+* To create and run a container:
+```
+docker run --gpus all --name DeepLIIF_Container -it DeepLIIF_Image
+```
+When you run a container from the image, a conda environment is activated in the specified WORKDIR.
+You can easily run the preprocessing.py, postprocessing.py, train.py and test.py in the activated environment and copy the results from the docker container to the host.
+* A quick sample of testing the pre-trained model on the sample images:
+```
+python preprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/test/
+python test.py --dataroot Sample_Data_Tiled/ --name deepLIIF_model --model DeepLIIF
+python postprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/test/ --input_orig_dir Sample_Data/
+```
+
 ## More options?
 You can find more options in:
 * **/DeepLIIF/options/base_option.py** for basic options for training and testing purposes. 
