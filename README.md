@@ -68,7 +68,7 @@ python test.py --dataroot /path/to/input/images
                --model DeepLIIF
 ```
 * The test results will be by default saved to /DeepLIIF/results/Model_Name/test_latest/images.
-* Pretrained models can be downloaded here. Place the pretrained model in /DeepLIIF/checkpoints/deepLIIF_model and set the Model_Name as deepLIIF_model.
+* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YJvi8kNKhH4). Place the pretrained model in /DeepLIIF/checkpoints/deepLIIF_model and set the Model_Name as deepLIIF_model.
 
 ## Demo:
 Change the DeepLIIF_path to the path of DeepLIIF project. Set input_path to the directory containing the input images and python_run_path to the path of python run file. It saves the modalities to the input directory next to each image.
@@ -77,6 +77,7 @@ Change the DeepLIIF_path to the path of DeepLIIF project. Set input_path to the 
 You can use the docker file to create the docker image for running the model.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
+* Download the pretrained model and place them in /DeepLIIF/checkpoints/deepLIIF_model.
 * Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
 * To create a docker image from the docker file:
 ```
@@ -108,6 +109,9 @@ Please report all issues on the public forum.
 
 ## License
 © This code is made available under the GPLv3 License and is available for non-commercial academic purposes. 
+
+## Acknowledgments
+* This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 
 ## Reference
 If you find our work useful in your research or if you use parts of this code please consider citing our paper:
