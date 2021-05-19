@@ -15,7 +15,7 @@ class DeepLIIFModel(BaseModel):
         BaseModel.__init__(self, opt)
 
         # weights of the modalities in generating segmentation mask
-        self.seg_weights = [0.5, 0.15, 0.25, 0.1]
+        self.seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
 
         # loss weights in calculating the final loss
         self.loss_G_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
@@ -35,14 +35,14 @@ class DeepLIIFModel(BaseModel):
             for i in range(1, self.opt.targets_no):
                 self.model_names.extend(['G' + str(i), 'D' + str(i)])
 
-            for i in range(1, self.opt.targets_no):
+            for i in range(1, self.opt.targets_no+1):
                 self.model_names.extend(['G5' + str(i), 'D5' + str(i)])
         else:  # during test time, only load G
             self.model_names = []
             for i in range(1, self.opt.targets_no):
                 self.model_names.extend(['G' + str(i)])
 
-            for i in range(1, self.opt.targets_no):
+            for i in range(1, self.opt.targets_no+1):
                 self.model_names.extend(['G5' + str(i)])
 
         # define networks (both generator and discriminator)
@@ -62,6 +62,8 @@ class DeepLIIFModel(BaseModel):
         self.netG53 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'unet_512', opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
         self.netG54 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'unet_512', opt.norm,
+                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+        self.netG55 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'unet_512', opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
 
@@ -83,6 +85,8 @@ class DeepLIIFModel(BaseModel):
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
             self.netD54 = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+            self.netD55 = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
+                                          opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
 
         if self.isTrain:
             # define loss functions
@@ -91,10 +95,10 @@ class DeepLIIFModel(BaseModel):
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters())
+            params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
             self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
-            params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters())
+            params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters()) + list(self.netD55.parameters())
             self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
             self.optimizers.append(self.optimizer_G)
@@ -128,10 +132,12 @@ class DeepLIIFModel(BaseModel):
         self.fake_B_5_2 = self.netG52(self.fake_B_1)    # Segmentation mask generator from Hematoxylin input image
         self.fake_B_5_3 = self.netG53(self.fake_B_2)    # Segmentation mask generator from mpIF DAPI input image
         self.fake_B_5_4 = self.netG54(self.fake_B_3)    # Segmentation mask generator from mpIF Lap2 input image
+        self.fake_B_5_5 = self.netG55(self.fake_B_4)    # Segmentation mask generator from mpIF Lap2 input image
         self.fake_B_5 = torch.stack([torch.mul(self.fake_B_5_1, self.seg_weights[0]),
                                      torch.mul(self.fake_B_5_2, self.seg_weights[1]),
                                      torch.mul(self.fake_B_5_3, self.seg_weights[2]),
-                                     torch.mul(self.fake_B_5_4, self.seg_weights[3])]).sum(dim=0)
+                                     torch.mul(self.fake_B_5_4, self.seg_weights[3]),
+                                     torch.mul(self.fake_B_5_5, self.seg_weights[4])]).sum(dim=0)
 
     def backward_D(self):
         """Calculate GAN loss for the discriminators"""
@@ -149,17 +155,20 @@ class DeepLIIFModel(BaseModel):
         fake_AB_5_2 = torch.cat((self.real_B_1, self.fake_B_5), 1)  # Conditional GANs; feed Hematoxylin input and Segmentation mask output to the discriminator
         fake_AB_5_3 = torch.cat((self.real_B_2, self.fake_B_5), 1)  # Conditional GANs; feed mpIF DAPI input and Segmentation mask output to the discriminator
         fake_AB_5_4 = torch.cat((self.real_B_3, self.fake_B_5), 1)  # Conditional GANs; feed mpIF Lap2 input and Segmentation mask output to the discriminator
+        fake_AB_5_5 = torch.cat((self.real_B_4, self.fake_B_5), 1)  # Conditional GANs; feed mpIF Lap2 input and Segmentation mask output to the discriminator
 
         pred_fake_5_1 = self.netD51(fake_AB_5_1.detach())
         pred_fake_5_2 = self.netD52(fake_AB_5_2.detach())
         pred_fake_5_3 = self.netD53(fake_AB_5_3.detach())
         pred_fake_5_4 = self.netD54(fake_AB_5_4.detach())
+        pred_fake_5_5 = self.netD55(fake_AB_5_5.detach())
 
         pred_fake_5 = torch.stack(
             [torch.mul(pred_fake_5_1, self.seg_weights[0]),
              torch.mul(pred_fake_5_2, self.seg_weights[1]),
              torch.mul(pred_fake_5_3, self.seg_weights[2]),
-             torch.mul(pred_fake_5_4, self.seg_weights[3])]).sum(dim=0)
+             torch.mul(pred_fake_5_4, self.seg_weights[3]),
+             torch.mul(pred_fake_5_5, self.seg_weights[4])]).sum(dim=0)
 
         self.loss_D_fake_1 = self.criterionGAN_BCE(pred_fake_1, False)
         self.loss_D_fake_2 = self.criterionGAN_BCE(pred_fake_2, False)
@@ -182,17 +191,20 @@ class DeepLIIFModel(BaseModel):
         real_AB_5_2 = torch.cat((self.real_B_1, self.real_B_5), 1)
         real_AB_5_3 = torch.cat((self.real_B_2, self.real_B_5), 1)
         real_AB_5_4 = torch.cat((self.real_B_3, self.real_B_5), 1)
+        real_AB_5_5 = torch.cat((self.real_B_4, self.real_B_5), 1)
 
         pred_real_5_1 = self.netD51(real_AB_5_1)
         pred_real_5_2 = self.netD52(real_AB_5_2)
         pred_real_5_3 = self.netD53(real_AB_5_3)
         pred_real_5_4 = self.netD54(real_AB_5_4)
+        pred_real_5_5 = self.netD55(real_AB_5_5)
 
         pred_real_5 = torch.stack(
             [torch.mul(pred_real_5_1, self.seg_weights[0]),
              torch.mul(pred_real_5_2, self.seg_weights[1]),
              torch.mul(pred_real_5_3, self.seg_weights[2]),
-             torch.mul(pred_real_5_4, self.seg_weights[3])]).sum(dim=0)
+             torch.mul(pred_real_5_4, self.seg_weights[3]),
+             torch.mul(pred_real_5_5, self.seg_weights[4])]).sum(dim=0)
 
         self.loss_D_real_1 = self.criterionGAN_BCE(pred_real_1, True)
         self.loss_D_real_2 = self.criterionGAN_BCE(pred_real_2, True)
@@ -221,6 +233,7 @@ class DeepLIIFModel(BaseModel):
         fake_AB_5_2 = torch.cat((self.real_B_1, self.fake_B_5), 1)
         fake_AB_5_3 = torch.cat((self.real_B_2, self.fake_B_5), 1)
         fake_AB_5_4 = torch.cat((self.real_B_3, self.fake_B_5), 1)
+        fake_AB_5_5 = torch.cat((self.real_B_4, self.fake_B_5), 1)
 
         pred_fake_1 = self.netD1(fake_AB_1)
         pred_fake_2 = self.netD2(fake_AB_2)
@@ -231,11 +244,13 @@ class DeepLIIFModel(BaseModel):
         pred_fake_5_2 = self.netD52(fake_AB_5_2)
         pred_fake_5_3 = self.netD53(fake_AB_5_3)
         pred_fake_5_4 = self.netD54(fake_AB_5_4)
+        pred_fake_5_5 = self.netD55(fake_AB_5_5)
         pred_fake_5 = torch.stack(
             [torch.mul(pred_fake_5_1, self.seg_weights[0]),
              torch.mul(pred_fake_5_2, self.seg_weights[1]),
              torch.mul(pred_fake_5_3, self.seg_weights[2]),
-             torch.mul(pred_fake_5_4, self.seg_weights[3])]).sum(dim=0)
+             torch.mul(pred_fake_5_4, self.seg_weights[3]),
+             torch.mul(pred_fake_5_5, self.seg_weights[4])]).sum(dim=0)
 
         self.loss_G_GAN_1 = self.criterionGAN_BCE(pred_fake_1, True)
         self.loss_G_GAN_2 = self.criterionGAN_BCE(pred_fake_2, True)
@@ -269,6 +284,7 @@ class DeepLIIFModel(BaseModel):
         self.set_requires_grad(self.netD52, True)  # enable backprop for D52
         self.set_requires_grad(self.netD53, True)  # enable backprop for D53
         self.set_requires_grad(self.netD54, True)  # enable backprop for D54
+        self.set_requires_grad(self.netD55, True)  # enable backprop for D54
 
         self.optimizer_D.zero_grad()     # set D's gradients to zero
         self.backward_D()                # calculate gradients for D
@@ -283,6 +299,7 @@ class DeepLIIFModel(BaseModel):
         self.set_requires_grad(self.netD52, False)  # D52 requires no gradients when optimizing G52
         self.set_requires_grad(self.netD53, False)  # D53 requires no gradients when optimizing G53
         self.set_requires_grad(self.netD54, False)  # D54 requires no gradients when optimizing G54
+        self.set_requires_grad(self.netD55, False)  # D54 requires no gradients when optimizing G54
 
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G

@@ -1,6 +1,6 @@
-"""General-purpose training script for image-to-image translation.
+"""General-purpose training script for multi-task image-to-image translation.
 
-This script works for various models (with option '--model': e.g., pix2pix, cyclegan, colorization) and
+This script works for various models (with option '--model': e.g., DeepLIIF) and
 different datasets (with option '--dataset_mode': e.g., aligned, unaligned, single, colorization).
 You need to specify the dataset ('--dataroot'), experiment name ('--name'), and model ('--model').
 

@@ -16,6 +16,7 @@ class ProcessingOptions():
         # basic parameters
         parser.add_argument('--input_dir', required=True, help='path to input images')
         parser.add_argument('--output_dir', required=True, help='path to output images')
+        parser.add_argument('--validation_ratio', required=False, type=float, default=0.2, help='the ratio of the number of the images in the validation set to the total number of images.')
         parser.add_argument('--input_orig_dir', required=False, type=str, default='', help='path to original whole slide images')
         parser.add_argument('--resize_size', required=False, default=None, help='resizing size of the whole slide image')
         parser.add_argument('--image_size', required=False, default=None, help='size of the original whole slide image')

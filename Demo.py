@@ -6,16 +6,20 @@ image_extensions = ['png', 'jpg', 'tif']
 
 DeepLIIF_path = '/media/parmida/Work/DeepLIIF'   # path to the DeppLIIF directory
 
-input_path = '/media/parmida/Work/Marker_Datasets/TMA'   # path to the folder containing images
-output_images_path = '/media/parmida/Work/Marker_Datasets/TMA_modalities'   # path to save the output images (modalities)
+# input_path = '/media/parmida/Work/Marker_Datasets/TMA'   # path to the folder containing images
+input_path = '/home/parmida/Desktop/Tissues4'   # path to the folder containing images
+# output_images_path = '/media/parmida/Work/Marker_Datasets/TMA_modalities'   # path to save the output images (modalities)
+output_images_path = '/media/parmida/Work/Marker_Datasets/Tissues_Results2'   # path to save the output images (modalities)
 
 python_run_path = '/home/parmida/miniconda3/envs/pytorch_env/bin/python'    # path to the python run file
+
 
 test_file_path = os.path.join(DeepLIIF_path, 'test.py')
 preprocessing_file_path = os.path.join(DeepLIIF_path, 'preprocessing.py')
 postprocessing_file_path = os.path.join(DeepLIIF_path, 'postprocessing.py')
 
-model_name = 'deepLIIF_model'
+# model_name = 'deepLIIF_model'
+model_name = 'DeepLIIF_Model'
 # checkpoints_path = '/home/parmida/pytorch_multi_task_pix2pix/checkpoints'
 checkpoints_path = os.path.join(DeepLIIF_path, 'checkpoints')
 # results_path = '/home/parmida/pytorch_multi_task_pix2pix/results'
