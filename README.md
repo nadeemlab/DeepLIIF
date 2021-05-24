@@ -1,8 +1,6 @@
 ### DeepLIIF: Deep-Learning Inferred Multiplex Immunofluoresence for IHC Quantification
 
-[Paper](https://www.biorxiv.org/content/10.1101/2021.05.01.442219v1)
-/[Code](https://github.com/nadeemlab/DeepLIIF)
-/[Colab](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing)
+[Read Link](https://www.biorxiv.org/content/10.1101/2021.05.01.442219v1) | [Google CoLab Demo](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing)
 
 *Reporting biomarkers assessed by routine immunohistochemical (IHC) staining of tissue is broadly used in diagnostic pathology laboratories for patient care. To date, clinical reporting is predominantly qualitative or semi-quantitative. By creating a multitask deep learning framework referred to as DeepLIIF, we are presenting a single step solution to nuclear segmentation and quantitative single-cell IHC scoring. Leveraging a unique de novo dataset of co-registered IHC and multiplex immunoflourescence (mpIF) data generated from the same tissue section, we simultaneously segment and translate low-cost and prevalent IHC slides to more expensive-yet-informative mpIF images. Moreover, a nuclear-pore marker, LAP2beta, is co-registered to improve cell segmentation and protein expression quantification on IHC slides. By formulating the IHC quantification as cell instance segmentation/classification rather than cell detection problem, we show that our model trained on clean IHC Ki67 data can generalize to more noisy and artifact-ridden images as well as other nuclear and non-nuclear markers such as CD3, CD8, BCL2, BCL6, MYC, MUM1, CD10 and TP53. We thoroughly evaluate our method on publicly available benchmark datasets as well as against pathologists’ semi-quantitative scoring.*
 
@@ -104,10 +102,6 @@ Change the DeepLIIF_path to the path of DeepLIIF project.
 Set input_path to the directory containing the input images and python_run_path to the python executable (path to installed python directory). 
 It saves the modalities to the input directory next to each image.
 
-## Colab:
-You can train and test your models using Google Colab, if you do not have a proper GPU.
-Please follow the steps in the [provided Colab notebook](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) to run the training and testing scripts.
-
 ## Docker File:
 You can use the docker file to create the docker image for running the model.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
@@ -131,6 +125,12 @@ python preprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/
 python test.py --dataroot Sample_Data_Tiled/ --name DeepLIIF_Model --model DeepLIIF
 python postprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/test/ --input_orig_dir Sample_Data/
 ```
+
+## Google CoLab:
+If you don't have access to GPU or appropriate hardware, we have also created [Google CoLab project](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) for your convenience. 
+Please follow the steps in the [provided Colab notebook](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) to install the requirements and run the training and testing scripts.
+All the libraries and pretrained models have already been set up there. 
+The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
 
 ## More options?
 You can find more options in:
