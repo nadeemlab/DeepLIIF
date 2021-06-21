@@ -21,7 +21,7 @@ visdom>=0.1.8.3
 
 ## Dataset:
 All image pairs must be 512x512 and paired together in 3072x512 images (6 images of size 512x512 stitched together horizontally). 
-For testing purpose, for any unavailable image in the pairing set, just put the original IHC image or a blank image in the final paired image in place of the missing image in the pair (example images are provided in the Dataset folder). 
+For testing purpose, for any unavailable image in the pairing set, just put the original IHC image or a blank image in the final paired image in place of the missing image in the pair (example images are provided in the Dataset folder). For testing, you can skip stitching the images and only put the original IHC image in the test folder, but make sure to set the --dataset_mode to 'single'. 
 Data needs to be arranged in the following order:
 ```
 XXX_Dataset 
