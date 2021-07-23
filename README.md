@@ -138,8 +138,9 @@ You can find more options in:
 * **DeepLIIF/options/test_options.py** for advanced testing options.
 * **DeepLIIF/options/processing_options.py** for advanced pre/post-processing options.
 
-## TO DOs:
-* Tumor immune cell inference
+## COMING SOON:
+* Additional multiplex tumor (PanCK) and immune cell (CD3) inference given just IHC/H&E images.
+* Self-configurable DeepLIIF which configures itself according to co-registered IHC/H&E, multiplex modalities, and semantic segmentation training input to achieve optimal performance on the task-of-interest.
 
 ## Issues
 Please report all issues on the public forum.
