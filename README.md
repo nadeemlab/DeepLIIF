@@ -59,6 +59,7 @@ python train.py --dataroot /path/to/input/images
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
 * To epoch-wise intermediate training results, DeepLIIF/checkpoints/Model_Name/web/index.html
 * Trained models will be by default save in DeepLIIF/checkpoints/Model_Name.
+* Training datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
 ## Testing:
 To test the model:
@@ -70,7 +71,7 @@ python test.py --dataroot /path/to/input/images
 * The test results will be by default saved to DeepLIIF/results/Model_Name/test_latest/images.
 * Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4) (DeepLIIF_Model or DeepLIIF_V2_Model). Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Model and set the Model_Name as DeepLIIF_Model.
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
-
+* Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
 ## Pre-processing:
 Using this script, you can prepare large tissue for testing purposes. It breaks large images into tiles of size 512x512 and create a 3072x512 image for each tile. Then, stores the generated tiles in the given directory.
