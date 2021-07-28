@@ -156,7 +156,7 @@ Please report all issues on the public forum.
 If you find our work useful in your research or if you use parts of this code please consider citing our paper:
 ```
 @article{ghahremani2021deepliif,
-  title={DeepLIIF: Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Quantification},
+  title={DeepLIIF: Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
   journal={bioRxiv},
   year={2021},
