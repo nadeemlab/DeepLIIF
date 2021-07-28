@@ -12,9 +12,11 @@ cd ../../..
 
 mv ./Datasets/Dataset1/train/DeepLIIF_Training_Set/*.png ./Datasets/Dataset1/train/
 rm ./Datasets/Dataset1/train/DeepLIIF_Training_Set.zip
+rm -r ./Datasets/Dataset1/train/DeepLIIF_Training_Set
 
 mv ./Datasets/Dataset1/train/BC-DeepLIIF_Training_Set/*.png ./Datasets/Dataset1/train/
 rm ./Datasets/Dataset1/train/BC-DeepLIIF_Training_Set.zip
+rm -r ./Datasets/Dataset1/train/BC-DeepLIIF_Training_Set
 
 
 
@@ -30,8 +32,10 @@ unzip BC-DeepLIIF_Validation_Set.zip
 
 cd ../../..
 
-mv ./Datasets/Dataset1/val/DeepLIIF_Validation_Set/*.png ./Datasets/Dataset1/train/
+mv ./Datasets/Dataset1/val/DeepLIIF_Validation_Set/*.png ./Datasets/Dataset1/val/
 rm ./Datasets/Dataset1/val/DeepLIIF_Validation_Set.zip
+rm -r ./Datasets/Dataset1/val/DeepLIIF_Validation_Set
 
-mv ./Datasets/Dataset1/val/BC-DeepLIIF_Validation_Set/*.png ./Datasets/Dataset1/train/
+mv ./Datasets/Dataset1/val/BC-DeepLIIF_Validation_Set/*.png ./Datasets/Dataset1/val/
 rm ./Datasets/Dataset1/val/BC-DeepLIIF_Validation_Set.zip
+rm -r ./Datasets/Dataset1/val/BC-DeepLIIF_Validation_Set
