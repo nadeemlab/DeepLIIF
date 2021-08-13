@@ -74,7 +74,7 @@ python test.py --dataroot /path/to/input/images
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-## Pre-processing:
+## Pre-processing Large Tissues:
 Using this script, you can prepare large tissue for testing purposes. It breaks large images into tiles of size 512x512 and create a 3072x512 image for each tile. Then, stores the generated tiles in the given directory.
 ```
 python preprocessing.py --input_dir /path/to/input/images 
@@ -85,7 +85,7 @@ python preprocessing.py --input_dir /path/to/input/images
                         --resize_size
 ```
 
-## Post-processing:
+## Post-processing Large Tissues:
 This script is used for testing purposes. It can be used to post-process the results of the model tested on the images tiled by pre-processing script. 
 It stitches the generated tiles with the given overlap_size to create the inferred images for the original images and saves the generated images with the proper postfixes in the given directory.
 ```
@@ -96,6 +96,12 @@ python postprocessing.py --input_dir /path/to/preprocessed/images
                          --overlap_size overlap_size_between_crops 
                          --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
                          --resize_size resizing_size
+```
+
+## Post-processing Segmentation Mask:
+Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells.
+```
+python PostProcessSegmentationMask.py /path/to/output/images/generated/by/model/
 ```
 
 ## Demo:
