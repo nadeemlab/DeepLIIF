@@ -56,6 +56,7 @@ def align_seg_on_image(input_image, input_mask, output_image, thresh=100, noise_
     orig_image = cv2.cvtColor(cv2.imread(input_image), cv2.COLOR_BGR2RGB)
 
     final_mask = orig_image.copy()
+    processed_mask = np.zeros_like(orig_image)
 
     red = seg_image[:,:,0]
     blue = seg_image[:,:,2]
@@ -97,7 +98,20 @@ def align_seg_on_image(input_image, input_mask, output_image, thresh=100, noise_
                                            cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(final_mask, contours, -1, (0, 0, 255), 2)
 
+
+    processed_mask[positive_cells > 0] = (0, 0, 255)
+    processed_mask[negative_cells > 0] = (255, 0, 0)
+
+    contours, hierarchy = cv2.findContours(positive_cells,
+                                           cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    cv2.drawContours(processed_mask, contours, -1, (0, 255, 0), 2)
+
+    contours, hierarchy = cv2.findContours(negative_cells,
+                                           cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    cv2.drawContours(processed_mask, contours, -1, (0, 255, 0), 2)
+
     cv2.imwrite(output_image, cv2.cvtColor(final_mask, cv2.COLOR_BGR2RGB))
+    cv2.imwrite(output_image.replace('_Segmentation_Overlaid', '_Segmentation_Refined'), cv2.cvtColor(processed_mask, cv2.COLOR_BGR2RGB))
 
 
 if __name__ == '__main__':
