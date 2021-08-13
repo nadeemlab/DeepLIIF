@@ -99,7 +99,7 @@ python postprocessing.py --input_dir /path/to/preprocessed/images
 ```
 
 ## Post-processing Segmentation Mask:
-Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells.
+Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells. It also refines the generated segmentation mask by removing the noises. It saves the overlaid image and the refined mask in the same directory.
 ```
 python PostProcessSegmentationMask.py /path/to/output/images/generated/by/model/
 ```
