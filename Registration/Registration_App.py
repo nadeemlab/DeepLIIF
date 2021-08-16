@@ -172,9 +172,6 @@ class RegistrationApp:
         moving_image_copy = self.crop_moving.copy()
         base_image_copy = base_image_copy.resize((self.blended_canvas_size, self.blended_canvas_size))
         moving_image_copy = moving_image_copy.resize((self.blended_canvas_size, self.blended_canvas_size))
-        # self.blended_img = Image.new("RGBA", base_image_copy.size)
-        # self.blended_img = Image.alpha_composite(self.blended_img, base_image_copy)
-        # self.blended_img = Image.alpha_composite(self.blended_img, moving_image_copy)
         self.blended_img = Image.blend(base_image_copy, moving_image_copy, 0.5)
         self.tk_blended_img = ImageTk.PhotoImage(master=self.window, image=self.blended_img)
         self.canvas_blended.create_image(int(self.blended_canvas_size / 2) + self.padding,
@@ -198,10 +195,6 @@ class RegistrationApp:
         zoom_y_val = int(self.zoom_y_text_box.get())
         if self.zoom_value >= 0:
             image_size = self.moving_img.size
-            zoomed_image = crop_aligned.crop((zoom_y_val * self.zoom_value,
-                                              zoom_x_val * self.zoom_value,
-                                              image_size[1] - zoom_y_val * self.zoom_value,
-                                              image_size[0] - zoom_x_val * self.zoom_value)).resize((image_size[1], image_size[0]))
             zoomed_image = crop_aligned.crop((zoom_x_val * self.zoom_value,
                                               zoom_y_val * self.zoom_value,
                                               image_size[0] - zoom_x_val * self.zoom_value,
@@ -219,25 +212,10 @@ class RegistrationApp:
         self.crop_moving = zoomed_image
         print(self.alignment_values)
         print(self.zoom_value)
-        # self.crop_moving.show()
         self.create_blended_image()
 
     def save_image(self):
         print('SAVE CLICKED')
-        #tiff.imsave(self.output_dir + 'Scene' + self.scene_number + '_brown_' + str(self.start_index_i) + '_' + str(self.end_index_i) + '_' + str(
-        #   self.start_index_j) + '_' + str(self.end_index_j) + '.tif', self.crop_brown)
-        # imsave(self.output_dir +
-        #             str(self.start_index_i) + '_' +
-        #             str(self.start_index_j) + '_' +
-        #             str(self.start_index_i + self.alignment_values[1]) + '_' +
-        #             str(self.start_index_j + self.alignment_values[0])
-        #             + '_image1.png', self.crop_brown)
-        # imsave(self.output_dir +
-        #             str(self.start_index_i) + '_' +
-        #             str(self.start_index_j) + '_' +
-        #             str(self.start_index_i + self.alignment_values[1]) + '_' +
-        #             str(self.start_index_j + self.alignment_values[0])
-        #             + '_image4.png', self.crop_blue)
         files = [('All Files', '*.*'),
                  ('PNG Files', '*.png'),
                  ('TIF Files', '*.tif'),
@@ -245,12 +223,8 @@ class RegistrationApp:
         new_filename = self.filename.split('/')[-1]
         last_dot_index = new_filename.rfind('.')
         save_file = fd.asksaveasfile(mode='w', initialfile=new_filename[0:last_dot_index] + '_registered' + new_filename[last_dot_index:],filetypes=files, defaultextension=files)
-        # save_file.write(np.asarray(self.crop_moving))
         abs_path = os.path.abspath(save_file.name)
         self.crop_moving.save(abs_path)
-        # self.crop_moving.save(save_file, new_filename[last_dot_index+1:])
-        # imsave(self.output_dir + self.available_files[self.image_index]['name']
-        #             + '_hematoxylin.tif', self.crop_blue)
 
     def initial_load(self):
         self.base_img = Image.fromarray(np.zeros((self.base_canvas_size, self.base_canvas_size, 3), dtype=np.uint8))
@@ -301,34 +275,6 @@ class RegistrationApp:
     def rotate_left(self):
         self.rotate_value += int(self.rotate_value_text_box.get())
         self.reload_moving_image()
-
-    def adjust_gamma(self, image, gamma=1.0):
-        # build a lookup table mapping the pixel values [0, 255] to
-        # their adjusted gamma values
-        invGamma = 1.0 / gamma
-        table = np.array([((i / 255.0) ** invGamma) * 255
-                          for i in np.arange(0, 256)]).astype("uint8")
-        # apply gamma correction using the lookup table
-        return cv2.LUT(image, table)
-
-    def next_starting(self):
-        self.image_index += 1
-        # self.start_index_j += self.height
-        # if self.start_index_j >= self.cols:
-        #     self.start_index_j = 0
-        #     # self.alignment_values[1] = 0
-        #     self.start_index_i += self.width
-        #     if self.start_index_i >= self.rows:
-        #         return
-            # else:
-            #     self.alignment_values[0] = 0
-
-    def next_image(self):
-        print('-----------------------------------------')
-        print(self.start_index_i, self.start_index_j)
-        self.next_starting()
-        print(self.start_index_i, self.start_index_j)
-        self.create_mask_image()
 
 
 if __name__ == '__main__':
