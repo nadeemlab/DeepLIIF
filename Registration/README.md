@@ -26,7 +26,7 @@ python Registration_App.py
 * Ater loading both images, you will see the moving image overlaid on top of the base image.
 * **Translation:** Using the 'Left', 'Right', 'Up', and 'Down' buttons, you can move the moving image to the left, right, up, and down. You can change the translation value using the text box in the middle of the alignment buttons.
 * **Scaling:** Using the 'Zoom in' and 'Zoom out' button, you can change the scale of the moving image. You can set the vertical and horizontal scaling value using the provided text boxes under the zoom buttons.
-* **Rotation:** You can rotate the moving image using the provided buttons.
+* **Rotation:** You can rotate the moving image using the provided buttons. You can set the rotation angle in the provided text box between two buttons!
 
 
 ## Issues
