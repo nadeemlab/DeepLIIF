@@ -140,7 +140,7 @@ All the libraries and pretrained models have already been set up there.
 The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
 
 ## Registration:
-To register the acquired mpIF images over the IHC images, you can use the registration framework in the 'Registration directory. Please refer to the README file provided in the same directory for more details.
+To register the denovo stained mpIF and IHC images, you can use the registration framework in the 'Registration' directory. Please refer to the README file provided in the same directory for more details.
 
 ## More options?
 You can find more options in:
