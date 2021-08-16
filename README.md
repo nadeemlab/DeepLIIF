@@ -139,12 +139,16 @@ Please follow the steps in the provided notebook to install the requirements and
 All the libraries and pretrained models have already been set up there. 
 The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
 
+## Registration:
+To register the acquired mpIF images over the IHC images, you can use the registration framework in the 'Registration directory. Please refer to the README file provided in the same directory for more details.
+
 ## More options?
 You can find more options in:
 * **DeepLIIF/options/base_option.py** for basic options for training and testing purposes. 
 * **DeepLIIF/options/train_options.py** for advanced training options.
 * **DeepLIIF/options/test_options.py** for advanced testing options.
 * **DeepLIIF/options/processing_options.py** for advanced pre/post-processing options.
+* **DeepLIIF/options/Registration_App.py** for registering pathology crops and slides.
 
 ## Issues
 Please report all issues on the public forum.
