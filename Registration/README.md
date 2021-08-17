@@ -30,7 +30,7 @@ Please report all issues on the public forum.
 © [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
 
 ## Reference
-If you find our work useful in your research or if you use parts of this code please consider citing our paper:
+If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
 @article{ghahremani2021deepliif,
   title={DeepLIIF: Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Quantification},
