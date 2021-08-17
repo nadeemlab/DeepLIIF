@@ -1,4 +1,4 @@
-### DeepLIIF: Deep-Learning Inferred Multiplex Immunofluoresence for IHC Quantification
+### DeepLIIF: Deep-Learning Inferred Multiplex Immunofluoresence for IHC Image Quantification
 
 © This code is made available for non-commercial academic purposes.
 
@@ -27,10 +27,7 @@ python Registration_App.py
 Please report all issues on the public forum.
 
 ## License
-© DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
-
-## Acknowledgments
-* This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
+© [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
 
 ## Reference
 If you find our work useful in your research or if you use parts of this code please consider citing our paper:
