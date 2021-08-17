@@ -160,7 +160,7 @@ Please report all issues on the public forum.
 * This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 
 ## Reference
-If you find our work useful in your research or if you use parts of this code please consider citing our paper:
+If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
 @article{ghahremani2021deepliif,
   title={DeepLIIF: Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
