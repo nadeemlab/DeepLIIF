@@ -55,7 +55,7 @@ We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI
 
 In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are shown in Figure 2.
 
-![IHC_Gen_image](./images/IHC_Gen.png)**Figure1**. *Overview of synthetic IHC image generation. (a) A training sample of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
+![IHC_Gen_image](./images/IHC_Gen.png)**Figure2**. *Overview of synthetic IHC image generation. (a) A training sample of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
 
 We created a new dataset using the original IHC images and synthetic IHC images. We synthesize each image in the dataset two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can find the new trained model [here](https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1).
 
