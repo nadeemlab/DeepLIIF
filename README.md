@@ -6,7 +6,7 @@
 
 © This code is made available for non-commercial academic purposes.
 
-![overview_image](./images/overview.png)**Figure**. *Overview of DeepLIIF pipeline and sample input IHCs (different brown/DAB markers -- BCL2, BCL6, CD10, CD3/CD8, Ki67) with corresponding DeepLIIF-generated hematoxylin/mpIF modalities and classified (positive (red) and negative (blue) cell) segmentation masks. (a) Overview of DeepLIIF. Given an IHC input, our multitask deep learning framework simultaneously infers corresponding Hematoxylin channel, mpIF DAPI, mpIF protein expression (Ki67, CD3, CD8, etc.), and the positive/negative protein cell segmentation, baking explainability and interpretability into the model itself rather than relying on coarse activation/attention maps. In the segmentation mask, the red cells denote cells with positive protein expression (brown/DAB cells in the input IHC), whereas blue cells represent negative cells (blue cells in the input IHC). (b) Example DeepLIIF-generated hematoxylin/mpIF modalities and segmentation masks for different IHC markers. DeepLIIF, trained on clean IHC Ki67 nuclear marker images, can generalize to noisier as well as other IHC nuclear/cytoplasmic marker images.*
+![overview_image](./images/overview.png)**Figure1**. *Overview of DeepLIIF pipeline and sample input IHCs (different brown/DAB markers -- BCL2, BCL6, CD10, CD3/CD8, Ki67) with corresponding DeepLIIF-generated hematoxylin/mpIF modalities and classified (positive (red) and negative (blue) cell) segmentation masks. (a) Overview of DeepLIIF. Given an IHC input, our multitask deep learning framework simultaneously infers corresponding Hematoxylin channel, mpIF DAPI, mpIF protein expression (Ki67, CD3, CD8, etc.), and the positive/negative protein cell segmentation, baking explainability and interpretability into the model itself rather than relying on coarse activation/attention maps. In the segmentation mask, the red cells denote cells with positive protein expression (brown/DAB cells in the input IHC), whereas blue cells represent negative cells (blue cells in the input IHC). (b) Example DeepLIIF-generated hematoxylin/mpIF modalities and segmentation masks for different IHC markers. DeepLIIF, trained on clean IHC Ki67 nuclear marker images, can generalize to noisier as well as other IHC nuclear/cytoplasmic marker images.*
 
 ## Prerequisites:
 ```del
@@ -48,6 +48,16 @@ Then it reads the IHC images in the folder and saves a pair in the test director
 python PrepareDataForTesting.py --input_dir /path/to/input/images
                                 --output_dir /path/to/dataset/directory
 ```
+
+## Synthetic Data Generation:
+Our trained model's primary issue was its inability to separate positive cells in some large clusters, resulting from the absence of clustered positive cells in our training data. To infuse more information about the clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using co-registered data. 
+We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI image, and the segmentation mask and generates the corresponding IHC image. The model converts the Hematoxylin channel to gray-scale to infer more helpful information such as the texture and discard unnecessary information such as color. The Hematoxylin image guides the network to synthesize the background of the IHC image by preserving the shape and texture of the cells and artifacts in the background. The DAPI image assists the network in identifying the location, shape, and texture of the cells to better isolate the cells from the background. The segmentation mask helps the network specify the color of cells based on the type of the cell (positive cell: a brown hue, negative: a blue hue).
+
+In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are shown in Figure 2.
+
+![IHC_Gen_image](./images/IHC_Gen.png)**Figure1**. *Overview of synthetic IHC image generation. (a) A training sample of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
+
+We created a new dataset using the original IHC images and synthetic IHC images. We synthesize each image in the dataset two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can find the new trained model [here](https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1).
 
 ## Training:
 To train a model:
