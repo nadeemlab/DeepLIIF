@@ -1,4 +1,6 @@
+<p align="center">
 <img src="./images/DeepLIIF_logo.png" width="50%">
+</p>
 
 ### DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification
 
