@@ -83,7 +83,7 @@ python test.py --dataroot /path/to/input/images
                --model DeepLIIF
 ```
 * The test results will be by default saved to DeepLIIF/results/Model_Name/test_latest/images.
-* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4). **You can find two pre-trained models: (1) DeepLIIF_Model_V1: This is the one reported in the paper, and (2) DeepLIIF_Model_V2: This is the improved version which includes the BCDataset and the new generated synthetic IHC data (mentioned above) in training.**
+* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4). **You can find two pre-trained models: (1) DeepLIIF_Model_V1: This is the one reported in the paper, and (2) DeepLIIF_Model_: This is the improved version which includes the BCDataset and the new generated synthetic IHC data (mentioned above) in training.**
 * Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Model and set the Model_Name as DeepLIIF_Model.
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
@@ -155,6 +155,11 @@ The user can directly run DeepLIIF on their images using the instructions given 
 
 ## Registration:
 To register the denovo stained mpIF and IHC images, you can use the registration framework in the 'Registration' directory. Please refer to the README file provided in the same directory for more details.
+
+## Contributing Training Data:
+To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC images using affine transformations, resulting in 1667 registered sets of IHC images and the other modalities of size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. We also randomly selected and segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (targeting cell detection as opposed to cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test set varies widely in the density of tumor cells and the Ki67 index. You can find these datasets [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&E/IHC and multiplex images and produce the optimal output. If you are generating or have generated H&E/IHC and multiplex staining for the same slide (denovo staining) and would like to contribute that data for DeepLIIF, we can perform co-registration, whole-cell multiplex segmentation, train the DeepLIIF model and release back to the community with full credit to the contributors.
+
 
 ## More options?
 You can find more options in:
