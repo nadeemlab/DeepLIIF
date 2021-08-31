@@ -1,3 +1,6 @@
+![log_image](./images/DeepLIIF_logo.png)
+
+
 ### DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification
 
 [Read Link](https://www.biorxiv.org/content/10.1101/2021.05.01.442219v3) | [Google CoLab Demo](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) | [Docker](#docker-file)
