@@ -83,7 +83,7 @@ python test.py --dataroot /path/to/input/images
                --model DeepLIIF
 ```
 * The test results will be by default saved to DeepLIIF/results/Model_Name/test_latest/images.
-* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4). **You can find two pre-trained models: (1) DeepLIIF_Model_V1: This is the one reported in the paper, and (2) DeepLIIF_Model_: This is the improved version which includes the BCDataset and the new generated synthetic IHC data (mentioned above) in training.**
+* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4). **You can find two pre-trained models: (1) DeepLIIF_Model_V1: This is the one reported in the paper, and (2) DeepLIIF_Model_V2: This is the improved version which includes the BCDataset and the new generated synthetic IHC data (mentioned above) in training.**
 * Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Model and set the Model_Name as DeepLIIF_Model.
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
