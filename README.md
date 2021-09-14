@@ -153,7 +153,7 @@ You can easily run the preprocessing.py, postprocessing.py, train.py and test.py
 * A quick sample of testing the pre-trained model on the sample images:
 ```
 python preprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/
-python test.py --dataroot Sample_Data_Tiled/ --name DeepLIIF_Model --model DeepLIIF
+python test.py --dataroot Sample_Large_Tissues_Tiled/ --name DeepLIIF_Model --model DeepLIIF
 python postprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/ --input_orig_dir Sample_Large_Tissues/
 ```
 
