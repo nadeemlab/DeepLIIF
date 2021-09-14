@@ -141,20 +141,20 @@ After installing the Docker, you need to follow these steps:
 * Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
 * To create a docker image from the docker file:
 ```
-docker build -t DeepLIIF_Image .
+docker build -t deepliif_image .
 ```
 The image is then used as a base. You can copy and use it to run an application. The application needs an isolated environment in which to run, referred to as a container.
 * To create and run a container:
 ```
-docker run --gpus all --name DeepLIIF_Container -it DeepLIIF_Image
+docker run --gpus all --name deepliif_container -it deepliif_image
 ```
 When you run a container from the image, a conda environment is activated in the specified WORKDIR.
 You can easily run the preprocessing.py, postprocessing.py, train.py and test.py in the activated environment and copy the results from the docker container to the host.
 * A quick sample of testing the pre-trained model on the sample images:
 ```
-python preprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/test/
+python preprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/
 python test.py --dataroot Sample_Data_Tiled/ --name DeepLIIF_Model --model DeepLIIF
-python postprocessing.py --input_dir Sample_Data/ --output_dir Sample_Data_Tiled/test/ --input_orig_dir Sample_Data/
+python postprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/ --input_orig_dir Sample_Large_Tissues/
 ```
 
 ## Google CoLab:
