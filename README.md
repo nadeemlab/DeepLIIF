@@ -154,7 +154,7 @@ You can easily run the preprocessing.py, postprocessing.py, train.py and test.py
 ```
 python preprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/
 python test.py --dataroot Sample_Large_Tissues_Tiled/ --name DeepLIIF_Model --model DeepLIIF
-python postprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/ --input_orig_dir Sample_Large_Tissues/
+python postprocessing.py --output_dir Sample_Large_Tissues/ --input_dir results/DeepLIIF_Model/test_latest/images/ --input_orig_dir Sample_Large_Tissues/
 ```
 
 ## Google CoLab:
