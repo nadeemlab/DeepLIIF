@@ -52,11 +52,7 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
             save_types = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'SegOverlaid', 'SegRefined']
         else:
             save_types = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg']
-    images = os.listdir(input_dir)
-    images.sort()
-    images_dict = {}
-    images_size = {}
-    original_image_sizes = {}
+
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -71,6 +67,11 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
         img_types = {'fake_B_1': 'Hema', 'fake_B_2': 'DAPI', 'fake_B_3': 'DAPILap2', 'fake_B_4': 'Ki67',
                      'fake_B_5': 'Seg'}
 
+    images = os.listdir(input_dir)
+    images.sort()
+    images_dict = {}
+    images_size = {}
+    original_image_sizes = {}
     print('Creating Whole Slide Image Started!')
     for img_name in images:
         for img_type in img_types.keys():
