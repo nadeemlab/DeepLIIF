@@ -114,22 +114,19 @@ def align_seg_on_image(input_image, input_mask, output_image, thresh=100, noise_
     cv2.imwrite(output_image.replace('Overlaid', 'Refined'), processed_mask)
 
 
-def post_process_segmentation_mask(input_dir, is_model_results=True, seg_thresh=100, noise_object_size=100):
+def post_process_segmentation_mask(input_dir, seg_thresh=100, noise_object_size=100):
     images = os.listdir(input_dir)
-    if is_model_results:
-        for img in images:
-            if '_fake_B_5.png' in img:
-                align_seg_on_image(os.path.join(input_dir, img.replace('_fake_B_5', '_real_A')),
-                                   os.path.join(input_dir, img),
-                                   os.path.join(input_dir, img.replace('_fake_B_5', '_Seg_Overlaid_')),
-                                   thresh=seg_thresh, noise_objects_size=noise_object_size)
-    else:
-        for img in images:
-            if '_Seg.png' in img:
-                align_seg_on_image(os.path.join(input_dir, img.replace('_Seg', '')),
-                                   os.path.join(input_dir, img),
-                                   os.path.join(input_dir, img.replace('_Seg', '_SegOverlaid')),
-                                   thresh=seg_thresh, noise_objects_size=noise_object_size)
+    for img in images:
+        if '_fake_B_5.png' in img:
+            align_seg_on_image(os.path.join(input_dir, img.replace('_fake_B_5', '_real_A')),
+                               os.path.join(input_dir, img),
+                               os.path.join(input_dir, img.replace('_fake_B_5', '_Seg_Overlaid_')),
+                               thresh=seg_thresh, noise_objects_size=noise_object_size)
+        elif '_Seg.png' in img:
+            align_seg_on_image(os.path.join(input_dir, img.replace('_Seg', '')),
+                               os.path.join(input_dir, img),
+                               os.path.join(input_dir, img.replace('_Seg', '_SegOverlaid')),
+                               thresh=seg_thresh, noise_objects_size=noise_object_size)
 
 
 if __name__ == '__main__':
@@ -141,4 +138,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 3:
         noise_obj_size = int(sys.argv[3])
 
-    post_process_segmentation_mask(base_dir, False, segmentation_thresh, noise_obj_size)
+    post_process_segmentation_mask(base_dir, segmentation_thresh, noise_obj_size)
