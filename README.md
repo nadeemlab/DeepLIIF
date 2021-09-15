@@ -125,8 +125,8 @@ python postprocessing.py --input_dir /path/to/preprocessed/images
 
 ## Post-processing Segmentation Mask:
 Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells. It also refines the generated segmentation mask by removing noise. It saves the overlaid image and the refined mask in the same directory.
-While doing pot-processing step to stich images, you can use --post_process_seg_mask option to post-process segmentation mask and overlay it on the image.
-You can also post-process the final segmentation mask of the whole slide image which is createf after the postprocessing step by passing the directory containing segmentation images to the following command.
+While doing post-processing step to stich images, you can use --post_process_seg_mask option to post-process segmentation mask and overlay it on the image.
+You can also post-process the final segmentation mask of the whole slide image which is created after the postprocessing step by passing the directory containing segmentation images to the following command.
 ```
 python PostProcessSegmentationMask.py /path/to/output/images/generated/by/model/
 ```
