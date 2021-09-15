@@ -24,7 +24,7 @@ class ProcessingOptions():
         parser.add_argument('--overlap_size', required=False, type=int, default=50, help='size of the overlapping area between tiles')
         parser.add_argument('--resize_self', required=False, type=bool, default=True, help='if want to resize the whole slide to a specific size')
         parser.add_argument('--gpu_ids', required=False, type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
-        parser.add_argument('--post_process_seg_mask', required=False, type=bool, default=False, help='if user wants the post-processing script post-processes the segmentation mask')
+        parser.add_argument('--post_process_seg_mask', action='store_true', help='if user wants the post-processing script post-processes the segmentation mask')
 
         self.initialized = True
         return parser
