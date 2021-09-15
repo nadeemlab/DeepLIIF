@@ -118,10 +118,6 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
     seg_image = cv2.cvtColor(cv2.imread(input_mask), cv2.COLOR_BGR2RGB)
     orig_image = cv2.cvtColor(cv2.imread(input_image), cv2.COLOR_BGR2RGB)
 
-    # cv2.imshow('seg_', seg_image)
-    # cv2.imshow('orig_', orig_image)
-
-
     final_mask = orig_image.copy()
     processed_mask = np.zeros_like(orig_image)
 
@@ -155,12 +151,6 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
 
     negative_cells[boundary > thresh] = 0
     positive_cells[boundary > thresh] = 0
-
-    # negative_cells = remove_background_noise(negative_cells, boundary)
-    # positive_cells = remove_background_noise(positive_cells, boundary)
-    #
-    # negative_cells, positive_cells = remove_cell_noise(negative_cells, positive_cells)
-    # positive_cells, negative_cells = remove_cell_noise(positive_cells, negative_cells)
 
     contours, hierarchy = cv2.findContours(positive_cells,
                                            cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
