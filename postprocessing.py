@@ -2,6 +2,7 @@ import cv2
 import os
 import numpy as np
 
+from PostProcessSegmentationMask import post_process_segmentation_mask
 from options.processing_options import ProcessingOptions
 
 
@@ -25,7 +26,7 @@ def imadjust(x, gamma=0.7, c=0, d=1):
 
 
 def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_size=256, overlap_size=6, input_orig_dir='',
-                 save_types=None):
+                 save_types=None, post_process_seg_mask=False):
 
     """
     Post processing the results of the model:
@@ -47,7 +48,10 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
     if resize_size is None:
         resize_size = [2000, 2000]
     if save_types is None:
-        save_types = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg']
+        if post_process_seg_mask:
+            save_types = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'SegOverlaid', 'SegRefined']
+        else:
+            save_types = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg']
     images = os.listdir(input_dir)
     images.sort()
     images_dict = {}
@@ -57,11 +61,20 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    img_types = {'fake_B_1':'Hema', 'fake_B_2':'DAPI', 'fake_B_3':'DAPILap2', 'fake_B_4':'Ki67', 'fake_B_5': 'Seg'}
+    if post_process_seg_mask:
+        print('Post Processing Segmentation Mask Started!')
+        post_process_segmentation_mask(input_dir)
+        img_types = {'fake_B_1': 'Hema', 'fake_B_2': 'DAPI', 'fake_B_3': 'DAPILap2', 'fake_B_4': 'Ki67',
+                     'fake_B_5': 'Seg', 'Seg_Overlaid_': 'SegOverlaid', 'Seg_Refined_': 'SegRefined'}
+        print('Post Processing Segmentation Mask Finished!')
+    else:
+        img_types = {'fake_B_1': 'Hema', 'fake_B_2': 'DAPI', 'fake_B_3': 'DAPILap2', 'fake_B_4': 'Ki67',
+                     'fake_B_5': 'Seg'}
+
+    print('Creating Whole Slide Image Started!')
     for img_name in images:
         for img_type in img_types.keys():
             if img_type in img_name:
-
                 orig_name_splits = img_name.split('_')
                 orig_name = ''
                 for k in range(len(orig_name_splits) - 6):
@@ -116,6 +129,8 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
                 index_y * (tile_size) + overlap_size:(index_y + 1) * (tile_size) + overlap_size] = image[
                                                                                                    overlap_size:overlap_size + tile_size,
                                                                                                    overlap_size:overlap_size + tile_size]
+
+    print('Saving Inferred Modalities and Segmentation Mask of Whole Slide Image!')
     # Saving the whole slide images
     for img_key in images_dict.keys():
         if img_key in images_size.keys():
@@ -129,6 +144,6 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
 
 if __name__ == '__main__':
     opt = ProcessingOptions().parse()   # get training options
-    post_process(input_dir=opt.input_dir, output_dir=opt.output_dir, resize_size=opt.resize_size, tile_size=opt.tile_size, overlap_size=opt.overlap_size, input_orig_dir=opt.input_orig_dir, image_size=opt.image_size)
+    post_process(input_dir=opt.input_dir, output_dir=opt.output_dir, resize_size=opt.resize_size, tile_size=opt.tile_size, overlap_size=opt.overlap_size, input_orig_dir=opt.input_orig_dir, image_size=opt.image_size, post_process_seg_mask=opt.post_process_seg_mask)
 
 
