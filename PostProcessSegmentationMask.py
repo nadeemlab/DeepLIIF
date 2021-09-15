@@ -149,9 +149,6 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
 
     boundary = cv2.morphologyEx(boundary, cv2.MORPH_ERODE, kernel=np.ones((2, 2)))
 
-    negative_cells[boundary > thresh] = 0
-    positive_cells[boundary > thresh] = 0
-
     contours, hierarchy = cv2.findContours(positive_cells,
                                            cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(final_mask, contours, -1, (255, 0, 0), 2)
