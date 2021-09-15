@@ -111,7 +111,7 @@ python preprocessing.py --input_dir /path/to/input/images
 
 ## Post-processing Large Tissues:
 This script is used for testing purposes. It can be used to post-process the results of the model tested on the images tiled by pre-processing script. 
-It stitches the generated tiles with the given overlap_size to create the inferred images for the original images and saves the generated images with the proper postfixes in the given directory.
+It stitches the generated tiles with the given overlap_size to create the inferred images for the original images and saves the generated images with the proper postfixes in the given directory. You can use --post_process_seg_mask to post-process segmentation mask and overlay it on the image.
 ```
 python postprocessing.py --input_dir /path/to/preprocessed/images 
                          --output_dir /path/to/output/images 
@@ -120,10 +120,13 @@ python postprocessing.py --input_dir /path/to/preprocessed/images
                          --overlap_size overlap_size_between_crops 
                          --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
                          --resize_size resizing_size
+                         --post_process_seg_mask
 ```
 
 ## Post-processing Segmentation Mask:
 Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells. It also refines the generated segmentation mask by removing noise. It saves the overlaid image and the refined mask in the same directory.
+While doing pot-processing step to stich images, you can use --post_process_seg_mask option to post-process segmentation mask and overlay it on the image.
+You can also post-process the final segmentation mask of the whole slide image which is createf after the postprocessing step by passing the directory containing segmentation images to the following command.
 ```
 python PostProcessSegmentationMask.py /path/to/output/images/generated/by/model/
 ```
