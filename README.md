@@ -64,7 +64,7 @@ python PrepareDataForTesting.py --input_dir /path/to/input/images
 ```
 
 ## Synthetic Data Generation:
-The DeepLIIF_Model_V1 suffered from its inability to separate IHC positive cells in some large clusters, resulting from the absence of clustered positive cells in our training data. To infuse more information about the clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using co-registered data. 
+The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters, resulting from the absence of clustered positive cells in our training data. To infuse more information about the clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using co-registered data. 
 We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI image, and the segmentation mask and generates the corresponding IHC image. The model converts the Hematoxylin channel to gray-scale to infer more helpful information such as the texture and discard unnecessary information such as color. The Hematoxylin image guides the network to synthesize the background of the IHC image by preserving the shape and texture of the cells and artifacts in the background. The DAPI image assists the network in identifying the location, shape, and texture of the cells to better isolate the cells from the background. The segmentation mask helps the network specify the color of cells based on the type of the cell (positive cell: a brown hue, negative: a blue hue).
 
 In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are shown in Figure 2.
@@ -93,8 +93,8 @@ python test.py --dataroot /path/to/input/images
                --model DeepLIIF
 ```
 * The test results will be by default saved to DeepLIIF/results/Model_Name/test_latest/images.
-* Pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4). **You can find two pre-trained models: (1) DeepLIIF_Model_V1: This is the one reported in the paper, and (2) DeepLIIF_Model_V2: This is the improved version which includes the BCDataset and the new generated synthetic IHC data (mentioned above) in training.**
-* Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Model and set the Model_Name as DeepLIIF_Model.
+* The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+* Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Latest_Model and set the Model_Name as DeepLIIF_Latest_Model.
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
@@ -140,7 +140,7 @@ It saves the modalities to the input directory next to each image.
 You can use the docker file to create the docker image for running the model.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
-* Download the pretrained model and place them in DeepLIIF/checkpoints/DeepLIIF_Model.
+* Download the pretrained model and place them in DeepLIIF/checkpoints/DeepLIIF_Latest_Model.
 * Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
 * To create a docker image from the docker file:
 ```
@@ -156,8 +156,8 @@ You can easily run the preprocessing.py, postprocessing.py, train.py and test.py
 * A quick sample of testing the pre-trained model on the sample images:
 ```
 python preprocessing.py --input_dir Sample_Large_Tissues/ --output_dir Sample_Large_Tissues_Tiled/test/
-python test.py --dataroot Sample_Large_Tissues_Tiled/ --name DeepLIIF_Model --model DeepLIIF
-python postprocessing.py --output_dir Sample_Large_Tissues/ --input_dir results/DeepLIIF_Model/test_latest/images/ --input_orig_dir Sample_Large_Tissues/
+python test.py --dataroot Sample_Large_Tissues_Tiled/ --name DeepLIIF_Latest_Model --model DeepLIIF
+python postprocessing.py --output_dir Sample_Large_Tissues/ --input_dir results/DeepLIIF_Latest_Model/test_latest/images/ --input_orig_dir Sample_Large_Tissues/
 ```
 
 ## Google CoLab:
