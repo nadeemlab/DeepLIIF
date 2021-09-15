@@ -141,4 +141,5 @@ dependencies:
     - websocket-client==0.58.0
     - opencv-python
     - numba==0.53.1
-    - scikit-learn==0.18.3
+    - scikit-learn==0.24.2
+    - scikit-image==0.18.3
