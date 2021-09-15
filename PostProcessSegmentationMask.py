@@ -6,7 +6,7 @@ import numpy as np
 import skimage.measure
 from skimage.morphology import remove_small_objects
 import scipy.ndimage as ndi
-from numba import jit
+# from numba import jit
 
 
 def remove_small_objects_from_image(image, min_size=100):
@@ -111,21 +111,34 @@ def align_seg_on_image(input_image, input_mask, output_image, thresh=100, noise_
     cv2.drawContours(processed_mask, contours, -1, (0, 255, 0), 2)
 
     cv2.imwrite(output_image, cv2.cvtColor(final_mask, cv2.COLOR_BGR2RGB))
-    cv2.imwrite(output_image.replace('_Segmentation_Overlaid', '_Segmentation_Refined'), cv2.cvtColor(processed_mask, cv2.COLOR_BGR2RGB))
+    cv2.imwrite(output_image.replace('Overlaid', 'Refined'), processed_mask)
+
+
+def post_process_segmentation_mask(input_dir, is_model_results=True, seg_thresh=100, noise_object_size=100):
+    images = os.listdir(input_dir)
+    if is_model_results:
+        for img in images:
+            if '_fake_B_5.png' in img:
+                align_seg_on_image(os.path.join(input_dir, img.replace('_fake_B_5', '_real_A')),
+                                   os.path.join(input_dir, img),
+                                   os.path.join(input_dir, img.replace('_fake_B_5', '_Seg_Overlaid_')),
+                                   thresh=seg_thresh, noise_objects_size=noise_object_size)
+    else:
+        for img in images:
+            if '_Seg.png' in img:
+                align_seg_on_image(os.path.join(input_dir, img.replace('_Seg', '')),
+                                   os.path.join(input_dir, img),
+                                   os.path.join(input_dir, img.replace('_Seg', '_SegOverlaid')),
+                                   thresh=seg_thresh, noise_objects_size=noise_object_size)
 
 
 if __name__ == '__main__':
-    input_dir = sys.argv[1]
+    base_dir = sys.argv[1]
     segmentation_thresh = 100
     noise_obj_size = 100
     if len(sys.argv) > 2:
         segmentation_thresh = int(sys.argv[2])
     if len(sys.argv) > 3:
         noise_obj_size = int(sys.argv[3])
-    images = os.listdir(input_dir)
-    for img in images:
-        if '_fake_B_5.png' in img:
-            align_seg_on_image(os.path.join(input_dir, img.replace('_fake_B_5', '_real_A')),
-                               os.path.join(input_dir, img),
-                               os.path.join(input_dir, img.replace('_fake_B_5', '_Segmentation_Overlaid')),
-                               thresh=segmentation_thresh, noise_objects_size=noise_obj_size)
+
+    post_process_segmentation_mask(base_dir, False, segmentation_thresh, noise_obj_size)
