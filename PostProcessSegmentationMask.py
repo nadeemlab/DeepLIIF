@@ -173,7 +173,7 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
     cv2.drawContours(processed_mask, contours, -1, (0, 255, 0), 2)
 
     cv2.imwrite(output_image, cv2.cvtColor(final_mask, cv2.COLOR_BGR2RGB))
-    cv2.imwrite(output_image.replace('Overlaid2', 'Refined'), processed_mask)
+    cv2.imwrite(output_image.replace('Overlaid', 'Refined'), processed_mask)
 
 
 def post_process_segmentation_mask(input_dir, seg_thresh=100, noise_object_size=100):
