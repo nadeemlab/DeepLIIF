@@ -4,7 +4,7 @@
     <img src="./images/DeepLIIF_logo.png" width="50%">
     <h3 align="center"><strong>DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
     <p align="center">
-    <a href="https://www.biorxiv.org/content/10.1101/2021.05.01.442219v3">Read Link</a>
+    <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
     <a href="https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing">Google CoLab Demo</a>
     |
