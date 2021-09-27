@@ -9,10 +9,10 @@ It then does standard network training. During the training, it also visualize/s
 The script supports continue/resume training. Use '--continue_train' to resume your previous training.
 """
 import time
-from options.train_options import TrainOptions
-from data import create_dataset
-from models import create_model
-from util.visualizer import Visualizer
+from deepliif.options.train_options import TrainOptions
+from deepliif.data import create_dataset
+from deepliif.models import create_model
+from deepliif.util.visualizer import Visualizer
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options

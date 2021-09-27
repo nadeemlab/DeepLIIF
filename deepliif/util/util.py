@@ -1,9 +1,26 @@
 """This module contains simple helper functions """
 from __future__ import print_function
+
+from functools import wraps
+from time import time
+
+import cv2
 import torch
 import numpy as np
 from PIL import Image
 import os
+
+
+def timeit(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        ts = time()
+        result = f(*args, **kwargs)
+        print(f'{f.__name__} {time() - ts}')
+
+        return result
+
+    return wrap
 
 
 def tensor2im(input_image, imtype=np.uint8):
@@ -25,6 +42,16 @@ def tensor2im(input_image, imtype=np.uint8):
     else:  # if it is a numpy array, do nothing
         image_numpy = input_image
     return image_numpy.astype(imtype)
+
+
+def cv_to_pil(img):
+    return Image.fromarray(
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    ).convert('RGB')
+
+
+def tensor_to_pil(t):
+    return cv_to_pil(tensor2im(t))
 
 
 def diagnose_network(net, name='network'):
