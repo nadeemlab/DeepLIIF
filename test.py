@@ -28,11 +28,11 @@ See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-a
 """
 import os
 import time
-from options.test_options import TestOptions
-from data import create_dataset
-from models import create_model
-from util.visualizer import save_images
-from util import html
+from deepliif.options.test_options import TestOptions
+from deepliif.data import create_dataset
+from deepliif.models import create_model
+from deepliif.util.visualizer import save_images
+from deepliif.util import html
 
 
 if __name__ == '__main__':

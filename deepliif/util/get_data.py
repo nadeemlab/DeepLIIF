@@ -16,7 +16,7 @@ class GetData(object):
         verbose (bool)  -- If True, print additional information.
 
     Examples:
-        >>> from util.get_data import GetData
+        >>> from deepliif.util import GetData
         >>> gd = GetData(technique='cyclegan')
         >>> new_data_path = gd.get(save_path='./datasets')  # options will be displayed.
 

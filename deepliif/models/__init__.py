@@ -18,8 +18,13 @@ Now you can use the model class by specifying flag '--model dummy'.
 See our template model class 'template_model.py' for more details.
 """
 
+import os
 import importlib
-from models.base_model import BaseModel
+
+import torch
+
+from deepliif.models.base_model import BaseModel
+from deepliif.models.networks import get_norm_layer, ResnetGenerator, UnetGenerator
 
 
 def find_model_using_name(model_name):
@@ -29,17 +34,18 @@ def find_model_using_name(model_name):
     be instantiated. It has to be a subclass of BaseModel,
     and it is case-insensitive.
     """
-    model_filename = "models." + model_name + "_model"
+    model_filename = "deepliif.models." + model_name + "_model"
     modellib = importlib.import_module(model_filename)
     model = None
     target_model_name = model_name.replace('_', '') + 'model'
     for name, cls in modellib.__dict__.items():
         if name.lower() == target_model_name.lower() \
-           and issubclass(cls, BaseModel):
+                and issubclass(cls, BaseModel):
             model = cls
 
     if model is None:
-        print("In %s.py, there should be a subclass of BaseModel with class name that matches %s in lowercase." % (model_filename, target_model_name))
+        print("In %s.py, there should be a subclass of BaseModel with class name that matches %s in lowercase." % (
+            model_filename, target_model_name))
         exit(0)
 
     return model
@@ -58,10 +64,37 @@ def create_model(opt):
     This is the main interface between this package and 'train.py'/'test.py'
 
     Example:
-        >>> from models import create_model
+        >>> from deepliif.models import create_model
         >>> model = create_model(opt)
     """
     model = find_model_using_name(opt.model)
     instance = model(opt)
     print("model [%s] was created" % type(instance).__name__)
     return instance
+
+
+def init_nets(model_dir):
+    input_nc = 3
+    output_nc = 3
+    ngf = 64
+    norm = 'batch'
+    use_dropout = True
+
+    norm_layer = get_norm_layer(norm_type=norm)
+
+    nets = {}
+    for n in ['G1', 'G2', 'G3', 'G4']:
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
+        net.load_state_dict(torch.load(
+            os.path.join(model_dir, f'latest_net_{n}.pth')
+        ))
+        nets[n] = net
+
+    for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
+        net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net.load_state_dict(torch.load(
+            os.path.join(model_dir, f'latest_net_{n}.pth')
+        ))
+        nets[n] = net
+
+    return nets

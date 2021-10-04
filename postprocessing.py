@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 from PostProcessSegmentationMask import post_process_segmentation_mask
-from options.processing_options import ProcessingOptions
+from deepliif.options.processing_options import ProcessingOptions
 
 
 # Image extensions to consider
@@ -146,5 +146,4 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
 if __name__ == '__main__':
     opt = ProcessingOptions().parse()   # get training options
     post_process(input_dir=opt.input_dir, output_dir=opt.output_dir, resize_size=opt.resize_size, tile_size=opt.tile_size, overlap_size=opt.overlap_size, input_orig_dir=opt.input_orig_dir, image_size=opt.image_size, post_process_seg_mask=opt.post_process_seg_mask)
-
 
