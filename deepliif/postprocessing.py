@@ -127,9 +127,9 @@ def overlay(img, seg_img, thresh=100, noise_objects_size=20):
     overlaid_mask = img.copy()
 
     contours, _ = cv2.findContours(positive_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
+    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
 
     contours, _ = cv2.findContours(negative_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
+    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
 
     return overlaid_mask
