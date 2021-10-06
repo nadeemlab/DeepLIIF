@@ -76,7 +76,7 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
     orig_image = cv2.cvtColor(cv2.imread(input_image), cv2.COLOR_BGR2RGB)
 
     overlaid_mask = overlay(orig_image, seg_image, thresh, noise_objects_size)
-    cv2.imwrite(output_image, cv2.cvtColor(overlaid_mask, cv2.COLOR_BGR2RGB))
+    cv2.imwrite(output_image, overlaid_mask)
 
     refined_mask = refine(orig_image, seg_image, thresh, noise_objects_size)
     cv2.imwrite(output_image.replace('Overlaid', 'Refined'), refined_mask)
