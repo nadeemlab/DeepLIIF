@@ -44,14 +44,8 @@ def tensor2im(input_image, imtype=np.uint8):
     return image_numpy.astype(imtype)
 
 
-def cv_to_pil(img):
-    return Image.fromarray(
-        cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    ).convert('RGB')
-
-
 def tensor_to_pil(t):
-    return cv_to_pil(tensor2im(t))
+    return Image.fromarray(tensor2im(t))
 
 
 def diagnose_network(net, name='network'):
