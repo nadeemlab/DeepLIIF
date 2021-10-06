@@ -27,7 +27,6 @@ def output_size(img, tile_size):
     return round(img.width / tile_size) * tile_size, round(img.height / tile_size) * tile_size
 
 
-@util.timeit
 def generate_tiles(img, tile_size, overlap_size):
     img = img.resize(output_size(img, tile_size))
 
@@ -47,7 +46,6 @@ def generate_tiles(img, tile_size, overlap_size):
             )).resize((tile_size, tile_size)))
 
 
-@util.timeit
 def transform(img):
     return default_collate([transforms.Compose([
         transforms.Lambda(lambda i: __make_power_2(i, base=4, method=Image.BICUBIC)),
