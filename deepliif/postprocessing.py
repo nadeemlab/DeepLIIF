@@ -5,12 +5,8 @@ from skimage.morphology import remove_small_objects
 import numpy as np
 import scipy.ndimage as ndi
 
-from deepliif.util import util
 
-
-def stitch(tiles, overlap_size):
-    tile_size = tiles[0].img.shape[2]
-
+def stitch(tiles, tile_size, overlap_size):
     rows = max(t.i for t in tiles) + 1
     cols = max(t.j for t in tiles) + 1
 
@@ -20,8 +16,7 @@ def stitch(tiles, overlap_size):
     new_im = Image.new('RGB', (width, height))
 
     for t in tiles:
-        img = util.tensor_to_pil(t.img)
-        img = img.resize((tile_size + 2 * overlap_size, tile_size + 2 * overlap_size))
+        img = t.img.resize((tile_size + 2 * overlap_size, tile_size + 2 * overlap_size))
         img = img.crop((overlap_size, overlap_size, overlap_size + tile_size, overlap_size + tile_size))
 
         new_im.paste(img, (t.j * tile_size, t.i * tile_size))
