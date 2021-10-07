@@ -5,7 +5,6 @@ from PIL import Image, ImageOps
 from torch.utils.data.dataloader import default_collate
 import torchvision.transforms as transforms
 
-from deepliif.util import util
 from deepliif.data.base_dataset import __make_power_2
 
 # Postfixes not to consider for segmentation
@@ -43,7 +42,7 @@ def generate_tiles(img, tile_size, overlap_size):
                 i * tile_size, j * tile_size,
                 i * tile_size + tile_size + 2 * overlap_size,
                 j * tile_size + tile_size + 2 * overlap_size
-            )).resize((tile_size, tile_size)))
+            )))
 
 
 def transform(img):
