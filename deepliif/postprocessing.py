@@ -1,9 +1,11 @@
 import cv2
 from PIL import Image
 import skimage.measure
+from skimage import feature
 from skimage.morphology import remove_small_objects
 import numpy as np
 import scipy.ndimage as ndi
+from numba import jit
 
 
 def stitch(tiles, tile_size, overlap_size):
@@ -74,6 +76,79 @@ def remove_cell_noise(mask1, mask2):
     return mask1, mask2
 
 
+@jit(nopython=True)
+def compute_cell_mapping(new_mapping, image_size, small_object_size=20):
+    marked = [[False for _ in range(image_size[1])] for _ in range(image_size[0])]
+    for i in range(image_size[0]):
+        for j in range(image_size[1]):
+            if marked[i][j] is False and (new_mapping[i, j, 0] > 0 or new_mapping[i, j, 2] > 0):
+                cluster_red_prob, cluster_blue_prob, cluster_red_no, cluster_blue_no = 0, 0, 0, 0
+                pixels = [(i, j)]
+                cluster = [(i, j)]
+                marked[i][j] = True
+                while len(pixels) > 0:
+                    pixel = pixels.pop()
+                    cluster_red_prob += new_mapping[pixel[0], pixel[1], 0]
+                    cluster_blue_prob += new_mapping[pixel[0], pixel[1], 2]
+                    if new_mapping[pixel[0], pixel[1], 0] > 0:
+                        cluster_red_no += 1
+                    if new_mapping[pixel[0], pixel[1], 2] > 0:
+                        cluster_blue_no += 1
+                    for neigh_i in range(-1, 2):
+                        for neigh_j in range(-1, 2):
+                            neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
+                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and marked[neigh_pixel[0]][neigh_pixel[1]] is False and (new_mapping[neigh_pixel[0], neigh_pixel[1], 0] > 0 or new_mapping[neigh_pixel[0], neigh_pixel[1], 2] > 0):
+                                cluster.append(neigh_pixel)
+                                pixels.append(neigh_pixel)
+                                marked[neigh_pixel[0]][neigh_pixel[1]] = True
+                cluster_value = None
+                if cluster_red_prob < cluster_blue_prob or cluster_red_no * 2 < cluster_blue_no:
+                    cluster_value = (0, 0, 255)
+                elif cluster_blue_prob < cluster_red_prob or cluster_blue_no * 2 < cluster_red_no:
+                    cluster_value = (255, 0, 0)
+                if len(cluster) < small_object_size:
+                    cluster_value = (0, 0, 0)
+                if cluster_value is not None:
+                    for node in cluster:
+                        new_mapping[node[0], node[1]] = cluster_value
+    return new_mapping
+
+
+@jit(nopython=True)
+def remove_noises(channel, image_size, small_object_size=20):
+    marked = [[False for _ in range(image_size[1])] for _ in range(image_size[0])]
+    for i in range(image_size[0]):
+        for j in range(image_size[1]):
+            if marked[i][j] is False and channel[i, j] > 0:
+                pixels = [(i, j)]
+                cluster = [(i, j)]
+                marked[i][j] = True
+                while len(pixels) > 0:
+                    pixel = pixels.pop()
+                    for neigh_i in range(-1, 2):
+                        for neigh_j in range(-1, 2):
+                            neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
+                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and marked[neigh_pixel[0]][neigh_pixel[1]] is False and channel[neigh_pixel[0], neigh_pixel[1]] > 0:
+                                cluster.append(neigh_pixel)
+                                pixels.append(neigh_pixel)
+                                marked[neigh_pixel[0]][neigh_pixel[1]] = True
+
+                cluster_value = None
+                if len(cluster) < small_object_size:
+                    cluster_value = 0
+                if cluster_value is not None:
+                    for node in cluster:
+                        channel[node[0], node[1]] = cluster_value
+    return channel
+
+
+def remove_noises_fill_empty_holes(label_img, size=200):
+    inverse_img = 255 - label_img
+    inverse_img_removed = remove_noises(inverse_img, inverse_img.shape, small_object_size=size)
+    label_img[inverse_img_removed == 0] = 255
+    return label_img
+
+
 def positive_negative_masks(mask, thresh=100, noise_objects_size=20):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
     negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
@@ -82,21 +157,33 @@ def positive_negative_masks(mask, thresh=100, noise_objects_size=20):
     blue = mask[:, :, 2]
     boundary = mask[:, :, 1]
 
+    boundary[boundary < 80] = 0
+
     positive_mask[red > thresh] = 255
     positive_mask[boundary > thresh] = 0
     positive_mask[blue > red] = 0
 
     negative_mask[blue > thresh] = 255
-    negative_mask[boundary > thresh] = 0
+    negative_mask[boundary > 0] = 0
     negative_mask[red >= blue] = 0
+
+    cell_mapping = np.zeros_like(mask)
+    cell_mapping[:, :, 0] = positive_mask
+    cell_mapping[:, :, 2] = negative_mask
+
+    compute_cell_mapping(cell_mapping, mask.shape, small_object_size=50)
+    cell_mapping[cell_mapping > 0] = 255
+
+    positive_mask = cell_mapping[:, :, 0]
+    negative_mask = cell_mapping[:, :, 2]
 
     def inner(img):
         img = remove_small_objects_from_image(img, noise_objects_size)
         img = ndi.binary_fill_holes(img).astype(np.uint8)
-
         return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
 
-    return inner(positive_mask), inner(negative_mask)
+    # return inner(positive_mask), inner(negative_mask)
+    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
 
 
 def refine(img, seg_img, thresh=100, noise_objects_size=20):
@@ -107,10 +194,12 @@ def refine(img, seg_img, thresh=100, noise_objects_size=20):
     refined_mask[positive_mask > 0] = (0, 0, 255)
     refined_mask[negative_mask > 0] = (255, 0, 0)
 
-    contours, _ = cv2.findContours(positive_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
-    contours, _ = cv2.findContours(negative_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
     return refined_mask
@@ -121,10 +210,12 @@ def overlay(img, seg_img, thresh=100, noise_objects_size=20):
 
     overlaid_mask = img.copy()
 
-    contours, _ = cv2.findContours(positive_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
 
-    contours, _ = cv2.findContours(negative_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
 
     return overlaid_mask

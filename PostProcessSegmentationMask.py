@@ -84,6 +84,7 @@ def align_seg_on_image2(input_image, input_mask, output_image, thresh=100, noise
 
 def post_process_segmentation_mask(input_dir, seg_thresh=100, noise_object_size=100):
     images = os.listdir(input_dir)
+    image_extensions = ['.png', '.jpg', '.tif', '.tiff']
     for img in images:
         if '_fake_B_5.png' in img:
             align_seg_on_image2(os.path.join(input_dir, img.replace('_fake_B_5', '_real_A')),
@@ -91,7 +92,12 @@ def post_process_segmentation_mask(input_dir, seg_thresh=100, noise_object_size=
                                 os.path.join(input_dir, img.replace('_fake_B_5', '_Seg_Overlaid_')),
                                 thresh=seg_thresh, noise_objects_size=noise_object_size)
         elif '_Seg.png' in img:
-            align_seg_on_image2(os.path.join(input_dir, img.replace('_Seg', '')),
+            orig_img_ext = '.png'
+            for img_ext in image_extensions:
+                if os.path.exists(os.path.join(input_dir, img.replace('_Seg.png', img_ext))):
+                    orig_img_ext = img_ext
+                    break
+            align_seg_on_image2(os.path.join(input_dir, img.replace('_Seg.png', orig_img_ext)),
                                 os.path.join(input_dir, img),
                                 os.path.join(input_dir, img.replace('_Seg', '_SegOverlaid')),
                                 thresh=seg_thresh, noise_objects_size=noise_object_size)
