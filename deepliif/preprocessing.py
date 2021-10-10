@@ -23,7 +23,8 @@ def allowed_file(filename):
 
 
 def output_size(img, tile_size):
-    return round(img.width / tile_size) * tile_size, round(img.height / tile_size) * tile_size
+    return (max(round(img.width / tile_size) * tile_size, tile_size),
+            max(round(img.height / tile_size) * tile_size, tile_size))
 
 
 def generate_tiles(img, tile_size, overlap_size):
