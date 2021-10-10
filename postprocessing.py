@@ -1,10 +1,10 @@
 import cv2
 import os
 import numpy as np
-
+import sys
 from PostProcessSegmentationMask import post_process_segmentation_mask
-from deepliif.options.processing_options import ProcessingOptions
-
+from options.processing_options import ProcessingOptions
+import math
 
 # Image extensions to consider
 image_extensions = ['png', 'jpg', 'tif']
@@ -23,6 +23,42 @@ def imadjust(x, gamma=0.7, c=0, d=1):
     b = x.max()
     y = (((x - a) / (b - a)) ** gamma) * (d - c) + c
     return y
+
+
+def adjust_DAPI(image, orig_image_crop, multiplier):
+    orig_gray = cv2.cvtColor(orig_image_crop, cv2.COLOR_BGR2GRAY)
+    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    if np.mean(orig_gray) < 200:
+        image = cv2.cvtColor(
+            (imadjust(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY),
+                      gamma=multiplier * math.log(np.mean(image_gray)) / math.log(np.mean(orig_gray)),
+                      c=5, d=255)).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    else:
+
+        image = cv2.cvtColor(
+            (imadjust(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY),
+                      gamma=multiplier,
+                      c=5, d=255)).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    return image
+
+
+def adjust_marker(image, orig_image_crop, multiplier):
+    orig_gray = cv2.cvtColor(orig_image_crop, cv2.COLOR_BGR2GRAY)
+    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # print(img_name, np.mean(orig_gray), np.std(orig_gray), np.mean(image_gray), np.std(image_gray))
+
+    if np.mean(orig_gray) < 200:
+        image = cv2.cvtColor(
+            (imadjust(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY),
+                      gamma=multiplier * math.log(np.std(image_gray)) / math.log(np.std(orig_gray)),
+                      c=5, d=255)).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    else:
+        image = cv2.cvtColor(
+            (imadjust(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY),
+                      gamma=multiplier, c=5, d=255)).astype(
+                np.uint8), cv2.COLOR_GRAY2BGR)
+    return image
 
 
 def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_size=256, overlap_size=6, input_orig_dir='',
@@ -69,9 +105,11 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
 
     images = os.listdir(input_dir)
     images.sort()
+
     images_dict = {}
+    tiles_dict = {}
     images_size = {}
-    original_image_sizes = {}
+    img = None
     print('Creating Whole Slide Image Started!')
     for img_name in images:
         for img_type in img_types.keys():
@@ -89,6 +127,7 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
                         for img_ext in image_extensions:
                             if os.path.exists(os.path.join(input_orig_dir, orig_name + '.' + img_ext)):
                                 image_extension = img_ext
+                        print(input_orig_dir, orig_name + '.' + image_extension)
                         img = cv2.imread(os.path.join(input_orig_dir, orig_name + '.' + image_extension))
                         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -112,6 +151,8 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
                         images_dict[img_key][:,:,0] = 210
                         images_dict[img_key][:,:,1] = 210
                         images_dict[img_key][:,:,2] = 200
+                    if img_types[img_type] == 'DAPI':
+                        images_dict[img_key][:,:] = (5, 5, 5)
 
                 # Index of the cropped image in the final whole slide image
                 index_x = int(img_name.split('_')[-5])
@@ -119,13 +160,21 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
 
                 # Reading the image and adjusting if needed
                 image = cv2.imread(os.path.join(input_dir, img_name))
-                if img_types[img_type] == 'DAPI' or img_types[img_type] == 'Ki67':
-                    image = imadjust(image, gamma=1, c=0, d=255)
+                orig_image_crop = img[max(0, index_x*tile_size - overlap_size):min(img.shape[0], index_x*tile_size + tile_size +overlap_size), max(0, index_y*tile_size - overlap_size):min(index_y*tile_size + tile_size +overlap_size, img.shape[1])]
+
+                if img_types[img_type] == 'DAPI':
+                    image = adjust_DAPI(image, orig_image_crop, 8 / math.log(np.max(orig_image_crop)))
+
+                if img_types[img_type] == 'Ki67':
+                    image = adjust_marker(image, orig_image_crop, 10 / math.log(np.max(orig_image_crop)))
 
                 # Resizing the image to the tile_size with overlap_size
                 image = cv2.resize(image, (tile_size + 2 * overlap_size, tile_size + 2 * overlap_size), interpolation=cv2.INTER_CUBIC)
-
+                if img_key not in tiles_dict:
+                    tiles_dict[img_key] = {}
+                tiles_dict[img_key][(index_x, index_y)] = image
                 # Insert the image in the proper location in the final image.
+
                 images_dict[img_key][index_x * (tile_size) + overlap_size:(index_x + 1) * (tile_size) + overlap_size,
                 index_y * (tile_size) + overlap_size:(index_y + 1) * (tile_size) + overlap_size] = image[
                                                                                                    overlap_size:overlap_size + tile_size,
@@ -140,10 +189,11 @@ def post_process(input_dir, output_dir, resize_size=None, image_size=None, tile_
             curr_img = images_dict[img_key]
             new_image = curr_img[overlap_size:curr_img.shape[0]-overlap_size, overlap_size:curr_img.shape[1]-overlap_size]
             img = cv2.resize(new_image, (image_size[1],image_size[0]), interpolation=cv2.INTER_CUBIC)
+            if img_key == 'DAPI':
+                img = cv2.cvtColor((imadjust(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), gamma=1, c=0, d=255)).astype(np.uint8), cv2.COLOR_GRAY2BGR)
             cv2.imwrite(os.path.join(output_dir, img_key), img)
 
 
 if __name__ == '__main__':
     opt = ProcessingOptions().parse()   # get training options
     post_process(input_dir=opt.input_dir, output_dir=opt.output_dir, resize_size=opt.resize_size, tile_size=opt.tile_size, overlap_size=opt.overlap_size, input_orig_dir=opt.input_orig_dir, image_size=opt.image_size, post_process_seg_mask=opt.post_process_seg_mask)
-
