@@ -9,7 +9,7 @@ import torch
 import numpy as np
 from PIL import Image
 import os
-
+import math
 
 def timeit(f):
     @wraps(f)
@@ -46,6 +46,10 @@ def tensor2im(input_image, imtype=np.uint8):
 
 def tensor_to_pil(t):
     return Image.fromarray(tensor2im(t))
+
+
+def image_to_array(t):
+    return np.array(t)
 
 
 def diagnose_network(net, name='network'):
@@ -122,3 +126,72 @@ def mkdir(path):
     """
     if not os.path.exists(path):
         os.makedirs(path)
+
+
+def imadjust(x, gamma=0.7, c=0, d=1):
+    """
+    Adjusting the image contrast and brightness
+
+    :param x: Input array
+    :param gamma: Gamma value
+    :param c: Minimum value
+    :param d: Maximum value
+    :return: Adjusted image
+    """
+    a = x.min()
+    b = x.max()
+    y = (((x - a) / (b - a)) ** gamma) * (d - c) + c
+    return y
+
+
+def adjust_dapi(inferred_tile, orig_tile):
+    """Adjusts the intensity of mpIF DAPI image
+
+    Parameters:
+        inferred_tile (Image) -- inferred tile image
+        orig_tile (Image) -- original tile image
+
+    """
+    inferred_tile_array = image_to_array(inferred_tile)
+    orig_tile_array = image_to_array(orig_tile)
+
+    multiplier = 8 / math.log(np.max(orig_tile_array))
+
+    if np.mean(orig_tile_array) < 200:
+        processed_tile = imadjust(inferred_tile_array,
+                                  gamma=multiplier * math.log(np.mean(inferred_tile_array)) / math.log(np.mean(orig_tile_array)),
+                                  c=5, d=255).astype(np.uint8)
+
+    else:
+        processed_tile = imadjust(inferred_tile_array,
+                                  gamma=multiplier,
+                                  c=5, d=255).astype(np.uint8)
+    return Image.fromarray(processed_tile)
+
+
+def adjust_marker(inferred_tile, orig_tile):
+    """Adjusts the intensity of mpIF marker image
+
+    Parameters:
+        inferred_tile (Image) -- inferred tile image
+        orig_tile (Image) -- original tile image
+
+    """
+    inferred_tile_array = image_to_array(inferred_tile)
+    orig_tile_array = image_to_array(orig_tile)
+
+    multiplier = 10 / math.log(np.max(orig_tile_array))
+
+    if np.mean(orig_tile_array) < 200:
+        processed_tile = imadjust(inferred_tile_array,
+                                  gamma=multiplier * math.log(np.std(inferred_tile_array)) / math.log(
+                                      np.std(orig_tile_array)),
+                                  c=5, d=255).astype(np.uint8)
+
+    else:
+        processed_tile = imadjust(inferred_tile_array,
+                                  gamma=multiplier,
+                                  c=5, d=255).astype(np.uint8)
+    return Image.fromarray(processed_tile)
+
+
