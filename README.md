@@ -98,43 +98,16 @@ python test.py --dataroot /path/to/input/images
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-## Pre-processing Large Tissues:
-Using this script, you can prepare large tissue for testing purposes. It breaks large images into tiles of size 512x512 and create a 3072x512 image for each tile. Then, stores the generated tiles in the given directory.
-```
-python preprocessing.py --input_dir /path/to/input/images 
-                        --output_dir /path/to/output/images 
-                        --tile_size size_of_each_cropped_tile 
-                        --overlap_size overlap_size_between_crops 
-                        --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
-                        --resize_size
-```
 
-## Post-processing Large Tissues:
-This script is used for testing purposes. It can be used to post-process the results of the model tested on the images tiled by pre-processing script. 
-It stitches the generated tiles with the given overlap_size to create the inferred images for the original images and saves the generated images with the proper postfixes in the given directory. You can use --post_process_seg_mask to post-process segmentation mask and overlay it on the image.
+## DeepLIIF Inference on Large Tissues:
+This script is used for testing purposes. You can use this script to infer modalities and classified segmentation mask for large images.
+If the output_dir not given the script, it automatically saves the inferred modalities in the input_dir next to the original images.
 ```
-python postprocessing.py --input_dir /path/to/preprocessed/images 
-                         --output_dir /path/to/output/images 
-                         --input_orig_dir /path/to/original/input/images 
-                         --tile_size size_of_each_cropped_tile 
-                         --overlap_size overlap_size_between_crops 
-                         --resize_self if_True_resizes_to_the_closest_rectangle_dividable_by_tile_size_if_False_resize_size_need_to_be_set 
-                         --resize_size resizing_size
-                         --post_process_seg_mask
+python inference.py  --input_dir /path/to/preprocessed/images 
+                     --output_dir /path/to/output/images 
+                     --tile_size size_of_each_cropped_tile 
+                     --overlap_size overlap_size_between_crops 
 ```
-
-## Post-processing Segmentation Mask:
-Using the post-processing script, you can overlay the classified boundaries around the cells over the original IHC image. It draws a blue boundary around negative cells and a red boundary around positive cells. It also refines the generated segmentation mask by removing noise. It saves the overlaid image and the refined mask in the same directory.
-While doing post-processing step to stich images, you can use --post_process_seg_mask option to post-process segmentation mask and overlay it on the image.
-You can also post-process the final segmentation mask of the whole slide image which is created after the postprocessing step by passing the directory containing segmentation images to the following command.
-```
-python PostProcessSegmentationMask.py /path/to/output/images/generated/by/model/
-```
-
-## Demo:
-Change the DeepLIIF_path to the path of DeepLIIF project. 
-Set input_path to the directory containing the input images and python_run_path to the python executable (path to installed python directory). 
-It saves the modalities to the input directory next to each image.
 
 ## Docker File:
 You can use the docker file to create the docker image for running the model.

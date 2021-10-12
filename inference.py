@@ -4,13 +4,13 @@ from PIL import Image
 
 from deepliif.options.processing_options import ProcessingOptions
 from deepliif.preprocessing import allowed_file
-from models import init_nets
-from postprocessing import stitch, overlay, refine
-from preprocessing import generate_tiles, Tile, transform
+from deepliif.models import init_nets
+from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi
+from deepliif.preprocessing import generate_tiles, Tile, transform
 
 import torch
 import numpy as np
-from util import util
+from deepliif.util import util
 
 
 def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
@@ -73,33 +73,33 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
 
     hema_tiles = eval_net('G1')
     util.save_image(
-        util.image_to_array(stitch_tensor_tiles(hema_tiles)),
+        np.array(stitch_tensor_tiles(hema_tiles)),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Hema.png'))
     )
 
     dpi_tiles = eval_net('G2')
     dpi_pil_tiles = [Tile(dpi_tiles[tile_no].i, dpi_tiles[tile_no].j,
-                          util.adjust_dapi(util.tensor_to_pil(dpi_tiles[tile_no].img),
+                          adjust_dapi(util.tensor_to_pil(dpi_tiles[tile_no].img),
                                            tiles[tile_no].img))
                      for tile_no in range(len(dpi_tiles))]
     util.save_image(
-        util.image_to_array(stitch_pil_tiles(dpi_pil_tiles)),
+        np.array(stitch_pil_tiles(dpi_pil_tiles)),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_DAPI.png'))
     )
 
     lap2_tiles = eval_net('G3')
     util.save_image(
-        util.image_to_array(stitch_tensor_tiles(lap2_tiles)),
+        np.array(stitch_tensor_tiles(lap2_tiles)),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Lap2.png'))
     )
 
     ki67_tiles = eval_net('G4')
     ki67_pil_tiles = [Tile(ki67_tiles[tile_no].i, ki67_tiles[tile_no].j,
-                          util.adjust_marker(util.tensor_to_pil(ki67_tiles[tile_no].img),
+                          adjust_marker(util.tensor_to_pil(ki67_tiles[tile_no].img),
                                              tiles[tile_no].img))
                       for tile_no in range(len(ki67_tiles))]
     util.save_image(
-        util.image_to_array(stitch_pil_tiles(ki67_pil_tiles)),
+        np.array(stitch_pil_tiles(ki67_pil_tiles)),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Marker.png'))
     )
 
@@ -107,16 +107,16 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
         [segment_tile(*ts) for ts in zip(tiles, hema_tiles, dpi_tiles, lap2_tiles, ki67_tiles)]
     )
     util.save_image(
-        util.image_to_array(seg_img),
+        np.array(seg_img),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Seg.png'))
     )
 
     util.save_image(
-        util.image_to_array(Image.fromarray(overlay(np.array(img), np.array(seg_img)[:, :, ::-1]))),
+        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)[:, :, ::-1]))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
     )
     util.save_image(
-        util.image_to_array(Image.fromarray(refine(np.array(img), np.array(seg_img)[:, :, ::-1]))),
+        np.array(Image.fromarray(refine(np.array(img), np.array(seg_img)[:, :, ::-1]))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegRefined.png'))
     )
 
