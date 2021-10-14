@@ -6,6 +6,8 @@
     <p align="center">
     <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
+    <a href="https://deepliif.org/">AWS Cloud Deployment</a>
+    |
     <a href="https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing">Google CoLab Demo</a>
     |
     <a href="#docker-file">Docker</a>
