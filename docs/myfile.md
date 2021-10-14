@@ -39,7 +39,7 @@ python PrepareDataForTesting.py --input_dir /path/to/input/images
                                 --output_dir /path/to/dataset/directory
 ```
 
-# Training:
+# Training
 To train a model:
 ```
 python train.py --dataroot /path/to/input/images 
@@ -51,7 +51,7 @@ python train.py --dataroot /path/to/input/images
 * Trained models will be by default save in DeepLIIF/checkpoints/Model_Name.
 * Training datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-# Testing:
+# Testing
 To test the model:
 ```
 python test.py --dataroot /path/to/input/images 
@@ -64,12 +64,17 @@ python test.py --dataroot /path/to/input/images
 * To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). A brief tutorial on how to use these scripts is given.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-# Demo:
-Change the DeepLIIF_path to the path of DeepLIIF project. 
-Set input_path to the directory containing the input images and python_run_path to the python executable (path to installed python directory). 
-It saves the modalities to the input directory next to each image.
+## DeepLIIF Inference on Large Tissues
+This script is used for testing purposes. You can use this script to infer modalities and classified segmentation mask for large images.
+If the output_dir not given the script, it automatically saves the inferred modalities in the input_dir next to the original images.
+```
+python inference.py  --input_dir /path/to/preprocessed/images 
+                     --output_dir /path/to/output/images 
+                     --tile_size size_of_each_cropped_tile 
+                     --overlap_size overlap_size_between_crops 
+```
 
-# Docker File:
+# Docker File
 You can use the docker file to create the docker image for running the model.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
@@ -93,16 +98,16 @@ python test.py --dataroot Sample_Large_Tissues_Tiled/ --name DeepLIIF_Latest_Mod
 python postprocessing.py --output_dir Sample_Large_Tissues/ --input_dir results/DeepLIIF_Latest_Model/test_latest/images/ --input_orig_dir Sample_Large_Tissues/
 ```
 
-# Google CoLab:
+# Google CoLab
 If you don't have access to GPU or appropriate hardware, we have also created [Google CoLab project](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) for your convenience. 
 Please follow the steps in the provided notebook to install the requirements and run the training and testing scripts.
 All the libraries and pretrained models have already been set up there. 
 The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
 
-# Registration:
+# Registration
 To register the denovo stained mpIF and IHC images, you can use the registration framework in the 'Registration' directory. Please refer to the README file provided in the same directory for more details.
 
-# Contributing Training Data:
+# Contributing Training Data
 To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. We also randomly selected and segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (for cell detection rather than cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test set varies widely in the density of tumor cells and the Ki67 index. You can find this dataset [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
 We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&E/IHC and multiplex images and produce the optimal output. If you are generating or have generated H&E/IHC and multiplex staining for the same slide (denovo staining) and would like to contribute that data for DeepLIIF, we can perform co-registration, whole-cell multiplex segmentation, train the DeepLIIF model and release back to the community with full credit to the contributors.
