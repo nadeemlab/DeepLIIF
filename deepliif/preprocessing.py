@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 from deepliif.data.base_dataset import __make_power_2
 
 # Postfixes not to consider for segmentation
-excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid']
+excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
 image_extensions = ['.png', '.jpg', '.tif']
 

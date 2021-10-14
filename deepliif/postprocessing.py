@@ -245,6 +245,8 @@ def adjust_dapi(inferred_tile, orig_tile):
         inferred_tile (Image) -- inferred tile image
         orig_tile (Image) -- original tile image
 
+    Returns:
+        processed_tile (Image) -- the adjusted mpIF DAPI image
     """
     inferred_tile_array = np.array(inferred_tile)
     orig_tile_array = np.array(orig_tile)
@@ -270,6 +272,8 @@ def adjust_marker(inferred_tile, orig_tile):
         inferred_tile (Image) -- inferred tile image
         orig_tile (Image) -- original tile image
 
+    Returns:
+        processed_tile (Image) -- the adjusted marker image
     """
     inferred_tile_array = np.array(inferred_tile)
     orig_tile_array = np.array(orig_tile)
@@ -288,3 +292,25 @@ def adjust_marker(inferred_tile, orig_tile):
                                   c=5, d=255).astype(np.uint8)
     return Image.fromarray(processed_tile)
 
+
+def compute_IHC_scoring(mask_image):
+    """ Computes the number of cells and the IHC score for the given segmentation mask
+
+    Parameters:
+        mask_image (numpy array) -- segmentation mask image of red and blue cells
+
+    Returns:
+        all_cells_no (integer) -- number of all cells
+        positive_cells_no (integer) -- number of positive cells
+        negative_cells_no (integer) -- number of negative cells
+        IHC_score (integer) -- IHC score (percentage of positive cells to all cells)
+
+    """
+    label_image_red = skimage.measure.label(mask_image[:, :, 0], background=0)
+    label_image_blue = skimage.measure.label(mask_image[:, :, 2], background=0)
+    positive_cells_no = (len(np.unique(label_image_red)) - 1)
+    negative_cells_no = (len(np.unique(label_image_blue)) - 1)
+    all_cells_no = positive_cells_no + negative_cells_no
+    IHC_score = int(positive_cells_no / all_cells_no * 100) if all_cells_no > 0 else 0
+
+    return all_cells_no, positive_cells_no, negative_cells_no, IHC_score
