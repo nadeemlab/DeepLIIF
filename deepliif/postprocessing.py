@@ -149,14 +149,25 @@ def remove_noises_fill_empty_holes(label_img, size=200):
     label_img[inverse_img_removed == 0] = 255
     return label_img
 
+def apply_original_image_intensity(gray, channel, orig_image_intensity_effect=0.15):
+    red_image_value = np.zeros((gray.shape[0], gray.shape[1]))
+    red_image_value[channel > 10] = gray[channel > 10] * orig_image_intensity_effect
+    red_image_value += channel
+    red_image_value[red_image_value > 255] = 255
+    return red_image_value.astype(np.uint8)
 
-def positive_negative_masks(mask, thresh=100, noise_objects_size=20):
+def positive_negative_masks(mask, thresh=100, noise_objects_size=50):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
     negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
 
     red = mask[:, :, 0]
     blue = mask[:, :, 2]
     boundary = mask[:, :, 1]
+
+    gray = cv2.cvtColor(mask, cv2.COLOR_RGB2GRAY)
+
+    red = apply_original_image_intensity(gray, red)
+    blue = apply_original_image_intensity(gray, blue)
 
     boundary[boundary < 80] = 0
 
@@ -187,7 +198,7 @@ def positive_negative_masks(mask, thresh=100, noise_objects_size=20):
     return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
 
 
-def refine(img, seg_img, thresh=100, noise_objects_size=20):
+def refine(img, seg_img, thresh=80, noise_objects_size=20):
     positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
 
     refined_mask = np.zeros_like(img)
@@ -206,7 +217,7 @@ def refine(img, seg_img, thresh=100, noise_objects_size=20):
     return refined_mask
 
 
-def overlay(img, seg_img, thresh=100, noise_objects_size=20):
+def overlay(img, seg_img, thresh=80, noise_objects_size=20):
     positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
 
     overlaid_mask = img.copy()
@@ -278,7 +289,7 @@ def adjust_marker(inferred_tile, orig_tile):
     inferred_tile_array = np.array(inferred_tile)
     orig_tile_array = np.array(orig_tile)
 
-    multiplier = 10 / math.log(np.max(orig_tile_array))
+    multiplier = 8 / math.log(np.max(orig_tile_array))
 
     if np.mean(orig_tile_array) < 200:
         processed_tile = imadjust(inferred_tile_array,

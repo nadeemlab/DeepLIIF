@@ -6,7 +6,8 @@ from torch.utils.data.dataloader import default_collate
 import torchvision.transforms as transforms
 
 from deepliif.data.base_dataset import __make_power_2
-
+import cv2
+import numpy as np
 # Postfixes not to consider for segmentation
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
@@ -29,10 +30,8 @@ def output_size(img, tile_size):
 
 def generate_tiles(img, tile_size, overlap_size):
     img = img.resize(output_size(img, tile_size))
-
     # Adding borders with size of given overlap around the whole slide image
     img = ImageOps.expand(img, border=overlap_size, fill='white')
-
     rows = int(img.height / tile_size)  # Number of tiles in the row
     cols = int(img.width / tile_size)  # Number of tiles in the column
 

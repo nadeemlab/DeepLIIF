@@ -13,6 +13,7 @@ import numpy as np
 from deepliif.util import util
 
 
+
 def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
 
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', 'DeepLIIF/checkpoints/DeepLIIF_Latest_Model/')
@@ -43,7 +44,11 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
             torch.mul(ki67_mask, seg_weights[4])
         ]).sum(dim=0))
 
+    overlap_size = tile_size / 4
     img = Image.open(os.path.join(input_dir, filename))
+    w, h = img.size
+    if abs(w - tile_size) < overlap_size and abs(h - tile_size) < overlap_size:
+        overlap_size = 0
 
     # generate the tiles and resize them to the
     # nets input size 512x512
