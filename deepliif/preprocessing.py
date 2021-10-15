@@ -6,8 +6,7 @@ from torch.utils.data.dataloader import default_collate
 import torchvision.transforms as transforms
 
 from deepliif.data.base_dataset import __make_power_2
-import cv2
-import numpy as np
+
 # Postfixes not to consider for segmentation
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
