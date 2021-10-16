@@ -2,7 +2,7 @@
 <br />
 <p align="center">
     <img src="./images/DeepLIIF_logo.png" width="50%">
-    <h3 align="center"><strong>DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
+    <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
     <p align="center">
     <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
