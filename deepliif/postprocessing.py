@@ -322,6 +322,6 @@ def compute_IHC_scoring(mask_image):
     positive_cells_no = (len(np.unique(label_image_red)) - 1)
     negative_cells_no = (len(np.unique(label_image_blue)) - 1)
     all_cells_no = positive_cells_no + negative_cells_no
-    IHC_score = int(positive_cells_no / all_cells_no * 100) if all_cells_no > 0 else 0
+    IHC_score = round(positive_cells_no / all_cells_no * 100, 1) if all_cells_no > 0 else 0
 
     return all_cells_no, positive_cells_no, negative_cells_no, IHC_score
