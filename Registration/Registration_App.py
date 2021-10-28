@@ -16,8 +16,6 @@ from matplotlib import cm
 from skimage.color import rgb2hed
 import os
 
-from Dataset_Generation.ReadBioformatImage import read_bf_image, write_bf_image
-
 from matplotlib.image import imsave
 
 
