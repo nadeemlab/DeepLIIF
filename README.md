@@ -242,7 +242,7 @@ torch-workflow-archiver -f --workflow-name deepliif \
     --export-path model-store
 ```
 
-## Run the server
+### Run the server
 Once all artifacts are available in the model store, run the model server.
 
 ```shell
