@@ -231,6 +231,17 @@ def overlay(img, seg_img, thresh=80, noise_objects_size=20):
     return overlaid_mask
 
 
+def create_mask(img, seg_img, thresh=80, noise_objects_size=20):
+    positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
+
+    mask = np.zeros_like(img)
+
+    mask[positive_mask > 0] = (255, 0, 0)
+    mask[negative_mask > 0] = (0, 0, 255)
+
+    return mask
+
+
 def imadjust(x, gamma=0.7, c=0, d=1):
     """
     Adjusting the image contrast and brightness

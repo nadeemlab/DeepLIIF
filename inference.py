@@ -5,7 +5,7 @@ from PIL import Image
 from deepliif.options.processing_options import ProcessingOptions
 from deepliif.preprocessing import allowed_file
 from deepliif.models import init_nets
-from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi, compute_IHC_scoring
+from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi, compute_IHC_scoring, create_mask
 from deepliif.preprocessing import generate_tiles, Tile, transform
 
 import torch
@@ -121,17 +121,18 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
     )
 
-    refined_image = refine(np.array(img), np.array(seg_img))
-    all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(refined_image)
+    util.save_image(
+        np.array(Image.fromarray(refine(np.array(img), np.array(seg_img)))),
+        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegRefined.png'))
+    )
+
+    mask_image = create_mask(np.array(img), np.array(seg_img))
+    all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
     print('image name:', filename.split('.')[0],
           'number of all cells:', all_cells_no,
           'number of positive cells:', positive_cells_no,
           'number of negative cells:', negative_cells_no,
           'IHC Score:', IHC_score)
-    util.save_image(
-        np.array(Image.fromarray(refined_image)),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegRefined.png'))
-    )
 
 
 if __name__ == '__main__':
