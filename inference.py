@@ -119,7 +119,8 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Seg.png'))
     )
 
-    mask_image = create_final_segmentation_mask(np.array(img), np.array(seg_img), np.array(marker_image))
+    marker_effect = 0.4
+    mask_image = create_final_segmentation_mask(np.array(img), np.array(seg_img), np.array(marker_image), marker_effect=marker_effect)
 
     util.save_image(
         np.array(Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))),
