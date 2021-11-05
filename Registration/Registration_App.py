@@ -16,8 +16,6 @@ from matplotlib import cm
 from skimage.color import rgb2hed
 import os
 
-from Dataset_Generation.ReadBioformatImage import read_bf_image, write_bf_image
-
 from matplotlib.image import imsave
 
 
@@ -149,7 +147,7 @@ class RegistrationApp:
         self.image_index = 0
         self.filename = fd.askopenfilename()
         if event == 'base':
-            self.orig_base_img = Image.open(self.filename)
+            self.orig_base_img = Image.open(self.filename).convert('RGB')
             self.base_img = self.orig_base_img.copy()
             self.base_img = self.base_img.resize((self.base_canvas_size, self.base_canvas_size))
             self.tk_base_img = ImageTk.PhotoImage(master=self.window, image=self.base_img)
@@ -157,7 +155,7 @@ class RegistrationApp:
                                           int(self.base_canvas_size / 2) + self.padding, anchor=tk.CENTER,
                                           image=self.tk_base_img)
         elif event == 'moving':
-            self.orig_moving_img = Image.open(self.filename)
+            self.orig_moving_img = Image.open(self.filename).convert('RGB')
             self.moving_img = self.orig_moving_img.copy()
             self.moving_img = self.moving_img.resize((self.moving_canvas_size, self.moving_canvas_size))
             self.crop_moving = self.moving_img.copy()
@@ -172,6 +170,8 @@ class RegistrationApp:
         moving_image_copy = self.crop_moving.copy()
         base_image_copy = base_image_copy.resize((self.blended_canvas_size, self.blended_canvas_size))
         moving_image_copy = moving_image_copy.resize((self.blended_canvas_size, self.blended_canvas_size))
+        print(base_image_copy.size)
+        print(moving_image_copy.size)
         self.blended_img = Image.blend(base_image_copy, moving_image_copy, 0.5)
         self.tk_blended_img = ImageTk.PhotoImage(master=self.window, image=self.blended_img)
         self.canvas_blended.create_image(int(self.blended_canvas_size / 2) + self.padding,

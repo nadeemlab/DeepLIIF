@@ -15,7 +15,7 @@ from deepliif.util import util
 
 
 def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
-
+    noise_objects_size = 0
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', 'DeepLIIF/checkpoints/DeepLIIF_Latest_Model/')
     nets = init_nets(model_dir)
 
@@ -44,7 +44,7 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
             torch.mul(ki67_mask, seg_weights[4])
         ]).sum(dim=0))
 
-    overlap_size = tile_size / 4
+    overlap_size = int(tile_size / 4)
     img = Image.open(os.path.join(input_dir, filename))
     w, h = img.size
     if abs(w - tile_size) < overlap_size and abs(h - tile_size) < overlap_size:
@@ -117,11 +117,11 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
     )
 
     util.save_image(
-        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)[:, :, ::-1]))),
+        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)[:, :, ::-1], noise_objects_size=noise_objects_size))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
     )
 
-    refined_image = refine(np.array(img), np.array(seg_img)[:, :, ::-1])
+    refined_image = refine(np.array(img), np.array(seg_img)[:, :, ::-1], noise_objects_size=noise_objects_size)
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(refined_image)
     print('image name:', filename.split('.')[0],
           'number of all cells:', all_cells_no,
