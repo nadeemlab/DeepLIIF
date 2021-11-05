@@ -83,14 +83,12 @@ def compute_cell_mapping(new_mapping, image_size, small_object_size=20):
     for i in range(image_size[0]):
         for j in range(image_size[1]):
             if marked[i][j] is False and (new_mapping[i, j, 0] > 0 or new_mapping[i, j, 2] > 0):
-                cluster_red_prob, cluster_blue_prob, cluster_red_no, cluster_blue_no = 0, 0, 0, 0
+                cluster_red_no, cluster_blue_no = 0, 0
                 pixels = [(i, j)]
                 cluster = [(i, j)]
                 marked[i][j] = True
                 while len(pixels) > 0:
                     pixel = pixels.pop()
-                    cluster_red_prob += new_mapping[pixel[0], pixel[1], 0]
-                    cluster_blue_prob += new_mapping[pixel[0], pixel[1], 2]
                     if new_mapping[pixel[0], pixel[1], 0] > 0:
                         cluster_red_no += 1
                     if new_mapping[pixel[0], pixel[1], 2] > 0:
@@ -103,9 +101,9 @@ def compute_cell_mapping(new_mapping, image_size, small_object_size=20):
                                 pixels.append(neigh_pixel)
                                 marked[neigh_pixel[0]][neigh_pixel[1]] = True
                 cluster_value = None
-                if cluster_red_prob < cluster_blue_prob or cluster_red_no * 2 < cluster_blue_no:
+                if cluster_red_no < cluster_blue_no:
                     cluster_value = (0, 0, 255)
-                elif cluster_blue_prob < cluster_red_prob or cluster_blue_no * 2 < cluster_red_no:
+                else:
                     cluster_value = (255, 0, 0)
                 if len(cluster) < small_object_size:
                     cluster_value = (0, 0, 0)
@@ -172,7 +170,7 @@ def positive_negative_masks(mask, thresh=100, noise_objects_size=50):
     boundary[boundary < 80] = 0
 
     positive_mask[red > thresh] = 255
-    positive_mask[boundary > thresh] = 0
+    positive_mask[boundary > 0] = 0
     positive_mask[blue > red] = 0
 
     negative_mask[blue > thresh] = 255
@@ -203,8 +201,8 @@ def refine(img, seg_img, thresh=80, noise_objects_size=20):
 
     refined_mask = np.zeros_like(img)
 
-    refined_mask[positive_mask > 0] = (0, 0, 255)
-    refined_mask[negative_mask > 0] = (255, 0, 0)
+    refined_mask[positive_mask > 0] = (255, 0, 0)
+    refined_mask[negative_mask > 0] = (0, 0, 255)
 
     edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
@@ -224,13 +222,24 @@ def overlay(img, seg_img, thresh=80, noise_objects_size=20):
 
     edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
+    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
 
     edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
+    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
 
     return overlaid_mask
+
+
+def create_mask(img, seg_img, thresh=80, noise_objects_size=20):
+    positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
+
+    mask = np.zeros_like(img)
+
+    mask[positive_mask > 0] = (255, 0, 0)
+    mask[negative_mask > 0] = (0, 0, 255)
+
+    return mask
 
 
 def imadjust(x, gamma=0.7, c=0, d=1):
@@ -322,6 +331,6 @@ def compute_IHC_scoring(mask_image):
     positive_cells_no = (len(np.unique(label_image_red)) - 1)
     negative_cells_no = (len(np.unique(label_image_blue)) - 1)
     all_cells_no = positive_cells_no + negative_cells_no
-    IHC_score = int(positive_cells_no / all_cells_no * 100) if all_cells_no > 0 else 0
+    IHC_score = round(positive_cells_no / all_cells_no * 100, 1) if all_cells_no > 0 else 0
 
     return all_cells_no, positive_cells_no, negative_cells_no, IHC_score

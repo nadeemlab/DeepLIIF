@@ -2,7 +2,7 @@
 <br />
 <p align="center">
     <img src="./images/DeepLIIF_logo.png" width="50%">
-    <h3 align="center"><strong>DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
+    <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
     <p align="center">
     <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
@@ -147,7 +147,7 @@ To register the denovo stained mpIF and IHC images, you can use the registration
 ## Contributing Training Data:
 To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. We also randomly selected and segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (for cell detection rather than cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test set varies widely in the density of tumor cells and the Ki67 index. You can find this dataset [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&E/IHC and multiplex images and produce the optimal output. If you are generating or have generated H&E/IHC and multiplex staining for the same slide (denovo staining) and would like to contribute that data for DeepLIIF, we can perform co-registration, whole-cell multiplex segmentation, train the DeepLIIF model and release back to the community with full credit to the contributors.
+We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&E/IHC and multiplex images and produce the optimal output. If you are generating or have generated H&E/IHC and multiplex staining for the same slide (denovo staining) and would like to contribute that data for DeepLIIF, we can perform co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the DeepLIIF model and release back to the community with full credit to the contributors.
 
 
 ## More options?
