@@ -5,13 +5,15 @@ from PIL import Image
 from deepliif.options.processing_options import ProcessingOptions
 from deepliif.preprocessing import allowed_file
 from deepliif.models import init_nets
-from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi, compute_IHC_scoring, create_mask
+from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi, compute_IHC_scoring, \
+    create_final_segmentation_mask,\
+    overlay_final_segmentation_mask, \
+    create_final_segmentation_mask_with_boundaries
 from deepliif.preprocessing import generate_tiles, Tile, transform
 
 import torch
 import numpy as np
 from deepliif.util import util
-
 
 
 def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
@@ -103,8 +105,9 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
                           adjust_marker(util.tensor_to_pil(ki67_tiles[tile_no].img),
                                              tiles[tile_no].img))
                       for tile_no in range(len(ki67_tiles))]
+    marker_image = np.array(stitch_pil_tiles(ki67_pil_tiles))
     util.save_image(
-        np.array(stitch_pil_tiles(ki67_pil_tiles)),
+        marker_image,
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Marker.png'))
     )
 
@@ -116,17 +119,18 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Seg.png'))
     )
 
+    mask_image = create_final_segmentation_mask(np.array(img), np.array(seg_img), np.array(marker_image))
+
     util.save_image(
-        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)))),
+        np.array(Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
     )
 
     util.save_image(
-        np.array(Image.fromarray(refine(np.array(img), np.array(seg_img)))),
+        np.array(Image.fromarray(create_final_segmentation_mask_with_boundaries(mask_image))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegRefined.png'))
     )
 
-    mask_image = create_mask(np.array(img), np.array(seg_img))
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
     print('image name:', filename.split('.')[0],
           'number of all cells:', all_cells_no,
