@@ -117,11 +117,11 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
     )
 
     util.save_image(
-        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)[:, :, ::-1]))),
+        np.array(Image.fromarray(overlay(np.array(img), np.array(seg_img)))),
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
     )
 
-    refined_image = refine(np.array(img), np.array(seg_img)[:, :, ::-1])
+    refined_image = refine(np.array(img), np.array(seg_img))
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(refined_image)
     print('image name:', filename.split('.')[0],
           'number of all cells:', all_cells_no,
