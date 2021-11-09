@@ -155,6 +155,13 @@ def apply_original_image_intensity(gray, channel, orig_image_intensity_effect=0.
     red_image_value[red_image_value > 255] = 255
     return red_image_value.astype(np.uint8)
 
+def apply_original_image_intensity2(gray, channel, channel2, orig_image_intensity_effect=0.1):
+    red_image_value = np.zeros((gray.shape[0], gray.shape[1]))
+    red_image_value[channel > 10] = gray[channel > 10] * orig_image_intensity_effect
+    red_image_value[channel2 > 10] = gray[channel2 > 10] * orig_image_intensity_effect
+    red_image_value += channel
+    red_image_value[red_image_value > 255] = 255
+    return red_image_value.astype(np.uint8)
 
 def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=100, noise_objects_size=50):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
@@ -167,13 +174,14 @@ def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=1
     # Adding the original image intensity to increase the probability of low-contrast cells
     # with lower probability in the segmentation mask
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    red = apply_original_image_intensity(gray, red)
-    blue = apply_original_image_intensity(gray, blue)
+    red = apply_original_image_intensity(gray, red, 0.3)
+    blue = apply_original_image_intensity(gray, blue, 0.3)
 
     # Adding marker_image annotations to red probability mask
     # to increase the probability of positive cells in the segmentation mask
-    gray = cv2.cvtColor(marker_image, cv2.COLOR_RGB2GRAY)
-    red = apply_original_image_intensity(gray, red, marker_effect)
+    # gray = cv2.cvtColor(marker_image, cv2.COLOR_RGB2GRAY)
+    # # red = apply_original_image_intensity(gray, red, marker_effect)
+    # red = apply_original_image_intensity2(gray, red, blue, marker_effect)
 
     # Filtering boundary pixels
     boundary[boundary < 80] = 0

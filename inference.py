@@ -17,7 +17,9 @@ from deepliif.util import util
 
 
 def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
-    noise_objects_size = 0
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', 'DeepLIIF/checkpoints/DeepLIIF_Latest_Model/')
     nets = init_nets(model_dir)
 
@@ -49,7 +51,7 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
     overlap_size = int(tile_size / 4)
     img = Image.open(os.path.join(input_dir, filename))
     w, h = img.size
-    if abs(w - tile_size) < overlap_size and abs(h - tile_size) < overlap_size:
+    if round(w / tile_size) * tile_size == tile_size and round(h / tile_size) * tile_size == tile_size:
         overlap_size = 0
 
     # generate the tiles and resize them to the
@@ -119,7 +121,7 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
         os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Seg.png'))
     )
 
-    marker_effect = 0.8
+    marker_effect = 2
     mask_image = create_final_segmentation_mask(np.array(img), np.array(seg_img), np.array(marker_image), marker_effect=marker_effect)
 
     util.save_image(
