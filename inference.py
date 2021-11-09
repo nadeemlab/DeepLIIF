@@ -48,10 +48,10 @@ def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
             torch.mul(ki67_mask, seg_weights[4])
         ]).sum(dim=0))
 
-    overlap_size = int(tile_size / 4)
+    overlap_size = tile_size // 4
     img = Image.open(os.path.join(input_dir, filename))
     w, h = img.size
-    if round(w / tile_size) * tile_size == tile_size and round(h / tile_size) * tile_size == tile_size:
+    if round(w / tile_size) == 1 and round(h / tile_size) == 1:
         overlap_size = 0
 
     # generate the tiles and resize them to the
