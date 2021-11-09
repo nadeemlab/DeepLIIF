@@ -5,7 +5,7 @@ from PIL import Image
 from deepliif.options.processing_options import ProcessingOptions
 from deepliif.preprocessing import allowed_file
 from deepliif.models import init_nets
-from deepliif.postprocessing import stitch, overlay, refine, adjust_marker, adjust_dapi, compute_IHC_scoring, \
+from deepliif.postprocessing import stitch, adjust_marker, adjust_dapi, compute_IHC_scoring, \
     create_final_segmentation_mask,\
     overlay_final_segmentation_mask, \
     create_final_segmentation_mask_with_boundaries

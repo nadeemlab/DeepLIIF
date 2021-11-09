@@ -155,6 +155,7 @@ def apply_original_image_intensity(gray, channel, orig_image_intensity_effect=0.
     red_image_value[red_image_value > 255] = 255
     return red_image_value.astype(np.uint8)
 
+
 def apply_original_image_intensity2(gray, channel, channel2, orig_image_intensity_effect=0.1):
     red_image_value = np.zeros((gray.shape[0], gray.shape[1]))
     red_image_value[channel > 10] = gray[channel > 10] * orig_image_intensity_effect
@@ -162,6 +163,7 @@ def apply_original_image_intensity2(gray, channel, channel2, orig_image_intensit
     red_image_value += channel
     red_image_value[red_image_value > 255] = 255
     return red_image_value.astype(np.uint8)
+
 
 def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=100, noise_objects_size=50):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
@@ -213,39 +215,46 @@ def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=1
     return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
 
 
-def refine(img, seg_img, thresh=80, noise_objects_size=20):
-    positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
+def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50):
+    positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
+    negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
 
-    refined_mask = np.zeros_like(img)
+    red = mask[:, :, 0]
+    blue = mask[:, :, 2]
+    boundary = mask[:, :, 1]
 
-    refined_mask[positive_mask > 0] = (255, 0, 0)
-    refined_mask[negative_mask > 0] = (0, 0, 255)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
-    edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
+    red = apply_original_image_intensity(gray, red)
+    blue = apply_original_image_intensity(gray, blue)
 
-    edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
+    boundary[boundary < 80] = 0
 
-    return refined_mask
+    positive_mask[red > thresh] = 255
+    positive_mask[boundary > 0] = 0
+    positive_mask[blue > red] = 0
 
+    negative_mask[blue > thresh] = 255
+    negative_mask[boundary > 0] = 0
+    negative_mask[red >= blue] = 0
 
-def overlay(img, seg_img, thresh=80, noise_objects_size=20):
-    positive_mask, negative_mask = positive_negative_masks(seg_img, thresh, noise_objects_size)
+    cell_mapping = np.zeros_like(mask)
+    cell_mapping[:, :, 0] = positive_mask
+    cell_mapping[:, :, 2] = negative_mask
 
-    overlaid_mask = img.copy()
+    compute_cell_mapping(cell_mapping, mask.shape, small_object_size=50)
+    cell_mapping[cell_mapping > 0] = 255
 
-    edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
+    positive_mask = cell_mapping[:, :, 0]
+    negative_mask = cell_mapping[:, :, 2]
 
-    edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
+    def inner(img):
+        img = remove_small_objects_from_image(img, noise_objects_size)
+        img = ndi.binary_fill_holes(img).astype(np.uint8)
+        return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
 
-    return overlaid_mask
+    # return inner(positive_mask), inner(negative_mask)
+    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
 
 
 def create_final_segmentation_mask_with_boundaries(mask_image):
@@ -280,6 +289,17 @@ def overlay_final_segmentation_mask(img, mask_image):
 
 def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4, thresh=80, noise_objects_size=20):
     positive_mask, negative_mask = positive_negative_masks(img, seg_img, marker_image, marker_effect, thresh, noise_objects_size)
+
+    mask = np.zeros_like(img)
+
+    mask[positive_mask > 0] = (255, 0, 0)
+    mask[negative_mask > 0] = (0, 0, 255)
+
+    return mask
+
+
+def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20):
+    positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size)
 
     mask = np.zeros_like(img)
 
