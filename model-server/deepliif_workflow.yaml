@@ -1,7 +1,7 @@
 models:
   #global model params
   min-workers: 1
-  max-workers: 4
+  max-workers: 2
   batch-size: 1
   max-batch-delay: 500
   retry-attempts: 3

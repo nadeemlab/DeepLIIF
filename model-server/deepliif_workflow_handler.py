@@ -14,7 +14,7 @@ def weighted_average(data, context):
         seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
 
         def to_tensor(bs):
-            return torch.load(BytesIO(bs))
+            return torch.load(BytesIO(bs)).to(torch.device('cuda'))
 
         return [torch.stack([
             torch.mul(to_tensor(data[0]['g51']), seg_weights[0]),
