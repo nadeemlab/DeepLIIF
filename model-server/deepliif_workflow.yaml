@@ -1,0 +1,42 @@
+models:
+  #global model params
+  min-workers: 1
+  max-workers: 2
+  batch-size: 1
+  max-batch-delay: 500
+  retry-attempts: 3
+  timeout-ms: 10000
+
+  g1:
+    url: G1.mar
+  g2:
+    url: G2.mar
+  g3:
+    url: G3.mar
+  g4:
+    url: G4.mar
+  g51:
+    url: G51.mar
+  g52:
+    url: G52.mar
+  g53:
+    url: G53.mar
+  g54:
+    url: G54.mar
+  g55:
+    url: G55.mar
+
+dag:
+  preprocess: [ g1, g2, g3, g4, g51 ]
+
+  g1: [ g52, aggregate ]
+  g2: [ g53, aggregate ]
+  g3: [ g54, aggregate ]
+  g4: [ g55, aggregate ]
+
+  g51: [ weighted_average ]
+  g52: [ weighted_average ]
+  g53: [ weighted_average ]
+  g54: [ weighted_average ]
+  g55: [ weighted_average ]
+  weighted_average: [ aggregate ]
