@@ -176,7 +176,7 @@ A common use case scenario would be:
 1. Load an IHC image and generate the tiles.
 3. For each tile
     1. Resize to 512x512 and transform to tensor.
-    2. Serilialize the tensor and use the inference API to generate all the masks
+    2. Serialize the tensor and use the inference API to generate all the masks
     3. Deserialize the results
 4. Stitch back the results and apply post-processing operations 
 
@@ -184,7 +184,7 @@ The next sections show how to deploy the model server.
 
 ### Pre-requisites
 1. Install Torchserve and torch-model-archiver following [these instructions](https://github.com/pytorch/serve#install-torchserve-and-torch-model-archiver).
-In MacOS, navigate into the `model-server` directory:
+In MacOS, navigate to the `model-server` directory:
 
 ```shell
 cd model-server
@@ -201,7 +201,7 @@ unzip DeepLIIF_Latest_Model.zip
 ```
 
 ### Package models and workflow
-In order to run the DeepLIIF nets using Torchserve, they first need to archived as MAR files.
+In order to run the DeepLIIF nets using Torchserve, they first need to be archived as MAR files.
 In this section we will create the model artifacts and archive them in the model store.
 First, inside `model-server` create a directory to store the models.
 
