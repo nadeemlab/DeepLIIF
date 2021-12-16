@@ -215,7 +215,7 @@ def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=1
     return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
 
 
-def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50):
+def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50, small_object_size=50):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
     negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
 
@@ -242,7 +242,7 @@ def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50):
     cell_mapping[:, :, 0] = positive_mask
     cell_mapping[:, :, 2] = negative_mask
 
-    compute_cell_mapping(cell_mapping, mask.shape, small_object_size=50)
+    compute_cell_mapping(cell_mapping, mask.shape, small_object_size)
     cell_mapping[cell_mapping > 0] = 255
 
     positive_mask = cell_mapping[:, :, 0]
@@ -298,7 +298,7 @@ def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4
     return mask
 
 
-def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20):
+def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
     positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size)
 
     mask = np.zeros_like(img)
