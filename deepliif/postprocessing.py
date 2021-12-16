@@ -299,7 +299,7 @@ def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4
 
 
 def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
-    positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size)
+    positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size, small_object_size)
 
     mask = np.zeros_like(img)
 
