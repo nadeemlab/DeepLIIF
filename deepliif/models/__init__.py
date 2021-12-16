@@ -17,14 +17,27 @@ In the function <__init__>, you need to define four lists:
 Now you can use the model class by specifying flag '--model dummy'.
 See our template model class 'template_model.py' for more details.
 """
-
+import base64
 import os
+import itertools
 import importlib
+from functools import lru_cache
+from io import BytesIO
 
+import requests
 import torch
+from PIL import Image
+import numpy as np
+from dask import delayed, compute
 
-from deepliif.models.base_model import BaseModel
-from deepliif.models.networks import get_norm_layer, ResnetGenerator, UnetGenerator
+from deepliif.util import generate_tiles, stitch, Tile, chunker, tensor_to_pil
+from deepliif.data import transform
+from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
+    overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
+
+from .base_model import BaseModel
+from .DeepLIIF_model import DeepLIIFModel
+from .networks import get_norm_layer, ResnetGenerator, UnetGenerator
 
 
 def find_model_using_name(model_name):
@@ -73,7 +86,11 @@ def create_model(opt):
     return instance
 
 
-def init_nets(model_dir):
+def load_torchscript_model(model_pt_path, device):
+    return torch.jit.load(model_pt_path, map_location=device)
+
+
+def load_eager_models(model_dir, devices):
     input_nc = 3
     output_nc = 3
     ngf = 64
@@ -86,15 +103,147 @@ def init_nets(model_dir):
     for n in ['G1', 'G2', 'G3', 'G4']:
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
         net.load_state_dict(torch.load(
-            os.path.join(model_dir, f'latest_net_{n}.pth')
+            os.path.join(model_dir, f'latest_net_{n}.pth'),
+            map_location=devices[n]
         ))
         nets[n] = net
 
     for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
         net.load_state_dict(torch.load(
-            os.path.join(model_dir, f'latest_net_{n}.pth')
+            os.path.join(model_dir, f'latest_net_{n}.pth'),
+            map_location=devices[n]
         ))
         nets[n] = net
 
     return nets
+
+
+@lru_cache
+def init_nets(model_dir, eager_mode=False):
+    """
+    Init DeepLIIF networks so that every net in
+    the same group is deployed on the same GPU
+    """
+    net_groups = [
+        ('G1', 'G52'),
+        ('G2', 'G53'),
+        ('G3', 'G54'),
+        ('G4', 'G55'),
+        ('G51',)
+    ]
+
+    number_of_gpus = torch.cuda.device_count()
+    if number_of_gpus:
+        chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
+        devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
+    else:
+        devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
+
+    if eager_mode:
+        return load_eager_models(model_dir, devices)
+
+    return {
+        n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
+        for n, d in devices.items()
+    }
+
+
+def compute_overlap(img_size, tile_size):
+    w, h = img_size
+    if round(w / tile_size) == 1 and round(h / tile_size) == 1:
+        return 0
+
+    return tile_size // 4
+
+
+def run_torchserve(img):
+    buffer = BytesIO()
+    torch.save(transform(img.resize((512, 512))), buffer)
+
+    torchserve_host = os.getenv('TORCHSERVE_HOST', 'http://localhost')
+    res = requests.post(
+        f'{torchserve_host}/wfpredict/deepliif',
+        json={'img': base64.b64encode(buffer.getvalue()).decode('utf-8')}
+    )
+
+    res.raise_for_status()
+
+    def deserialize_tensor(bs):
+        return torch.load(BytesIO(base64.b64decode(bs.encode())), map_location=torch.device('cpu'))
+
+    return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
+
+
+def run_dask(img):
+    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
+    nets = init_nets(model_dir)
+
+    ts = transform(img.resize((512, 512)))
+
+    @delayed
+    def forward(input, model):
+        with torch.no_grad():
+            return model(input.to(next(model.parameters()).device))
+
+    seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+
+    lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+    gens = compute(lazy_gens)[0]
+
+    lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+    lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+    segs = compute(lazy_segs)[0]
+
+    seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+    seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
+
+    res = {k: tensor_to_pil(v) for k, v in gens.items()}
+    res['G5'] = tensor_to_pil(seg)
+
+    return res
+
+
+def inference(img, tile_size, overlap_size, use_torchserve=False):
+    tiles = list(generate_tiles(img, tile_size, overlap_size))
+
+    run_fn = run_torchserve if use_torchserve else run_dask
+    res = [Tile(t.i, t.j, run_fn(t.img)) for t in tiles]
+
+    def get_net_tiles(n):
+        return [Tile(t.i, t.j, t.img[n]) for t in res]
+
+    images = {}
+
+    images['Hema'] = stitch(get_net_tiles('G1'), tile_size, overlap_size).resize(img.size)
+
+    images['DAPI'] = stitch(
+        [Tile(t.i, t.j, adjust_dapi(dt.img, t.img))
+         for t, dt in zip(tiles, get_net_tiles('G2'))],
+        tile_size, overlap_size).resize(img.size)
+
+    images['DAPILap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
+
+    images['Ki67'] = stitch(
+        [Tile(t.i, t.j, adjust_marker(kt.img, t.img))
+         for t, kt in zip(tiles, get_net_tiles('G4'))],
+        tile_size, overlap_size).resize(img.size)
+
+    images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
+
+    mask_image = create_basic_segmentation_mask(np.array(img), np.array(images['Seg']))
+
+    images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
+
+    refined_image = create_final_segmentation_mask_with_boundaries(np.array(img))
+    images['SegRefined'] = Image.fromarray(refined_image)
+
+    all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
+    scoring = {
+        'num_total': all_cells_no,
+        'num_pos': positive_cells_no,
+        'num_neg': negative_cells_no,
+        'percent_pos': IHC_score
+    }
+
+    return images, scoring

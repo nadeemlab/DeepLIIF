@@ -1,150 +1,157 @@
 import os
-
-from PIL import Image
-
-from deepliif.options.processing_options import ProcessingOptions
-from deepliif.preprocessing import allowed_file
-from deepliif.models import init_nets
-from deepliif.postprocessing import stitch, adjust_marker, adjust_dapi, compute_IHC_scoring, \
-    create_final_segmentation_mask,\
-    overlay_final_segmentation_mask, \
-    create_final_segmentation_mask_with_boundaries
-from deepliif.preprocessing import generate_tiles, Tile, transform
+import json
+from collections import namedtuple
 
 import torch
 import numpy as np
+from PIL import Image
+from dask import delayed, compute
+
+from deepliif.options.processing_options import ProcessingOptions
+from deepliif.preprocessing import allowed_file, generate_tiles, Tile, transform
+from deepliif.models import init_nets
+from deepliif.postprocessing import stitch, adjust_marker, adjust_dapi, compute_IHC_scoring, \
+    overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
 from deepliif.util import util
 
+model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
 
-def infer_images(input_dir, output_dir, filename, tile_size, overlap_size):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
-    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', 'DeepLIIF/checkpoints/DeepLIIF_Latest_Model/')
+@util.timeit
+def run_models(nets, img):
+    ts = transform(img.resize((512, 512)))
+
+    @delayed
+    def forward(input, model):
+        with torch.no_grad():
+            return model(input.to(next(model.parameters()).device))
+
+    gen_map = {
+        'hema': 'G1',
+        'dapi': 'G2',
+        'lap2': 'G3',
+        'ki67': 'G4',
+    }
+
+    lazy_gens = {k: forward(ts, nets[v]) for k, v in gen_map.items()}
+    gens = compute(lazy_gens)[0]
+
+    seg_map = {
+        'hema': 'G52',
+        'dapi': 'G53',
+        'lap2': 'G54',
+        'ki67': 'G55',
+    }
+
+    lazy_segs = {f'{k}_seg': forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+    lazy_segs['original_seg'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+    segs = compute(lazy_segs)[0]
+
+    seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+    seg = torch.stack([
+        torch.mul(segs['original_seg'], seg_weights[0]),
+        torch.mul(segs['hema_seg'], seg_weights[1]),
+        torch.mul(segs['dapi_seg'], seg_weights[3]),
+        torch.mul(segs['lap2_seg'], seg_weights[2]),
+        torch.mul(segs['ki67_seg'], seg_weights[4]),
+    ]).sum(dim=0)
+
+    return {
+        'g1': util.tensor_to_pil(gens['hema']),
+        'g2': util.tensor_to_pil(gens['dapi']),
+        'g3': util.tensor_to_pil(gens['lap2']),
+        'g4': util.tensor_to_pil(gens['ki67']),
+        'g5': util.tensor_to_pil(seg)
+    }
+
+
+def inference(img, tile_size, overlap_size):
     nets = init_nets(model_dir)
 
-    device = torch.device('cpu') if os.getenv('DEEPLIIF_PROC') == 'cpu' else torch.device('cuda')
+    tiles = list(generate_tiles(img, tile_size, overlap_size))
 
-    def segment_tile(t, hema, dpi, lap2, ki67):
-        with torch.no_grad():
-            # Segmentation mask generator from IHC input image
-            ihc_mask = nets['G51'].to(device)(transform(t.img).to(device))
-            # Segmentation mask generator from Hematoxylin input image
-            hema_mask = nets['G52'].to(device)(hema.img.to(device))
-            # Segmentation mask generator from mpIF DAPI input image
-            dpi_mask = nets['G53'].to(device)(dpi.img.to(device))
-            # Segmentation mask generator from mpIF Lap2 input image
-            lap2_mask = nets['G54'].to(device)(lap2.img.to(device))
-            # Segmentation mask generator from Ki67 input image
-            ki67_mask = nets['G55'].to(device)(ki67.img.to(device))
+    res = [Tile(t.i, t.j, run_models(nets, t.img)) for t in tiles]
 
-        seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+    images = {}
 
-        return Tile(t.i, t.j, torch.stack([
-            torch.mul(ihc_mask, seg_weights[0]),
-            torch.mul(hema_mask, seg_weights[1]),
-            torch.mul(dpi_mask, seg_weights[2]),
-            torch.mul(lap2_mask, seg_weights[3]),
-            torch.mul(ki67_mask, seg_weights[4])
-        ]).sum(dim=0))
+    hema_tiles = [Tile(t.i, t.j, t.img['g1']) for t in res]
 
-    overlap_size = tile_size // 4
-    img = Image.open(os.path.join(input_dir, filename))
-    w, h = img.size
-    if round(w / tile_size) == 1 and round(h / tile_size) == 1:
-        overlap_size = 0
+    images['Hema'] = stitch(hema_tiles, tile_size, overlap_size).resize(img.size)
 
-    # generate the tiles and resize them to the
-    # nets input size 512x512
-    tiles = [Tile(t.i, t.j, t.img.resize((512, 512)))
-             for t in generate_tiles(img, tile_size, overlap_size)]
+    dapi_tiles = [Tile(t.i, t.j, t.img['g2']) for t in res]
+    post_dapi_tiles = [
+        Tile(t.i, t.j, adjust_dapi(dt.img, t.img))
+        for t, dt in zip(tiles, dapi_tiles)
+    ]
+    images['DAPI'] = stitch(post_dapi_tiles, tile_size, overlap_size).resize(img.size)
 
-    def eval_net(net):
-        def eval_tile(t):
-            with torch.no_grad():
-                return Tile(t.i, t.j, nets[net].to(device)(transform(t.img).to(device)))
+    lap2_tiles = [Tile(t.i, t.j, t.img['g3']) for t in res]
+    images['DAPILap2'] = stitch(lap2_tiles, tile_size, overlap_size).resize(img.size)
 
-        return [eval_tile(t) for t in tiles]
+    ki67_tiles = [Tile(t.i, t.j, t.img['g4']) for t in res]
+    post_ki67_tiles = [
+        Tile(t.i, t.j, adjust_marker(kt.img, t.img))
+        for t, kt in zip(tiles, ki67_tiles)
+    ]
+    images['Ki67'] = stitch(post_ki67_tiles, tile_size, overlap_size).resize(img.size)
 
-    def stitch_tensor_tiles(ts):
-        return stitch(
-            [Tile(t.i, t.j, util.tensor_to_pil(t.img)) for t in ts],
-            tile_size,
-            overlap_size
-        ).resize(img.size)
+    seg_tiles = [Tile(t.i, t.j, t.img['g5']) for t in res]
+    seg_img = stitch(seg_tiles, tile_size, overlap_size).resize(img.size)
+    images['Seg'] = seg_img
 
-    def stitch_pil_tiles(ts):
-        return stitch(
-            ts,
-            tile_size,
-            overlap_size
-        ).resize(img.size)
+    mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img))
 
-    hema_tiles = eval_net('G1')
-    util.save_image(
-        np.array(stitch_tensor_tiles(hema_tiles)),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Hema.png'))
-    )
+    images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
 
-    dpi_tiles = eval_net('G2')
-    dpi_pil_tiles = [Tile(dpi_tiles[tile_no].i, dpi_tiles[tile_no].j,
-                          adjust_dapi(util.tensor_to_pil(dpi_tiles[tile_no].img),
-                                           tiles[tile_no].img))
-                     for tile_no in range(len(dpi_tiles))]
-    util.save_image(
-        np.array(stitch_pil_tiles(dpi_pil_tiles)),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_DAPI.png'))
-    )
-
-    lap2_tiles = eval_net('G3')
-    util.save_image(
-        np.array(stitch_tensor_tiles(lap2_tiles)),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Lap2.png'))
-    )
-
-    ki67_tiles = eval_net('G4')
-    ki67_pil_tiles = [Tile(ki67_tiles[tile_no].i, ki67_tiles[tile_no].j,
-                          adjust_marker(util.tensor_to_pil(ki67_tiles[tile_no].img),
-                                             tiles[tile_no].img))
-                      for tile_no in range(len(ki67_tiles))]
-    marker_image = np.array(stitch_pil_tiles(ki67_pil_tiles))
-    util.save_image(
-        marker_image,
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Marker.png'))
-    )
-
-    seg_img = stitch_tensor_tiles(
-        [segment_tile(*ts) for ts in zip(tiles, hema_tiles, dpi_tiles, lap2_tiles, ki67_tiles)]
-    )
-    util.save_image(
-        np.array(seg_img),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_Seg.png'))
-    )
-
-    marker_effect = 2
-    mask_image = create_final_segmentation_mask(np.array(img), np.array(seg_img), np.array(marker_image), marker_effect=marker_effect)
-
-    util.save_image(
-        np.array(Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegOverlaid.png'))
-    )
-
-    util.save_image(
-        np.array(Image.fromarray(create_final_segmentation_mask_with_boundaries(mask_image))),
-        os.path.join(output_dir, filename.replace('.' + filename.split('.')[-1], '_SegRefined.png'))
-    )
+    refined_image = create_final_segmentation_mask_with_boundaries(np.array(img))
+    images['SegRefined'] = Image.fromarray(refined_image)
 
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
-    print('image name:', filename.split('.')[0],
-          'number of all cells:', all_cells_no,
-          'number of positive cells:', positive_cells_no,
-          'number of negative cells:', negative_cells_no,
-          'IHC Score:', IHC_score)
+    scoring = {
+        'num_total': all_cells_no,
+        'num_pos': positive_cells_no,
+        'num_neg': negative_cells_no,
+        'percent_pos': IHC_score
+    }
+
+    return images, scoring
+
+
+def ensure_exists(d):
+    if not os.path.exists(d):
+        os.makedirs(d)
+
+
+def compute_overlap(img_size, tile_size):
+    w, h = img_size
+    if round(w / tile_size) == 1 and round(h / tile_size) == 1:
+        return 0
+
+    return tile_size // 4
 
 
 if __name__ == '__main__':
     opt = ProcessingOptions().parse()
-    for img_name in os.listdir(opt.input_dir):
-        if allowed_file(img_name):
-            output_addr = opt.output_dir if opt.output_dir != '' else opt.input_dir
-            infer_images(opt.input_dir, output_addr, img_name, opt.tile_size, opt.overlap_size)
+
+    output_dir = opt.output_dir or opt.input_dir
+    ensure_exists(output_dir)
+
+    image_files = [fn for fn in os.listdir(opt.input_dir) if allowed_file(fn)]
+
+    for filename in image_files:
+
+        img = Image.open(os.path.join(opt.input_dir, filename))
+
+        images, scoring = inference(
+            img,
+            tile_size=opt.tile_size,
+            overlap_size=compute_overlap(img.size, opt.tile_size)
+        )
+
+        for name, i in images.items():
+            i.save(os.path.join(
+                output_dir,
+                filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+            ))
+
+        print(json.dumps(scoring, indent=2))

@@ -1,15 +1,12 @@
 """This module contains simple helper functions """
-from __future__ import print_function
-
-from functools import wraps
+import os
 from time import time
+from functools import wraps
 
-import cv2
 import torch
 import numpy as np
 from PIL import Image
-import os
-import math
+
 
 def timeit(f):
     @wraps(f)
@@ -124,3 +121,6 @@ def mkdir(path):
         os.makedirs(path)
 
 
+def chunker(iterable, size):
+    for i in range(size):
+        yield iterable[i::size]

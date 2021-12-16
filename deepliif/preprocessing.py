@@ -2,7 +2,6 @@ import os
 import collections
 
 from PIL import Image, ImageOps
-from torch.utils.data.dataloader import default_collate
 import torchvision.transforms as transforms
 
 from deepliif.data.base_dataset import __make_power_2
@@ -45,8 +44,8 @@ def generate_tiles(img, tile_size, overlap_size):
 
 
 def transform(img):
-    return default_collate([transforms.Compose([
+    return transforms.Compose([
         transforms.Lambda(lambda i: __make_power_2(i, base=4, method=Image.BICUBIC)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])(img)])
+    ])(img).unsqueeze(0)
