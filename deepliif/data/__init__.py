@@ -29,11 +29,12 @@ def find_dataset_using_name(dataset_name):
     target_dataset_name = dataset_name.replace('_', '') + 'dataset'
     for name, cls in datasetlib.__dict__.items():
         if name.lower() == target_dataset_name.lower() \
-           and issubclass(cls, BaseDataset):
+                and issubclass(cls, BaseDataset):
             dataset = cls
 
     if dataset is None:
-        raise NotImplementedError("In %s.py, there should be a subclass of BaseDataset with class name that matches %s in lowercase." % (dataset_filename, target_dataset_name))
+        raise NotImplementedError("In %s.py, there should be a subclass of BaseDataset with class name that matches "
+                                  "%s in lowercase." % (dataset_filename, target_dataset_name))
 
     return dataset
 
@@ -44,48 +45,44 @@ def get_option_setter(dataset_name):
     return dataset_class.modify_commandline_options
 
 
-def create_dataset(opt):
+def create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size):
     """Create a dataset given the option.
 
     This function wraps the class CustomDatasetDataLoader.
         This is the main interface between this package and 'train.py'/'test.py'
-
-    Example:
-        >>> from deepliif.data import create_dataset
-        >>> dataset = create_dataset(opt)
     """
-    return CustomDatasetDataLoader(opt)
+    return CustomDatasetDataLoader(dataset, batch_size, serial_batches, num_threads, max_dataset_size)
 
 
-class CustomDatasetDataLoader():
+class CustomDatasetDataLoader(object):
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 
-    def __init__(self, opt):
+    def __init__(self, dataset, batch_size, serial_batches, num_threads, max_dataset_size):
         """Initialize this class
 
         Step 1: create a dataset instance given the name [dataset_mode]
         Step 2: create a multi-threaded data loader.
         """
-        self.opt = opt
-        dataset_class = find_dataset_using_name(opt.dataset_mode)
-        self.dataset = dataset_class(opt)
+        self.batch_size = batch_size
+        self.max_dataset_size = max_dataset_size
+        self.dataset = dataset
         print("dataset [%s] was created" % type(self.dataset).__name__)
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
-            batch_size=opt.batch_size,
-            shuffle=not opt.serial_batches,
-            num_workers=int(opt.num_threads))
+            batch_size=batch_size,
+            shuffle=not serial_batches,
+            num_workers=int(num_threads))
 
     def load_data(self):
         return self
 
     def __len__(self):
         """Return the number of data in the dataset"""
-        return min(len(self.dataset), self.opt.max_dataset_size)
+        return max(len(self.dataset), self.max_dataset_size or 0)
 
     def __iter__(self):
         """Return a batch of data"""
         for i, data in enumerate(self.dataloader):
-            if i * self.opt.batch_size >= self.opt.max_dataset_size:
+            if self.max_dataset_size and i * self.batch_size >= self.max_dataset_size:
                 break
             yield data

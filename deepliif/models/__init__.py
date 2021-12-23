@@ -70,7 +70,8 @@ def get_option_setter(model_name):
     return model_class.modify_commandline_options
 
 
-def create_model(opt):
+def create_model(model, gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf,
+                 netG, norm, no_dropout, init_type, init_gain, ndf, netD, n_layers_D, lr, beta1, lambda_L1, lr_policy):
     """Create a model given the option.
 
     This function warps the class CustomDatasetDataLoader.
@@ -80,8 +81,9 @@ def create_model(opt):
         >>> from deepliif.models import create_model
         >>> model = create_model(opt)
     """
-    model = find_model_using_name(opt.model)
-    instance = model(opt)
+    model = find_model_using_name(model)
+    instance = model(gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf, netG,
+                     norm, no_dropout, init_type, init_gain, ndf, netD, n_layers_D, lr, beta1, lambda_L1, lr_policy)
     print("model [%s] was created" % type(instance).__name__)
     return instance
 
