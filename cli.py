@@ -30,7 +30,7 @@ def cli():
               help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
 @click.option('--name', default='experiment_name',
               help='name of the experiment. It decides where to store samples and models')
-@click.option('--gpu-ids', default=-1, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
+@click.option('--gpu-ids', multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--targets-no', default=5, help='number of targets')
 # model parameters
