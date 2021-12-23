@@ -180,7 +180,7 @@ The image is then used as a base. You can copy and use it to run an application.
 environment in which to run, referred to as a container.
 * To create and run a container:
 ```
-docker run --gpus all -it cuda/deepliif
+ docker run -it -v `pwd`:`pwd` -w `pwd` cuda/deepliif deepliif test --input-dir Sample_Large_Tissues
 ```
 When you run a container from the image, the `deepliif` CLI will be available.
 You can easily run any CLI command in the activated environment and copy the results from the docker container to the host.
