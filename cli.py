@@ -255,8 +255,7 @@ def serialize(models_dir, output_dir):
     """
     output_dir = output_dir or models_dir
 
-    with Image.open('./Sample_Large_Tissues/ROI_7.png') as img:
-        sample = transform(img.resize((512, 512)))
+    sample = transform(Image.new('RGB', (512, 512)))
 
     with click.progressbar(
             init_nets(models_dir, eager_mode=True).items(),
