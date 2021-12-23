@@ -1,7 +1,8 @@
 """This package includes all the modules related to data loading and preprocessing
 
- To add a custom dataset class called 'dummy', you need to add a file called 'dummy_dataset.py' and define a subclass 'DummyDataset' inherited from BaseDataset.
- You need to implement four functions:
+To add a custom dataset class called 'dummy', you need to add a file called 'dummy_dataset.py'
+and define a subclass 'DummyDataset' inherited from BaseDataset.
+You need to implement four functions:
     -- <__init__>:                      initialize the class, first call BaseDataset.__init__(self, opt).
     -- <__len__>:                       return the size of dataset.
     -- <__getitem__>:                   get a data point from data loader.
@@ -10,9 +11,15 @@
 Now you can use the dataset class by specifying flag '--dataset_mode dummy'.
 See our template dataset class 'template_dataset.py' for more details.
 """
+
 import importlib
+
 import torch.utils.data
-from deepliif.data.base_dataset import BaseDataset
+import torchvision.transforms as transforms
+from PIL import Image
+
+from .base_dataset import __make_power_2, BaseDataset
+from .aligned_dataset import AlignedDataset
 
 
 def find_dataset_using_name(dataset_name):
@@ -86,3 +93,12 @@ class CustomDatasetDataLoader(object):
             if self.max_dataset_size and i * self.batch_size >= self.max_dataset_size:
                 break
             yield data
+
+
+def transform(img):
+    return transforms.Compose([
+        transforms.Lambda(lambda i: __make_power_2(i, base=4, method=Image.BICUBIC)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])(img).unsqueeze(0)
+
