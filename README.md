@@ -98,9 +98,9 @@ It, first, creates the train and validation directories inside the given dataset
 Then it reads all images in the folder and saves the pairs in the train or validation directory, based on the given
   `validation_ratio`.
 ```
-deepliif prepare-data-for-training --input_dir /path/to/input/images
-                                   --output_dir /path/to/dataset/directory
-                                   --validation_ratio 0.2
+deepliif prepare-training-data --input-dir /path/to/input/images
+                               --output-dir /path/to/output/images
+                               --validation-ratio 0.2
 ```
 
 * **To prepare data for testing**, you only need to have IHC images in the input directory.

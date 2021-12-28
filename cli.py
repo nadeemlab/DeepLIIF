@@ -268,11 +268,11 @@ def serialize(models_dir, output_dir):
 
 
 @cli.command()
-@click.option('--input_dir', required=True, help='Path to input images')
-@click.option('--output_dir', type=str, help='Path to output images')
-@click.option('--validation_ratio', default=0.2,
+@click.option('--input-dir', type=str, required=True, help='Path to input images')
+@click.option('--output-dir', type=str, required=True, help='Path to output images')
+@click.option('--validation-ratio', default=0.2,
               help='The ratio of the number of the images in the validation set to the total number of images')
-def prepare_training_data(input_dir, dataset_dir, validation_ratio):
+def prepare_training_data(input_dir, output_dir, validation_ratio):
     """Preparing data for training
 
     This function, first, creates the train and validation directories inside the given dataset directory.
@@ -282,16 +282,17 @@ def prepare_training_data(input_dir, dataset_dir, validation_ratio):
     marker, and segmentation mask in the input directory ***
 
     :param input_dir: Path to the input images.
-    :param dataset_dir: Path to the dataset directory. The function automatically creates the train and validation
+    :param outputt_dir: Path to the dataset directory. The function automatically creates the train and validation
         directories inside of this directory.
     :param validation_ratio: The ratio of the number of the images in the validation set to the total number of images.
     :return:
     """
-    train_dir = os.path.join(dataset_dir, 'train')
-    val_dir = os.path.join(dataset_dir, 'val')
+    train_dir = os.path.join(output_dir, 'train')
+    val_dir = os.path.join(output_dir, 'val')
     if not os.path.exists(train_dir):
-        os.mkdir(train_dir)
-        os.mkdir(val_dir)
+        os.makedirs(train_dir, exist_ok=True)
+    if not os.path.exists(val_dir):
+        os.makedirs(val_dir, exist_ok=True)
     images = os.listdir(input_dir)
     for img in images:
         if 'IHC' in img:
