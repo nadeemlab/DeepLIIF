@@ -237,7 +237,7 @@ def inference(img, tile_size, overlap_size, use_torchserve=False):
 
     images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
 
-    refined_image = create_final_segmentation_mask_with_boundaries(np.array(img))
+    refined_image = create_final_segmentation_mask_with_boundaries(np.array(mask_image))
     images['SegRefined'] = Image.fromarray(refined_image)
 
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
