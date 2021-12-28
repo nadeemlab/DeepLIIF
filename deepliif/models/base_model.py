@@ -15,7 +15,7 @@ class BaseModel(ABC):
         -- <modify_commandline_options>:    (optionally) add model-specific options and set default options.
     """
 
-    def __init__(self, opt):
+    def __init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy):
         """Initialize the BaseModel class.
 
         Parameters:
@@ -29,12 +29,12 @@ class BaseModel(ABC):
             -- self.visual_names (str list):        specify the images that you want to display and save.
             -- self.optimizers (optimizer list):    define and initialize optimizers. You can define one optimizer for each network. If two networks are updated at the same time, you can use itertools.chain to group them. See cycle_gan_model.py for an example.
         """
-        self.opt = opt
-        self.gpu_ids = opt.gpu_ids
-        self.isTrain = opt.isTrain
+        self.gpu_ids = gpu_ids
+        self.is_train = is_train
+        self.lr_policy = lr_policy
         self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')  # get device name: CPU or GPU
-        self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir
-        if opt.preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
+        self.save_dir = os.path.join(checkpoints_dir, name)  # save all the checkpoints to save_dir
+        if preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
             torch.backends.cudnn.benchmark = True
         self.loss_names = []
         self.model_names = []
@@ -63,18 +63,18 @@ class BaseModel(ABC):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
 
-    def setup(self, opt):
+    def setup(self, lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters, continue_train, load_iter, epoch, verbose):
         """Load and print networks; create schedulers
 
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
-        if self.isTrain:
-            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
-        if not self.isTrain or opt.continue_train:
-            load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
+        if self.is_train:
+            self.schedulers = [networks.get_scheduler(optimizer, lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters) for optimizer in self.optimizers]
+        if not self.is_train or continue_train:
+            load_suffix = 'iter_%d' % load_iter if load_iter > 0 else epoch
             self.load_networks(load_suffix)
-        self.print_networks(opt.verbose)
+        self.print_networks(verbose)
 
     def eval(self):
         """Make models eval mode during test time"""
@@ -104,7 +104,7 @@ class BaseModel(ABC):
     def update_learning_rate(self):
         """Update learning rates for all the networks; called at the end of every epoch"""
         for scheduler in self.schedulers:
-            if self.opt.lr_policy == 'plateau':
+            if self.lr_policy == 'plateau':
                 scheduler.step(self.metric)
             else:
                 scheduler.step()

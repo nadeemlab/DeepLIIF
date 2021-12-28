@@ -46,10 +46,12 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
 class Visualizer():
     """This class includes several functions that can display/save images and print/save logging information.
 
-    It uses a Python library 'visdom' for display, and a Python library 'dominate' (wrapped in 'HTML') for creating HTML files with images.
+    It uses a Python library 'visdom' for display,
+    and a Python library 'dominate' (wrapped in 'HTML') for creating HTML files with images.
     """
 
-    def __init__(self, opt):
+    def __init__(self, display_id, is_train, no_html, display_winsize, name, display_port, display_ncols,
+                 display_server, display_env, checkpoints_dir):
         """Initialize the Visualizer class
 
         Parameters:
@@ -59,27 +61,26 @@ class Visualizer():
         Step 3: create an HTML object for saveing HTML filters
         Step 4: create a logging file to store training losses
         """
-        self.opt = opt  # cache the option
-        self.display_id = opt.display_id
-        self.use_html = opt.isTrain and not opt.no_html
-        self.win_size = opt.display_winsize
-        self.name = opt.name
-        self.port = opt.display_port
+        self.display_id = display_id
+        self.use_html = is_train and not no_html
+        self.win_size = display_winsize
+        self.name = name
+        self.port = display_port
         self.saved = False
         if self.display_id > 0:  # connect to a visdom server given <display_port> and <display_server>
             import visdom
-            self.ncols = opt.display_ncols
-            self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port, env=opt.display_env)
+            self.ncols = display_ncols
+            self.vis = visdom.Visdom(server=display_server, port=display_port, env=display_env)
             if not self.vis.check_connection():
                 self.create_visdom_connections()
 
         if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under <checkpoints_dir>/web/images/
-            self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
+            self.web_dir = os.path.join(checkpoints_dir, name, 'web')
             self.img_dir = os.path.join(self.web_dir, 'images')
             print('create web directory %s...' % self.web_dir)
             util.mkdirs([self.web_dir, self.img_dir])
         # create a logging file to store training losses
-        self.log_name = os.path.join(opt.checkpoints_dir, opt.name, 'loss_log.txt')
+        self.log_name = os.path.join(checkpoints_dir, name, 'loss_log.txt')
         with open(self.log_name, "a") as log_file:
             now = time.strftime("%c")
             log_file.write('================ Training Loss (%s) ================\n' % now)
@@ -89,7 +90,9 @@ class Visualizer():
         self.saved = False
 
     def create_visdom_connections(self):
-        """If the program could not connect to Visdom server, this function will start a new server at port < self.port > """
+        """If the program could not connect to Visdom server,
+        this function will start a new server at port < self.port > """
+
         cmd = sys.executable + ' -m visdom.server -p %d &>/dev/null &' % self.port
         print('\n\nCould not connect to Visdom server. \n Trying to start a server....')
         print('Command: %s' % cmd)

@@ -1,3 +1,4 @@
+import math
 import cv2
 from PIL import Image
 import skimage.measure
@@ -6,25 +7,6 @@ from skimage.morphology import remove_small_objects
 import numpy as np
 import scipy.ndimage as ndi
 from numba import jit
-import math
-
-
-def stitch(tiles, tile_size, overlap_size):
-    rows = max(t.i for t in tiles) + 1
-    cols = max(t.j for t in tiles) + 1
-
-    width = tile_size * cols
-    height = tile_size * rows
-
-    new_im = Image.new('RGB', (width, height))
-
-    for t in tiles:
-        img = t.img.resize((tile_size + 2 * overlap_size, tile_size + 2 * overlap_size))
-        img = img.crop((overlap_size, overlap_size, overlap_size + tile_size, overlap_size + tile_size))
-
-        new_im.paste(img, (t.j * tile_size, t.i * tile_size))
-
-    return new_im
 
 
 def remove_small_objects_from_image(img, min_size=100):
@@ -96,7 +78,10 @@ def compute_cell_mapping(new_mapping, image_size, small_object_size=20):
                     for neigh_i in range(-1, 2):
                         for neigh_j in range(-1, 2):
                             neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
-                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and marked[neigh_pixel[0]][neigh_pixel[1]] is False and (new_mapping[neigh_pixel[0], neigh_pixel[1], 0] > 0 or new_mapping[neigh_pixel[0], neigh_pixel[1], 2] > 0):
+                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and \
+                                    marked[neigh_pixel[0]][neigh_pixel[1]] is False and (
+                                    new_mapping[neigh_pixel[0], neigh_pixel[1], 0] > 0 or new_mapping[
+                                neigh_pixel[0], neigh_pixel[1], 2] > 0):
                                 cluster.append(neigh_pixel)
                                 pixels.append(neigh_pixel)
                                 marked[neigh_pixel[0]][neigh_pixel[1]] = True
@@ -127,7 +112,9 @@ def remove_noises(channel, image_size, small_object_size=20):
                     for neigh_i in range(-1, 2):
                         for neigh_j in range(-1, 2):
                             neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
-                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and marked[neigh_pixel[0]][neigh_pixel[1]] is False and channel[neigh_pixel[0], neigh_pixel[1]] > 0:
+                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and \
+                                    marked[neigh_pixel[0]][neigh_pixel[1]] is False and channel[
+                                neigh_pixel[0], neigh_pixel[1]] > 0:
                                 cluster.append(neigh_pixel)
                                 pixels.append(neigh_pixel)
                                 marked[neigh_pixel[0]][neigh_pixel[1]] = True
@@ -212,7 +199,8 @@ def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=1
         return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
 
     # return inner(positive_mask), inner(negative_mask)
-    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
+    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(
+        negative_mask, noise_objects_size)
 
 
 def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50, small_object_size=50):
@@ -254,17 +242,18 @@ def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50, 
         return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
 
     # return inner(positive_mask), inner(negative_mask)
-    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(negative_mask, noise_objects_size)
+    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(
+        negative_mask, noise_objects_size)
 
 
 def create_final_segmentation_mask_with_boundaries(mask_image):
     refined_mask = mask_image.copy()
 
-    edges = feature.canny(refined_mask[:,:,0], sigma=3).astype(np.uint8)
+    edges = feature.canny(refined_mask[:, :, 0], sigma=3).astype(np.uint8)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
-    edges = feature.canny(refined_mask[:,:,2], sigma=3).astype(np.uint8)
+    edges = feature.canny(refined_mask[:, :, 2], sigma=3).astype(np.uint8)
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
@@ -288,7 +277,8 @@ def overlay_final_segmentation_mask(img, mask_image):
 
 
 def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4, thresh=80, noise_objects_size=20):
-    positive_mask, negative_mask = positive_negative_masks(img, seg_img, marker_image, marker_effect, thresh, noise_objects_size)
+    positive_mask, negative_mask = positive_negative_masks(img, seg_img, marker_image, marker_effect, thresh,
+                                                           noise_objects_size)
 
     mask = np.zeros_like(img)
 
@@ -342,7 +332,8 @@ def adjust_dapi(inferred_tile, orig_tile):
 
     if np.mean(orig_tile_array) < 200:
         processed_tile = imadjust(inferred_tile_array,
-                                  gamma=multiplier * math.log(np.mean(inferred_tile_array)) / math.log(np.mean(orig_tile_array)),
+                                  gamma=multiplier * math.log(np.mean(inferred_tile_array)) / math.log(
+                                      np.mean(orig_tile_array)),
                                   c=5, d=255).astype(np.uint8)
 
     else:
