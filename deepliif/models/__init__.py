@@ -223,13 +223,19 @@ def inference(img, tile_size, overlap_size, use_torchserve=False):
         [Tile(t.i, t.j, adjust_dapi(dt.img, t.img))
          for t, dt in zip(tiles, get_net_tiles('G2'))],
         tile_size, overlap_size).resize(img.size)
+    dapi_pix = np.array(images['DAPI'])
+    dapi_pix[:, :, 0] = 0
+    images['DAPI'] = Image.fromarray(dapi_pix)
 
-    images['DAPILap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
+    images['Lap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
 
-    images['Ki67'] = stitch(
+    images['Marker'] = stitch(
         [Tile(t.i, t.j, adjust_marker(kt.img, t.img))
          for t, kt in zip(tiles, get_net_tiles('G4'))],
         tile_size, overlap_size).resize(img.size)
+    marker_pix = np.array(images['Marker'])
+    marker_pix[:, :, 2] = 0
+    images['Marker'] = Image.fromarray(marker_pix)
 
     images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
 
