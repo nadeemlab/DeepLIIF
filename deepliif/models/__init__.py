@@ -239,12 +239,15 @@ def inference(img, tile_size, overlap_size, use_torchserve=False):
 
     images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
 
-    mask_image = create_basic_segmentation_mask(np.array(img), np.array(images['Seg']))
+    return images
 
+
+def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
+    mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
+                                                thresh, noise_objects_size, small_object_size)
+    images = {}
     images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
-
-    refined_image = create_final_segmentation_mask_with_boundaries(np.array(mask_image))
-    images['SegRefined'] = Image.fromarray(refined_image)
+    images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
 
     all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
     scoring = {

@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from deepliif.data import create_dataset, AlignedDataset, transform
-from deepliif.models import inference, compute_overlap, init_nets, DeepLIIFModel
+from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer
 
 
@@ -228,11 +228,14 @@ def test(input_dir, output_dir, tile_size):
         for filename in bar:
             img = Image.open(os.path.join(input_dir, filename))
 
-            images, scoring = inference(
+            images = inference(
                 img,
                 tile_size=tile_size,
                 overlap_size=compute_overlap(img.size, tile_size)
             )
+
+            post_images, scoring = postprocess(img, images['Seg'])
+            images = {**images, **post_images}
 
             for name, i in images.items():
                 i.save(os.path.join(
