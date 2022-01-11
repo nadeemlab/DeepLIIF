@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "asset_type": "connection",
+    "name": "DeepLIIFData",
+    "origin_country": "us",
+    "rov": {
+      "mode": 0
+    },
+    "asset_category": "USER",
+    "created_at": "2022-01-11T16:34:57Z",
+    "created": 1641918897715,
+    "asset_id": "connection.DeepLIIFData",
+    "asset_attributes": [
+      "connection"
+    ]
+  },
+  "entity": {
+    "connection": {
+      "datasource_type": "9f30e3c3-b854-4144-b5c3-98b7a835dc79",
+      "context": "source,target",
+      "properties": {
+        "volume": "DeepLIIFData",
+        "instance_id": "1640292707040930"
+      },
+      "flags": [
+        "personal_credentials"
+      ]
+    }
+  },
+  "attachments": []
+}

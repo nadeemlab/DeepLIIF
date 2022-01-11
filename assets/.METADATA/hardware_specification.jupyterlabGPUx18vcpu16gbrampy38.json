@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "name": "jupyterlab GPUx1 8vcpu 16gb ram py3.8",
+    "description": "",
+    "origin_country": "US",
+    "tags": [
+      "dsx"
+    ],
+    "asset_type": "hardware_specification",
+    "rov": {
+      "mode": 0
+    },
+    "asset_category": "USER",
+    "created_at": "2022-01-11T16:35:42Z",
+    "created": 1641918942869,
+    "asset_id": "hardware_specification.jupyterlabGPUx18vcpu16gbrampy38",
+    "asset_attributes": [
+      "hardware_specification"
+    ]
+  },
+  "entity": {
+    "hardware_specification": {
+      "nodes": {
+        "cpu": {
+          "units": "8",
+          "model": ""
+        },
+        "gpu": {
+          "num_gpu": 1,
+          "name": ""
+        },
+        "mem": {
+          "size": "16Gi"
+        }
+      }
+    }
+  },
+  "attachments": []
+}
