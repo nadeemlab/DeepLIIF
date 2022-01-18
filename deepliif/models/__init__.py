@@ -30,7 +30,8 @@ from PIL import Image
 import numpy as np
 from dask import delayed, compute
 
-from deepliif.util import generate_tiles, stitch, Tile, chunker, tensor_to_pil
+from deepliif.util import generate_tiles, stitch, Tile, chunker
+from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
     overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
@@ -122,7 +123,7 @@ def load_eager_models(model_dir, devices):
 
 
 @lru_cache
-def init_nets(model_dir, eager_mode=False):
+def init_nets(model_dir, eager_mode=True):
     """
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
