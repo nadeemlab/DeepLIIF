@@ -26,9 +26,6 @@ def chunker(iterable, size):
         yield iterable[i::size]
 
 
-def tensor_to_pil(t):
-    return Image.fromarray(tensor2im(t))
-
 
 Tile = collections.namedtuple('Tile', 'i, j, img')
 
