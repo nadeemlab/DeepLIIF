@@ -116,5 +116,6 @@ def tensor2im(input_image, imtype=np.uint8):
         image_numpy = input_image
     return image_numpy.astype(imtype)
 
+
 def tensor_to_pil(t):
     return Image.fromarray(tensor2im(t))
