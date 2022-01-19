@@ -26,7 +26,6 @@ def chunker(iterable, size):
         yield iterable[i::size]
 
 
-
 Tile = collections.namedtuple('Tile', 'i, j, img')
 
 
