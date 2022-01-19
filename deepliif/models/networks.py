@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
+import os
 
 
 ###############################################################################
@@ -112,7 +113,13 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
         net.to(gpu_ids[0])
-        net = torch.nn.DataParallel(net, gpu_ids)  # multi-GPUs
+        if os.getenv('LOCAL_RANK') is not None or os.getenv('RANK') is not None:
+            # net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
+            # broadcast_buffers=False: https://github.com/pytorch/pytorch/issues/22095#issuecomment-505099500
+            net = torch.nn.parallel.DistributedDataParallel(net,broadcast_buffers=False)
+        else:
+            net = torch.nn.DataParallel(net, gpu_ids)
+            
     init_weights(net, init_type, init_gain=init_gain)
     return net
 
@@ -321,7 +328,7 @@ class ResnetGenerator(nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect'):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='zero'):
         """Construct a Resnet-based generator
 
         Parameters:
@@ -340,7 +347,7 @@ class ResnetGenerator(nn.Module):
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
 
-        model = [nn.ReflectionPad2d(3),
+        model = [nn.ReflectionPad2d(3), #nn.ReflectionPad2d(3),
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
                  nn.ReLU(True)]
@@ -365,7 +372,8 @@ class ResnetGenerator(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
-        model += [nn.ReflectionPad2d(3)]
+        model += [nn.ZeroPad2d(3)#nn.ReflectionPad2d(3)
+                 ]
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
 

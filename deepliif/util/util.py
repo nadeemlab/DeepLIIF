@@ -93,7 +93,7 @@ def mkdir(path):
         path (str) -- a single directory path
     """
     if not os.path.exists(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
 
 def tensor2im(input_image, imtype=np.uint8):

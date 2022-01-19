@@ -143,3 +143,5 @@ cover/
 .pybuilder/
 .pytype/
 cython_debug/
+
+.DS_Store

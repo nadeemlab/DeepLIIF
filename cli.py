@@ -13,6 +13,34 @@ from deepliif.data import create_dataset, AlignedDataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer
 
+import torch.distributed as dist
+import os
+import torch
+
+import numpy as np
+import random
+import torch
+
+def set_seed(seed=0,rank=None):
+    """
+    seed: basic seed
+    rank: rank of the current process, using which to mutate basic seed to have a unique seed per process
+    """
+    if seed is not None:
+        if rank is not None:
+            seed_final = seed + int(rank)
+        else:
+            seed_final = seed
+        
+        random.seed(seed_final)
+        np.random.seed(seed_final)
+        torch.manual_seed(seed_final)
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+        print(f'deterministic training, basic seed set to {seed_final}')
+    else:
+        print(f'not using deterministic training')
+
 
 def ensure_exists(d):
     if not os.path.exists(d):
@@ -109,12 +137,17 @@ def cli():
 @click.option('--save-epoch-freq', default=100,
               help='frequency of saving checkpoints at the end of epochs')
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
+@click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
+@click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
+@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
-          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters):
+          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
+          remote, local_rank, remote_transfer_cmd, seed):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -127,25 +160,46 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     Use '--continue_train' to resume your previous training.
     """
 
+    if len(gpu_ids) > 0:
+        local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
+        rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
+
+        if local_rank is not None:
+            local_rank = int(local_rank)
+            torch.cuda.set_device(local_rank)
+            gpu_ids=[local_rank]
+        else:
+            torch.cuda.set_device(gpu_ids[0])
+
+    if local_rank is not None: # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
+        dist.init_process_group(backend='nccl')
+        print('local rank:',local_rank)
+        set_seed(seed,local_rank)
+    elif rank is not None:
+        set_seed(seed, rank)
+    else:
+        set_seed(seed)
+
+
     # create a dataset given dataset_mode and other options
     dataset = AlignedDataset(dataroot, load_size, crop_size, input_nc, output_nc, direction, targets_no, preprocess,
                              no_flip, phase, max_dataset_size)
 
-    dataset = create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size)
+    dataset = create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids)
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
 
     # create a model given model and other options
     model = DeepLIIFModel(gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf,
                           net_g, norm, no_dropout, init_type, init_gain, ndf, net_d, n_layers_d, lr, beta1, lambda_l1,
-                          lr_policy)
+                          lr_policy, remote_transfer_cmd)
     # regular setup: load and print networks; create schedulers
     model.setup(lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters, continue_train, load_iter, epoch,
                 verbose)
 
     # create a visualizer that display/save images and plots
     visualizer = Visualizer(display_id, is_train, no_html, display_winsize, name, display_port, display_ncols,
-                            display_server, display_env, checkpoints_dir)
+                            display_server, display_env, checkpoints_dir, remote, remote_transfer_cmd)
     # the total number of training iterations
     total_iters = 0
 
@@ -159,6 +213,11 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
         epoch_iter = 0
         # reset the visualizer: make sure it saves the results to HTML at least once every epoch
         visualizer.reset()
+
+        # https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
+        if local_rank is not None or os.getenv('RANK') is not None: # if DDP is used, either on one node or multi nodes
+            if not serial_batches: # if we want randome order in mini batches
+                dataset.sampler.set_epoch(epoch)
 
         # inner loop within one epoch
         for i, data in enumerate(dataset):
