@@ -15,11 +15,11 @@ class BaseModel(ABC):
         -- <modify_commandline_options>:    (optionally) add model-specific options and set default options.
     """
 
-    def __init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy):
+    def __init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy, remote_transfer_cmd):
         """Initialize the BaseModel class.
 
         Parameters:
-            opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
+            
 
         When creating your custom class, you need to implement your own initialization.
         In this function, you should first call <BaseModel.__init__(self, opt)>
@@ -42,6 +42,14 @@ class BaseModel(ABC):
         self.optimizers = []
         self.image_paths = []
         self.metric = 0  # used for learning rate policy 'plateau'
+        self.remote_transfer_cmd = remote_transfer_cmd
+
+        self.remote_transfer_cmd_module = None
+        self.remote_transfer_cmd_function = None
+
+        if self.remote_transfer_cmd:
+            self.remote_transfer_cmd_module = remote_transfer_cmd.split('.')[0]
+            self.remote_transfer_cmd_function = remote_transfer_cmd.split('.')[1]
 
     @abstractmethod
     def set_input(self, input):
@@ -128,23 +136,51 @@ class BaseModel(ABC):
                 errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
         return errors_ret
 
-    def save_networks(self, epoch):
+    def save_networks(self, epoch, save_from_one_process=False):
         """Save all the networks to the disk.
-
+        
         Parameters:
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+            save_from_one_process -- when having multiple processes, whether to save from all processes
+                (effectively overwrite each other) or only 1 process; WARNING saving from 1 process at
+                the moment takes LONGER time!!!
         """
+        def custom_save(save_path, remote_transfer_cmd_module, remote_transfer_cmd_function):
+            if remote_transfer_cmd_module and remote_transfer_cmd_function:
+                exec(f'from {remote_transfer_cmd_module} import {remote_transfer_cmd_function}')
+                exec(f'{remote_transfer_cmd_function}("{save_path}")')
+            else:
+                pass
+
         for name in self.model_names:
             if isinstance(name, str):
                 save_filename = '%s_net_%s.pth' % (epoch, name)
                 save_path = os.path.join(self.save_dir, save_filename)
                 net = getattr(self, 'net' + name)
-
+                
                 if len(self.gpu_ids) > 0 and torch.cuda.is_available():
-                    torch.save(net.module.cpu().state_dict(), save_path)
+                    if save_from_one_process:
+                        local_rank = os.getenv('LOCAL_RANK')
+                        rank = os.getenv('RANK')
+
+                        if local_rank is None and rank is None: # DP
+                            torch.save(net.module.cpu().state_dict(), save_path)
+                            custom_save(save_path, self.remote_transfer_cmd_module, self.remote_transfer_cmd_function)
+                        elif local_rank == '0' or rank == '0': # DDP, rank 0
+                            torch.save(net.module.state_dict(), save_path) # saving net.module.cpu().state_dict() causes the next iter hangs at back propagation
+                            custom_save(save_path, self.remote_transfer_cmd_module, self.remote_transfer_cmd_function)
+                        else: # DDP, rank != 0
+                            pass
+                    else:
+                        torch.save(net.module.cpu().state_dict(), save_path)
+                        custom_save(save_path, self.remote_transfer_cmd_module, self.remote_transfer_cmd_function)
+
                     net.cuda(self.gpu_ids[0])
                 else:
                     torch.save(net.cpu().state_dict(), save_path)
+                    custom_save(save_path, self.remote_transfer_cmd_module, self.remote_transfer_cmd_function)
+
+
 
     def __patch_instance_norm_state_dict(self, state_dict, module, keys, i=0):
         """Fix InstanceNorm checkpoints incompatibility (prior to 0.4)"""
