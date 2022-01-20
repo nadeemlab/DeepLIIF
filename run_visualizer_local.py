@@ -1,22 +1,19 @@
-"""General-purpose training script for multi-task image-to-image translation.
-
-This script works for various models (with option '--model': e.g., DeepLIIF) and
-different datasets (with option '--dataset_mode': e.g., aligned, unaligned, single, colorization).
-You need to specify the dataset ('--dataroot'), experiment name ('--name'), and model ('--model').
-
-It first creates model, dataset, and visualizer given the option.
-It then does standard network training. During the training, it also visualize/save the images, print/save the loss plot, and save models.
-The script supports continue/resume training. Use '--continue_train' to resume your previous training.
-"""
+import os
+import json
 import time
-from deepliif.options.train_options import TrainOptions
-from deepliif.data import create_dataset
-from deepliif.models import create_model
-from deepliif.util.visualizer import Visualizer
+import random
+
+import click
+import cv2
+import torch
+import numpy as np
+from PIL import Image
+
+from deepliif.data import create_dataset, AlignedDataset, transform
+from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
+from deepliif.util import allowed_file, Visualizer
 
 import pickle
-import os
-import numpy as np
 import argparse
 
 if __name__ == '__main__':
@@ -33,9 +30,9 @@ if __name__ == '__main__':
     while not os.path.exists(path_init):
         time.sleep(1)
         
-    opt = pickle.load(open(path_init,'rb'))
-    opt.remote = False
-    visualizer = Visualizer(opt)   # create a visualizer that display/save images and plots
+    params_opt = pickle.load(open(path_init,'rb'))
+    params_opt['remote'] = False
+    visualizer = Visualizer(**params_opt)   # create a visualizer that display/save images and plots
 
     paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
                   'plot_current_losses':os.path.join(pickle_dir,'plot_current_losses.pickle')}
