@@ -26,21 +26,24 @@ def set_seed(seed=0,rank=None):
     seed: basic seed
     rank: rank of the current process, using which to mutate basic seed to have a unique seed per process
     """
+    os.environ['DEEPLIIF_SEED'] = str(seed)
     if seed is not None:
         if rank is not None:
             seed_final = seed + int(rank)
         else:
             seed_final = seed
-        
+        os.environ['PYTHONHASHSEED'] = str(seed_final)
         random.seed(seed_final)
         np.random.seed(seed_final)
         torch.manual_seed(seed_final)
+        torch.cuda.manual_seed(seed_final)
+        torch.cuda.manual_seed_all(seed_final)
         torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
         torch.use_deterministic_algorithms(True)
-        print(f'deterministic training, basic seed set to {seed_final}')
+        print(f'deterministic training, seed set to {seed_final}')
     else:
         print(f'not using deterministic training')
-
 
 def ensure_exists(d):
     if not os.path.exists(d):
