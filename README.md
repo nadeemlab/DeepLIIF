@@ -59,12 +59,12 @@ $ source venv/bin/activate
 ```
 
 The package is composed of two parts:
-1. a library that implements the core functions used to train and test DeepLIIF models. 
-2. a CLI to run common batch operations including training, batch testing and Torchscipt models serialization.
+1. A library that implements the core functions used to train and test DeepLIIF models. 
+2. A CLI to run common batch operations including training, batch testing and Torchscipt models serialization.
 
 You can list all available commands:
 
-```shell
+```
 (venv) $ deepliif --help
 Usage: deepliif [OPTIONS] COMMAND [ARGS]...
 
@@ -79,76 +79,49 @@ Commands:
   train                  General-purpose training script for multi-task...
 ```
 
-## Dataset:
-For training, all image pairs must be 512x512 and paired together in 3072x512 images (6 images of size 512x512 stitched
+## Training Dataset:
+For training, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched
 together horizontally).
-Data needs to be arranged in the following order:
+The data need to be arranged in the following order:
 ```
 XXX_Dataset 
-    ├── test
-    ├── val
-    └── train
+    ├── train
+    └── val
 ```
-We have provided two simple functions in the CLI for preparing data for testing and training purposes.
+We have provided a simple function in the CLI for preparing data for training.
 
-* **To prepare data for training**, you need to have the paired data including IHC, Hematoxylin Channel, mpIF DAPI, mpIF
-  Lap2, mpIF marker, and segmentation mask in the input directory.
-The script gets the address of directory containing paired data and the address of the dataset directory.
-It, first, creates the train and validation directories inside the given dataset directory.
-Then it reads all images in the folder and saves the pairs in the train or validation directory, based on the given
-  `validation_ratio`.
+* **To prepare data for training**, you need to have the image dataset for each image (including IHC, Hematoxylin Channel, mpIF DAPI, mpIF Lap2, mpIF marker, and segmentation mask) in the input directory.
+Each of the six images for a single image set must have the same naming format, with only the name of the label for the type of image differing between them.  The label names must be, respectively: IHC, Hematoxylin, DAPI, Lap2, Marker, Seg.
+The command takes the address of the directory containing image set data and the address of the output dataset directory.
+It first creates the train and validation directories inside the given output dataset directory.
+It then reads all of the images in the input directory and saves the combined image in the train or validation directory, based on the given `validation_ratio`.
 ```
 deepliif prepare-training-data --input-dir /path/to/input/images
                                --output-dir /path/to/output/images
                                --validation-ratio 0.2
 ```
 
-* **To prepare data for testing**, you only need to have IHC images in the input directory.
-The function gets the address of directory containing the IHC data and the address of the dataset directory.
-It, first, creates the test directory inside the given dataset directory.
-Then it reads the IHC images in the folder and saves a pair in the test directory.
-```
-deepliif prepare-data-for-testing --input_dir /path/to/input/images
-                                  --output_dir /path/to/dataset/directory
-```
-
-## Synthetic Data Generation:
-The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
-resulting from the absence of clustered positive cells in our training data. To infuse more information about the
-clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using
-co-registered data. 
-We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI image, and the segmentation mask and
-generates the corresponding IHC image. The model converts the Hematoxylin channel to gray-scale to infer more helpful
-information such as the texture and discard unnecessary information such as color. The Hematoxylin image guides the
-network to synthesize the background of the IHC image by preserving the shape and texture of the cells and artifacts in
-the background. The DAPI image assists the network in identifying the location, shape, and texture of the cells to
-better isolate the cells from the background. The segmentation mask helps the network specify the color of cells based 
-on the type of the cell (positive cell: a brown hue, negative: a blue hue).
-
-In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the 
-segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and 
-converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
-shown in Figure 2.
-
-![IHC_Gen_image](./images/IHC_Gen3.png)**Figure 2**. *Overview of synthetic IHC image generation. (a) A training sample 
-of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
-Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
-
-We created a new dataset using the original IHC images and synthetic IHC images. We synthesize each image in the dataset 
-two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can 
-find the new trained model [here](https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1).
-
 ## Training:
 To train a model:
 ```
 deepliif train --dataroot /path/to/input/images 
                 --name Model_Name 
-                --model DeepLIIF
 ```
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
-* To epoch-wise intermediate training results, DeepLIIF/checkpoints/Model_Name/web/index.html
-* Trained models will be by default save in DeepLIIF/checkpoints/Model_Name.
+* Epoch-wise intermediate training results are in `DeepLIIF/checkpoints/Model_Name/web/index.html`.
+* Trained models will be by default be saved in `DeepLIIF/checkpoints/Model_Name`.
 * Training datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+
+## Serialize Model
+The installed `deepliif` uses Dask to perform inference on the input IHC images.
+Before running the `test` command, the model files must be serialized using Torchscript.
+To serialize the model files:
+```
+deepliif serialize --models-dir /path/to/input/model/files
+                   --output-dir /path/to/output/model/files
+```
+* By default, the model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
+* By default, the serialized files will be saved to the same directory as the input model files.
 
 ## Testing:
 To test the model:
@@ -157,13 +130,15 @@ deepliif test --input-dir /path/to/input/images
               --output-dir /path/to/output/images 
               --tile-size 512
 ```
-* The test results will be by default saved to DeepLIIF/results/Model_Name/test_latest/images.
 * The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
-* Place the pretrained model in DeepLIIF/checkpoints/DeepLIIF_Latest_Model and set the Model_Name as DeepLIIF_Latest_Model.
-* To test the model on large tissues, we have provided two scripts for pre-processing (breaking tissue into smaller 
-  tiles) and post-processing (stitching the tiles to create the corresponding inferred images to the original tissue). 
-  A brief tutorial on how to use these scripts is given.
+* Before running test on images, the model files must be serialized as described above.
+* The serialized model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
+* The test results will be saved to the specified output directory, which defaults to the input directory.
+* The default tile size is 512.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+
+If you prefer, it is possible to run the model using Torchserve.
+Please see below for instructions on how to deploy the model with Torchserve and for an example of how to run the inference.
 
 
 ## Docker
@@ -192,8 +167,34 @@ Please follow the steps in the provided notebook to install the requirements and
 All the libraries and pretrained models have already been set up there. 
 The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
 
+## Synthetic Data Generation:
+The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
+resulting from the absence of clustered positive cells in our training data. To infuse more information about the
+clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using
+co-registered data. 
+We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI image, and the segmentation mask and
+generates the corresponding IHC image. The model converts the Hematoxylin channel to gray-scale to infer more helpful
+information such as the texture and discard unnecessary information such as color. The Hematoxylin image guides the
+network to synthesize the background of the IHC image by preserving the shape and texture of the cells and artifacts in
+the background. The DAPI image assists the network in identifying the location, shape, and texture of the cells to
+better isolate the cells from the background. The segmentation mask helps the network specify the color of cells based 
+on the type of the cell (positive cell: a brown hue, negative: a blue hue).
+
+In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the 
+segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and 
+converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
+shown in Figure 2.
+
+![IHC_Gen_image](./images/IHC_Gen3.png)**Figure 2**. *Overview of synthetic IHC image generation. (a) A training sample 
+of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
+Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
+
+We created a new dataset using the original IHC images and synthetic IHC images. We synthesize each image in the dataset 
+two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can 
+find the new trained model [here](https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1).
+
 ## Registration:
-To register the denovo stained mpIF and IHC images, you can use the registration framework in the 'Registration' 
+To register the de novo stained mpIF and IHC images, you can use the registration framework in the 'Registration' 
 directory. Please refer to the README file provided in the same directory for more details.
 
 ## Contributing Training Data:
@@ -208,7 +209,7 @@ set varies widely in the density of tumor cells and the Ki67 index. You can find
 
 We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&E/IHC and 
 multiplex images and produce the optimal output. If you are generating or have generated H&E/IHC and multiplex staining 
-for the same slide (denovo staining) and would like to contribute that data for DeepLIIF, we can perform 
+for the same slide (de novo staining) and would like to contribute that data for DeepLIIF, we can perform 
 co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the 
 DeepLIIF model and release back to the community with full credit to the contributors.
 
