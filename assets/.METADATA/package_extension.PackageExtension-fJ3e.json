@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "Package Extension",
+    "description": "Package Extensions created by environments-ui",
+    "origin_country": "US",
+    "tags": [
+      "dsx"
+    ],
+    "asset_type": "package_extension",
+    "rov": {
+      "mode": 0
+    },
+    "asset_category": "USER",
+    "created_at": "2022-01-21T18:25:09Z",
+    "created": 1642789509252,
+    "asset_id": "package_extension.PackageExtension-fJ3e",
+    "asset_attributes": [
+      "package_extension"
+    ]
+  },
+  "entity": {
+    "package_extension": {
+      "type": "conda_yml",
+      "object_key": "package_extension/Package_Extension_OZfmzxWR5.yml"
+    }
+  },
+  "attachments": [
+    {
+      "name": "attachment for package extension package_extension.PackageExtension-fJ3e",
+      "description": "attachment for package extension package_extension.PackageExtension-fJ3e",
+      "mime": "application/json",
+      "asset_type": "package_extension",
+      "object_key": "package_extension/Package_Extension_OZfmzxWR5.yml",
+      "object_key_is_read_only": false,
+      "created_at": "2022-01-21T18:25:09Z",
+      "id": "5c80ab87-d935-4f80-b067-0b3b60d2a289",
+      "is_managed": false,
+      "is_referenced": true,
+      "is_remote": false
+    }
+  ]
+}

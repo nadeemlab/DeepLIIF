@@ -26,24 +26,26 @@ cd test; ls -t1 | tail -n +100 | xargs rm -r; cd ../
 
 
 #### WS DP 1 GPU #### PASS
-python train.py --dataroot /mnts/deepliif-data/DeepLIIF_Datasets/ --name Test_Model --model DeepLIIF --gpu_ids 0 --remote True --checkpoints_dir /mnts/deepliif-data/deepliif-ws-output --batch_size 2
+python cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model_wendy_ws --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --checkpoints-dir /mnts/DeepLIIFData/deepliif-ws-output
 
-python run_visualizer_local.py --pickle_dir /mnts/deepliif-data/deepliif-ws-output/Test_Model/pickle
+python run_visualizer_local.py --pickle_dir /mnts/DeepLIIFData/deepliif-ws-output/Test_Model_wendy_ws/pickle
 
 #### WS DDP 1 worker single gpu #### PASS
-torchrun -t 3 --log_dir /userfs/log/ --nproc_per_node 1 train.py --dataroot /mnts/deepliif-data/DeepLIIF_Datasets/ --name ws-20220103-num_threads0-batch_size2-num_workers1 --model DeepLIIF --checkpoints_dir /mnts/deepliif-data/deepliif-ws-output/ --batch_size 2  --remote True
+torchrun -t 3 --log_dir /userfs/log/ --nproc_per_node 1 cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model_wendy_ws --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --checkpoints-dir /mnts/DeepLIIFData/deepliif-ws-output
 
-python run_visualizer_local.py --pickle_dir /mnts/deepliif-data/deepliif-ws-output/ws-20220103-num_threads0-batch_size2-num_workers1/pickle
+python run_visualizer_local.py --pickle_dir /mnts/DeepLIIFData/deepliif-ws-output/Test_Model_wendy_ws/pickle
 
 
 #### WMLA PyTorch 1 worker single gpu #### PASS
+python cli.py train --dataroot {root_folder} --name Test_Model_wendy_wmla --remote True --remote-transfer-cmd custom_save.save_to_storage_volume --batch-size 3 --gpu-ids 0 --display-env $APP_ID
+
 !python dlicmd.py --exec-start PyTorch --rest-host $HOST --rest-port -1 --jwt-token $USER_ACCESS_TOKEN \
                   --msd-env USER_ACCESS_TOKEN=$USER_ACCESS_TOKEN --msd-env BASE_URL=https://daell-wmla.datascienceelite.com \
                   --workerDeviceNum 1 --workerMemory 8g \
                   --model-dir $DIR_job_submission --model-main train_command.py \
                   --cs-datastore-meta type=fs,data_path=DeepLIIF_Datasets/
 
-python run_visualizer_local.py --pickle_dir /mnts/deepliif-data/checkpoints/pickle
+python run_visualizer_local.py --pickle_dir /mnts/DeepLIIFData/checkpoints/Test_Model_wendy_wmla/pickle
 
 #### WMLA distPyTorch 1 worker single gpu #### PASS
 !python dlicmd.py --exec-start distPyTorch --rest-host $HOST --rest-port -1 --jwt-token $USER_ACCESS_TOKEN \
@@ -94,56 +96,53 @@ python run_visualizer_local.py --pickle_dir /mnts/deepliif-data/checkpoints/pick
 deterministic training
 
 #### WS DP GPUx1 #### PASS
+python cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --seed 0 --print-freq 1
 
-(epoch: 0, iters: 100, time: 1.072, data: 0.119) G_GAN_1: 1.404 G_L1_1: 1.511 D_real_1: 0.422 D_fake_1: 0.529 G_GAN_2: 0.793 G_L1_2: 1.764 D_real_2: 0.732 D_fake_2: 0.643 G_GAN_3: 0.699 G_L1_3: 1.196 D_real_3: 1.077 D_fake_3: 0.396 G_GAN_4: 1.321 G_L1_4: 0.317 D_real_4: 0.610 D_fake_4: 0.680 G_GAN_5: 3.544 G_L1_5: 16.374 D_real_5: 0.504 D_fake_5: 0.284 
-
-(epoch: 0, iters: 100, time: 1.075, data: 0.206) G_GAN_1: 1.404 G_L1_1: 1.511 D_real_1: 0.422 D_fake_1: 0.529 G_GAN_2: 0.793 G_L1_2: 1.764 D_real_2: 0.732 D_fake_2: 0.643 G_GAN_3: 0.699 G_L1_3: 1.196 D_real_3: 1.077 D_fake_3: 0.396 G_GAN_4: 1.321 G_L1_4: 0.317 D_real_4: 0.610 D_fake_4: 0.680 G_GAN_5: 3.544 G_L1_5: 16.374 D_real_5: 0.504 D_fake_5: 0.284 
+(epoch: 0, iters: 3, time: 0.673, data: 0.118) G_GAN_1: 0.973 G_L1_1: 26.864 D_real_1: 1.016 D_fake_1: 0.691 G_GAN_2: 0.905 G_L1_2: 18.429 D_real_2: 0.873 D_fake_2: 0.794 G_GAN_3: 0.858 G_L1_3: 41.366 D_real_3: 0.951 D_fake_3: 0.709 G_GAN_4: 0.878 G_L1_4: 73.108 D_real_4: 1.102 D_fake_4: 0.631 G_GAN_5: 10.136 G_L1_5: 51.323 D_real_5: 1.151 D_fake_5: 0.311 
 
 
 #### WS DP GPUx2 #### SMALL VARIATION
-(epoch: 0, iters: 100, time: 0.744, data: 0.239) G_GAN_1: 0.974 G_L1_1: 1.891 D_real_1: 0.834 D_fake_1: 0.595 G_GAN_2: 0.920 G_L1_2: 1.940 D_real_2: 0.741 D_fake_2: 0.641 G_GAN_3: 0.760 G_L1_3: 0.940 D_real_3: 1.342 D_fake_3: 0.306 G_GAN_4: 1.744 G_L1_4: 0.729 D_real_4: 0.437 D_fake_4: 0.419 G_GAN_5: 0.956 G_L1_5: 22.625 D_real_5: 0.182 D_fake_5: 0.171 
+python cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --gpu-ids 1 --seed 0 --print-freq 1
 
-(epoch: 0, iters: 100, time: 0.677, data: 0.237) G_GAN_1: 0.983 G_L1_1: 1.869 D_real_1: 0.832 D_fake_1: 0.565 G_GAN_2: 0.942 G_L1_2: 1.940 D_real_2: 0.737 D_fake_2: 0.667 G_GAN_3: 0.802 G_L1_3: 0.870 D_real_3: 1.236 D_fake_3: 0.319 G_GAN_4: 1.938 G_L1_4: 0.768 D_real_4: 0.398 D_fake_4: 0.475 G_GAN_5: 0.961 G_L1_5: 22.647 D_real_5: 0.176 D_fake_5: 0.167 
+(epoch: 0, iters: 3, time: 1.575, data: 0.093) G_GAN_1: 0.934 G_L1_1: 26.955 D_real_1: 1.016 D_fake_1: 0.690 G_GAN_2: 0.840 G_L1_2: 18.482 D_real_2: 0.871 D_fake_2: 0.789 G_GAN_3: 0.860 G_L1_3: 41.322 D_real_3: 0.952 D_fake_3: 0.714 G_GAN_4: 0.864 G_L1_4: 73.129 D_real_4: 1.102 D_fake_4: 0.626 G_GAN_5: 8.634 G_L1_5: 51.329 D_real_5: 1.155 D_fake_5: 0.300 
+
+(epoch: 0, iters: 3, time: 1.691, data: 0.100) G_GAN_1: 0.850 G_L1_1: 33.248 D_real_1: 0.913 D_fake_1: 0.692 G_GAN_2: 0.825 G_L1_2: 32.520 D_real_2: 0.795 D_fake_2: 0.810 G_GAN_3: 0.838 G_L1_3: 50.641 D_real_3: 0.870 D_fake_3: 0.796 G_GAN_4: 0.815 G_L1_4: 71.639 D_real_4: 0.969 D_fake_4: 0.646 G_GAN_5: 6.705 G_L1_5: 52.737 D_real_5: 1.105 D_fake_5: 0.204 
+
+
 
 https://discuss.pytorch.org/t/reproducibility-over-multigpus-is-impossible-until-randomness-of-threads-is-controled-and-yet/47079/7
 
 
 #### WS DDP GPUx1 #### PASS
+torchrun -t 3 --log /userfs/log/ --nproc_per_node 1 cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --seed 0 --print-freq 1
 
-[default0]:(epoch: 0, iters: 100, time: 1.079, data: 0.160) G_GAN_1: 0.968 G_L1_1: 1.876 D_real_1: 0.893 D_fake_1: 0.539 G_GAN_2: 1.633 G_L1_2: 2.366 D_real_2: 0.336 D_fake_2: 0.724 G_GAN_3: 1.047 G_L1_3: 0.979 D_real_3: 0.696 D_fake_3: 0.666 G_GAN_4: 0.542 G_L1_4: 0.501 D_real_4: 1.480 D_fake_4: 0.658 G_GAN_5: 1.323 G_L1_5: 13.461 D_real_5: 0.140 D_fake_5: 0.188 
-
-[default0]:(epoch: 0, iters: 100, time: 1.080, data: 0.117) G_GAN_1: 0.968 G_L1_1: 1.876 D_real_1: 0.893 D_fake_1: 0.539 G_GAN_2: 1.633 G_L1_2: 2.366 D_real_2: 0.336 D_fake_2: 0.724 G_GAN_3: 1.047 G_L1_3: 0.979 D_real_3: 0.696 D_fake_3: 0.666 G_GAN_4: 0.542 G_L1_4: 0.501 D_real_4: 1.480 D_fake_4: 0.658 G_GAN_5: 1.323 G_L1_5: 13.461 D_real_5: 0.140 D_fake_5: 0.188 
+[default0]:(epoch: 0, iters: 3, time: 0.678, data: 0.098) G_GAN_1: 1.073 G_L1_1: 27.205 D_real_1: 1.010 D_fake_1: 0.693 G_GAN_2: 1.197 G_L1_2: 18.859 D_real_2: 0.874 D_fake_2: 0.789 G_GAN_3: 0.836 G_L1_3: 41.954 D_real_3: 0.943 D_fake_3: 0.722 G_GAN_4: 0.936 G_L1_4: 71.545 D_real_4: 1.068 D_fake_4: 0.627 G_GAN_5: 7.346 G_L1_5: 51.339 D_real_5: 1.149 D_fake_5: 0.303
 
 
 #### WS DDP GPUx2 #### PASS
+torchrun -t 3 --log /userfs/log/ --nproc_per_node 2 cli.py train --dataroot /mnts/DeepLIIFData/DeepLIIF_Datasets/ --name Test_Model --batch-size 3 --num-threads 0 --remote True --gpu-ids 0 --gpu-ids 1 --seed 0 --print-freq 1
 
-[default0]:(epoch: 0, iters: 100, time: 1.128, data: 0.119) G_GAN_1: 1.364 G_L1_1: 1.684 D_real_1: 0.467 D_fake_1: 0.663 G_GAN_2: 0.856 G_L1_2: 1.548 D_real_2: 0.965 D_fake_2: 0.520 G_GAN_3: 1.087 G_L1_3: 1.151 D_real_3: 0.556 D_fake_3: 0.500 G_GAN_4: 1.198 G_L1_4: 0.667 D_real_4: 0.628 D_fake_4: 0.695 G_GAN_5: 1.052 G_L1_5: 16.801 D_real_5: 0.099 D_fake_5: 0.109 
-[default1]:(epoch: 0, iters: 100, time: 1.131, data: 0.128) G_GAN_1: 1.082 G_L1_1: 1.503 D_real_1: 0.627 D_fake_1: 0.791 G_GAN_2: 0.949 G_L1_2: 1.917 D_real_2: 0.659 D_fake_2: 0.523 G_GAN_3: 0.649 G_L1_3: 0.783 D_real_3: 0.877 D_fake_3: 0.452 G_GAN_4: 0.984 G_L1_4: 0.287 D_real_4: 0.570 D_fake_4: 0.880 G_GAN_5: 1.076 G_L1_5: 20.065 D_real_5: 0.236 D_fake_5: 0.235 
-
-[default0]:(epoch: 0, iters: 100, time: 1.128, data: 0.125) G_GAN_1: 1.364 G_L1_1: 1.684 D_real_1: 0.467 D_fake_1: 0.663 G_GAN_2: 0.856 G_L1_2: 1.548 D_real_2: 0.965 D_fake_2: 0.520 G_GAN_3: 1.087 G_L1_3: 1.151 D_real_3: 0.556 D_fake_3: 0.500 G_GAN_4: 1.198 G_L1_4: 0.667 D_real_4: 0.628 D_fake_4: 0.695 G_GAN_5: 1.052 G_L1_5: 16.801 D_real_5: 0.099 D_fake_5: 0.109 
-[default1]:(epoch: 0, iters: 100, time: 1.130, data: 0.128) G_GAN_1: 1.082 G_L1_1: 1.503 D_real_1: 0.627 D_fake_1: 0.791 G_GAN_2: 0.949 G_L1_2: 1.917 D_real_2: 0.659 D_fake_2: 0.523 G_GAN_3: 0.649 G_L1_3: 0.783 D_real_3: 0.877 D_fake_3: 0.452 G_GAN_4: 0.984 G_L1_4: 0.287 D_real_4: 0.570 D_fake_4: 0.880 G_GAN_5: 1.076 G_L1_5: 20.065 D_real_5: 0.236 D_fake_5: 0.235 
+[default1]:(epoch: 0, iters: 3, time: 0.704, data: 0.122) G_GAN_1: 1.040 G_L1_1: 28.298 D_real_1: 0.790 D_fake_1: 0.924 G_GAN_2: 1.016 G_L1_2: 41.070 D_real_2: 0.645 D_fake_2: 1.100 G_GAN_3: 1.290 G_L1_3: 55.502 D_real_3: 1.094 D_fake_3: 0.614 G_GAN_4: 0.768 G_L1_4: 38.655 D_real_4: 0.777 D_fake_4: 0.880 G_GAN_5: 7.985 G_L1_5: 49.894 D_real_5: 2.621 D_fake_5: 0.537 
+[default0]:(epoch: 0, iters: 3, time: 0.703, data: 0.126) G_GAN_1: 1.144 G_L1_1: 26.984 D_real_1: 1.009 D_fake_1: 0.690 G_GAN_2: 1.381 G_L1_2: 18.777 D_real_2: 0.861 D_fake_2: 0.789 G_GAN_3: 0.805 G_L1_3: 41.580 D_real_3: 0.944 D_fake_3: 0.721 G_GAN_4: 1.148 G_L1_4: 71.498 D_real_4: 1.078 D_fake_4: 0.633 G_GAN_5: 5.978 G_L1_5: 51.374 D_real_5: 1.141 D_fake_5: 0.336 
+[default0]:Remote mode, snapshot refreshed: plot_current_losses.pickle, epoch: 0, counter_ratio: 0.004231311706629055
 
 
 #### WMLA DP GPUx1 #### PASS
+subprocess.run(f'python cli.py train --dataroot {root_folder} --name Test_Model --remote True --remote-transfer-cmd custom_save.save_to_storage_volume --batch-size 3 --gpu-ids 0 --seed 0 --print-freq 1 --display-env $APP_ID',shell=True)
 
-*Task <1> SubProcess*: (epoch: 0, iters: 100, time: 1.074, data: 0.169) G_GAN_1: 1.404 G_L1_1: 1.511 D_real_1: 0.422 D_fake_1: 0.529 G_GAN_2: 0.793 G_L1_2: 1.764 D_real_2: 0.732 D_fake_2: 0.643 G_GAN_3: 0.699 G_L1_3: 1.196 D_real_3: 1.077 D_fake_3: 0.396 G_GAN_4: 1.321 G_L1_4: 0.317 D_real_4: 0.610 D_fake_4: 0.680 G_GAN_5: 3.544 G_L1_5: 16.374 D_real_5: 0.504 D_fake_5: 0.284 
-
-*Task <1> SubProcess*: (epoch: 0, iters: 100, time: 1.077, data: 0.201) G_GAN_1: 1.404 G_L1_1: 1.511 D_real_1: 0.422 D_fake_1: 0.529 G_GAN_2: 0.793 G_L1_2: 1.764 D_real_2: 0.732 D_fake_2: 0.643 G_GAN_3: 0.699 G_L1_3: 1.196 D_real_3: 1.077 D_fake_3: 0.396 G_GAN_4: 1.321 G_L1_4: 0.317 D_real_4: 0.610 D_fake_4: 0.680 G_GAN_5: 3.544 G_L1_5: 16.374 D_real_5: 0.504 D_fake_5: 0.284 
+(epoch: 0, iters: 3, time: 0.722, data: 0.484) G_GAN_1: 0.991 G_L1_1: 26.873 D_real_1: 1.008 D_fake_1: 0.689 G_GAN_2: 0.944 G_L1_2: 18.427 D_real_2: 0.866 D_fake_2: 0.797 G_GAN_3: 0.864 G_L1_3: 41.353 D_real_3: 0.949 D_fake_3: 0.711 G_GAN_4: 0.892 G_L1_4: 73.081 D_real_4: 1.101 D_fake_4: 0.635 G_GAN_5: 9.633 G_L1_5: 51.323 D_real_5: 1.143 D_fake_5: 0.303 
 
 
 #### WMLA DDP GPUx1 #### PASS
 
-*Task <1> SubProcess*: (epoch: 0, iters: 100, time: 1.083, data: 0.190) G_GAN_1: 0.968 G_L1_1: 1.876 D_real_1: 0.893 D_fake_1: 0.539 G_GAN_2: 1.633 G_L1_2: 2.366 D_real_2: 0.336 D_fake_2: 0.724 G_GAN_3: 1.047 G_L1_3: 0.979 D_real_3: 0.696 D_fake_3: 0.666 G_GAN_4: 0.542 G_L1_4: 0.501 D_real_4: 1.480 D_fake_4: 0.658 G_GAN_5: 1.323 G_L1_5: 13.461 D_real_5: 0.140 D_fake_5: 0.188 
-
-*Task <1> SubProcess*: (epoch: 0, iters: 100, time: 1.077, data: 0.102) G_GAN_1: 0.968 G_L1_1: 1.876 D_real_1: 0.893 D_fake_1: 0.539 G_GAN_2: 1.633 G_L1_2: 2.366 D_real_2: 0.336 D_fake_2: 0.724 G_GAN_3: 1.047 G_L1_3: 0.979 D_real_3: 0.696 D_fake_3: 0.666 G_GAN_4: 0.542 G_L1_4: 0.501 D_real_4: 1.480 D_fake_4: 0.658 G_GAN_5: 1.323 G_L1_5: 13.461 D_real_5: 0.140 D_fake_5: 0.188 
+(epoch: 0, iters: 3, time: 0.835, data: 0.481) G_GAN_1: 1.181 G_L1_1: 27.170 D_real_1: 1.002 D_fake_1: 0.699 G_GAN_2: 1.165 G_L1_2: 18.869 D_real_2: 0.863 D_fake_2: 0.791 G_GAN_3: 0.855 G_L1_3: 41.938 D_real_3: 0.932 D_fake_3: 0.720 G_GAN_4: 0.905 G_L1_4: 71.560 D_real_4: 1.078 D_fake_4: 0.621 G_GAN_5: 6.382 G_L1_5: 51.351 D_real_5: 1.161 D_fake_5: 0.330 
 
 
 #### WMLA DDP GPUx2 #### PASS
-(epoch: 0, iters: 100, time: 1.494, data: 0.188) G_GAN_1: 1.082 G_L1_1: 1.503 D_real_1: 0.627 D_fake_1: 0.791 G_GAN_2: 0.949 G_L1_2: 1.917 D_real_2: 0.659 D_fake_2: 0.523 G_GAN_3: 0.649 G_L1_3: 0.783 D_real_3: 0.877 D_fake_3: 0.452 G_GAN_4: 0.984 G_L1_4: 0.287 D_real_4: 0.570 D_fake_4: 0.880 G_GAN_5: 1.076 G_L1_5: 20.065 D_real_5: 0.236 D_fake_5: 0.235 
-(epoch: 0, iters: 100, time: 1.494, data: 0.132) G_GAN_1: 1.364 G_L1_1: 1.684 D_real_1: 0.467 D_fake_1: 0.663 G_GAN_2: 0.856 G_L1_2: 1.548 D_real_2: 0.965 D_fake_2: 0.520 G_GAN_3: 1.087 G_L1_3: 1.151 D_real_3: 0.556 D_fake_3: 0.500 G_GAN_4: 1.198 G_L1_4: 0.667 D_real_4: 0.628 D_fake_4: 0.695 G_GAN_5: 1.052 G_L1_5: 16.801 D_real_5: 0.099 D_fake_5: 0.109 
-
-(epoch: 0, iters: 100, time: 1.771, data: 0.186) G_GAN_1: 1.364 G_L1_1: 1.684 D_real_1: 0.467 D_fake_1: 0.663 G_GAN_2: 0.856 G_L1_2: 1.548 D_real_2: 0.965 D_fake_2: 0.520 G_GAN_3: 1.087 G_L1_3: 1.151 D_real_3: 0.556 D_fake_3: 0.500 G_GAN_4: 1.198 G_L1_4: 0.667 D_real_4: 0.628 D_fake_4: 0.695 G_GAN_5: 1.052 G_L1_5: 16.801 D_real_5: 0.099 D_fake_5: 0.109 
-(epoch: 0, iters: 100, time: 1.783, data: 0.089) G_GAN_1: 1.082 G_L1_1: 1.503 D_real_1: 0.627 D_fake_1: 0.791 G_GAN_2: 0.949 G_L1_2: 1.917 D_real_2: 0.659 D_fake_2: 0.523 G_GAN_3: 0.649 G_L1_3: 0.783 D_real_3: 0.877 D_fake_3: 0.452 G_GAN_4: 0.984 G_L1_4: 0.287 D_real_4: 0.570 D_fake_4: 0.880 G_GAN_5: 1.076 G_L1_5: 20.065 D_real_5: 0.236 D_fake_5: 0.235 
+(epoch: 0, iters: 3, time: 0.823, data: 0.535) G_GAN_1: 1.176 G_L1_1: 26.936 D_real_1: 1.004 D_fake_1: 0.685 G_GAN_2: 1.335 G_L1_2: 18.787 D_real_2: 0.857 D_fake_2: 0.789 G_GAN_3: 0.803 G_L1_3: 41.566 D_real_3: 0.938 D_fake_3: 0.717 G_GAN_4: 1.116 G_L1_4: 71.457 D_real_4: 1.065 D_fake_4: 0.630 G_GAN_5: 6.401 G_L1_5: 51.387 D_real_5: 1.152 D_fake_5: 0.341 
+(epoch: 0, iters: 3, time: 0.784, data: 0.648) G_GAN_1: 0.996 G_L1_1: 28.346 D_real_1: 0.778 D_fake_1: 0.934 G_GAN_2: 1.030 G_L1_2: 41.046 D_real_2: 0.651 D_fake_2: 1.106 G_GAN_3: 1.411 G_L1_3: 55.510 D_real_3: 1.088 D_fake_3: 0.607 G_GAN_4: 0.763 G_L1_4: 38.651 D_real_4: 0.781 D_fake_4: 0.880 G_GAN_5: 8.759 G_L1_5: 49.885 D_real_5: 2.603 D_fake_5: 0.545 
 
 
-#### WMLA DDP GPUx3 (cross node) ####
+#---------------------------------------------
+
+

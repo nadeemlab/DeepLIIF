@@ -28,7 +28,7 @@
       },
       "software_specification": {
         "type": "referenced",
-        "guid": "5d3232bf-c86b-5df4-a2cd-7bb870a1cd4e"
+        "guid": "software_specification.jupyterlabGPUx48vcpu16gbrampy38"
       },
       "tools_specification": {
         "supported_kernels": [
@@ -40,7 +40,7 @@
           }
         ]
       },
-      "runtime_definition": "jupyter-lab-py38gpu"
+      "runtime_definition": "df61b9f6-44ad-4ffe-bc1e-70d6cf2cc1ba"
     }
   },
   "attachments": []

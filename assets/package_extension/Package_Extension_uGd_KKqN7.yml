@@ -1,0 +1,20 @@
+# Modify the following content to add a software customization to an environment.
+# To remove an existing customization, delete the entire content and click Apply.
+# The customizations must follow the format of a conda environment yml file.
+
+# Add conda channels below defaults, indented by two spaces and a hyphen.
+channels:
+  - defaults
+
+# To add packages through conda or pip, remove the # on the following line.
+dependencies:
+
+# Add conda packages here, indented by two spaces and a hyphen.
+# Remove the # on the following line and replace sample package name with your package name:
+#  - a_conda_package=1.0
+
+# Add pip packages here, indented by four spaces and a hyphen.
+# Remove the # on the following lines and replace sample package name with your package name.
+  - pip:
+    - numba==0.54.1
+    - dominate

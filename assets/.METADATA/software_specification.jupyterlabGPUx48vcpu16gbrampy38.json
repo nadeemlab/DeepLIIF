@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "name": "jupyterlab GPUx4 8vcpu 16gb ram py3.8",
+    "origin_country": "US",
+    "tags": [
+      "dsx"
+    ],
+    "asset_type": "software_specification",
+    "rov": {
+      "mode": 0
+    },
+    "asset_category": "USER",
+    "created_at": "2022-01-21T18:25:31Z",
+    "created": 1642789531115,
+    "asset_id": "software_specification.jupyterlabGPUx48vcpu16gbrampy38",
+    "asset_attributes": [
+      "software_specification"
+    ]
+  },
+  "entity": {
+    "software_specification": {
+      "type": "derived",
+      "display_name": "jupyterlab GPUx4 8vcpu 16gb ram py3.8",
+      "base_software_specification": {
+        "guid": "5d3232bf-c86b-5df4-a2cd-7bb870a1cd4e",
+        "href": "/v2/software_specifications/5d3232bf-c86b-5df4-a2cd-7bb870a1cd4e"
+      },
+      "package_extensions": [
+        {
+          "guid": "package_extension.PackageExtension-t6R2",
+          "href": "/v2/package_extensions/package_extension.PackageExtension-t6R2"
+        }
+      ]
+    }
+  },
+  "attachments": []
+}
