@@ -372,6 +372,7 @@ class ResnetGenerator(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
+
         model += [nn.ZeroPad2d(3) if os.environ['DEEPLIIF_SEED'] != 'None' else nn.ReflectionPad2d(3)]
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
