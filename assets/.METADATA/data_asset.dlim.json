@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "name": "dlim",
+    "asset_type": "data_asset",
+    "origin_country": "us",
+    "asset_category": "USER",
+    "created_at": "2022-01-26T15:36:05Z",
+    "created": 1643211365665,
+    "asset_id": "data_asset.dlim",
+    "asset_attributes": [
+      "data_asset"
+    ]
+  },
+  "entity": {
+    "data_asset": {
+      "dataset": false,
+      "mime_type": "application/octet-stream"
+    }
+  },
+  "attachments": [
+    {
+      "asset_type": "data_asset",
+      "name": "dlim",
+      "mime": "application/octet-stream",
+      "object_key": "data_asset/dlim",
+      "object_key_is_read_only": true,
+      "created_at": "2022-01-26T15:36:06Z",
+      "id": "6438eb41-b3a7-4238-9d84-4e61339ab287",
+      "is_managed": false,
+      "is_referenced": true,
+      "is_remote": false
+    }
+  ]
+}
