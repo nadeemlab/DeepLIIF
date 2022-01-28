@@ -365,11 +365,10 @@ and is available for non-commercial academic purposes.
 ## Reference
 If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
-@article{ghahremani2021deepliif,
-  title={DeepLIIF: Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
+@article{ghahremani2022deepliif,
+  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
-  journal={bioRxiv},
-  year={2021},
-  publisher={Cold Spring Harbor Laboratory}
+  journal={Nature Machine Intelligence},
+  year={2022}
 }
 ```
