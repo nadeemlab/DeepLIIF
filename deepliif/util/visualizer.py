@@ -236,7 +236,7 @@ class Visualizer():
                     webpage.add_images(ims, txts, links, width=self.win_size)
                 webpage.save()
 
-    def plot_current_losses(self, epoch, counter_ratio, losses, n_proc=1):                    
+    def plot_current_losses(self, epoch, counter_ratio, losses):                    
         """display the current losses on visdom display: dictionary of error labels and values
 
         Parameters:
@@ -247,7 +247,8 @@ class Visualizer():
         """
         # counter_ratio defined in train.py: float(epoch_iter) / dataset_size
         # if having 2 processes, each process obtains 50% of the data (effective dataset_size divided by half), the effective counter ratio shall multiply by 2 to compensate that
-        counter_ratio = counter_ratio * n_proc 
+        n_proc = int(os.getenv('WORLD_SIZE',1))
+        counter_ratio = counter_ratio * n_proc
         
         if self.remote:
             fn = 'plot_current_losses.pickle'

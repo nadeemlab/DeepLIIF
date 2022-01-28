@@ -45,7 +45,6 @@ if __name__ == '__main__':
                 last_modified_time_plot = os.path.getmtime(path_plot)
                 if last_modified_time_plot > last_modified_time[method]:
                     params_plot = pickle.load(open(path_plot,'rb'))
-                    params_plot['n_proc'] = n_proc
                     last_modified_time[method] = last_modified_time_plot
                     getattr(visualizer,method)(**params_plot)
                     print(f'{method} refreshed, last modified time {time.ctime(last_modified_time[method])}')
