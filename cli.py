@@ -172,8 +172,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 
         if local_rank is not None:
             local_rank = int(local_rank)
-            torch.cuda.set_device(local_rank)
-            gpu_ids=[local_rank]
+            torch.cuda.set_device(gpu_ids[local_rank])
+            gpu_ids=[gpu_ids[local_rank]]
         else:
             torch.cuda.set_device(gpu_ids[0])
 
