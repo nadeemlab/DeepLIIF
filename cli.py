@@ -403,5 +403,39 @@ def prepare_testing_data(input_dir, dataset_dir):
             cv2.imwrite(os.path.join(test_dir, img), np.concatenate([image, image, image, image, image, image], 1))
 
 
+@cli.command()
+@click.option('--pickle-dir', required=True, help='directory where the pickled snapshots are stored')
+def visualize(pickle_dir):
+    import pickle
+
+    path_init = os.path.join(pickle_dir,'opt.pickle')
+    print(f'waiting for initialization signal from {path_init}')
+    while not os.path.exists(path_init):
+        time.sleep(1)
+
+    params_opt = pickle.load(open(path_init,'rb'))
+    params_opt['remote'] = False
+    visualizer = Visualizer(**params_opt)   # create a visualizer that display/save images and plots
+
+    paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
+                'plot_current_losses':os.path.join(pickle_dir,'plot_current_losses.pickle')}
+
+    last_modified_time = {k:0 for k in paths_plot.keys()} # initialize time
+
+    while True:
+        for method, path_plot in paths_plot.items():
+            try:
+                last_modified_time_plot = os.path.getmtime(path_plot)
+                if last_modified_time_plot > last_modified_time[method]:
+                    params_plot = pickle.load(open(path_plot,'rb'))
+                    last_modified_time[method] = last_modified_time_plot
+                    getattr(visualizer,method)(**params_plot)
+                    print(f'{method} refreshed, last modified time {time.ctime(last_modified_time[method])}')
+                else:
+                    print(f'{method} not refreshed')
+            except Exception as e:
+                print(e)
+        time.sleep(10)
+
 if __name__ == '__main__':
     cli()
