@@ -27,7 +27,7 @@ It is worth noting that multi-threading in this case can lead to significant per
 ### Train with DP
 Example with 2 GPUs (of course on 1 machine):
 ```
-python cli.py train --dataroot <data_dir> --batch-size 6 --gpu-ids 0 --gpu-ids 1
+deepliif train --dataroot <data_dir> --batch-size 6 --gpu-ids 0 --gpu-ids 1
 ```
 Note that
 1. `batch-size` is defined per process. Since DP is a single-process method, the `batch-size` you set is the **effective** batch size.
@@ -41,21 +41,19 @@ Despite all the benefits of DDP, one drawback is the extra GPU memory needed for
 
 ### Train with DDP
 #### 1. Local Machine
-To launch training using DDP on a local machine, simply add `torchrun --nproc_per_node <gpu_num>` before the training command. Example with 2 GPUs (on 1 machine):
+To launch training using DDP on a local machine, use `deepliif trainlaunch`. Example with 2 GPUs (on 1 machine):
 ```
-torchrun --nproc_per_node 2 cli.py train --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1
+deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "--nproc_per_node 2"
 ```
 Note that
 1. `batch-size` is defined per process. Since DDP is a single-process method, the `batch-size` you set is the batch size for each process, and the **effective** batch size will be `batch-size` multiplied by the number of processes you started. In the above example, it will be 3 * 2 = 6.
 2. You still need to provide **all GPU ids to use** to the training command. Internally, in each process DeepLIIF picks the device using `gpu_ids[local_rank]`. If you provide `--gpu-ids 2 --gpu-ids 3`, the process with local rank 0 will use gpu id 2 and that with local rank 1 will use gpu id 3. 
 3. `-t 3 --log_dir <log_dir>` is not required, but is a useful setting in `torchrun` that saves the log from each process to your target log directory. For example:
 ```
-torchrun -t 3 --log_dir <log_dir> --nproc_per_node 2 cli.py train --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1
+deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "-t 3 --log_dir <log_dir> --nproc_per_node 2"
 ```
-4. If your PyTorch is older than 1.10, instead of `torchrun`, you can use `torch.distributed.launch`:
-```
-python -m torch.distributed.launch --nproc_per_node 2 cli.py train --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1
-```
+4. If your PyTorch is older than 1.10, DeepLIIF calls `torch.distributed.launch` in the backend. Otherwise, DeepLIIF calls `torchrun`.
+
 
 #### 2. Kubernetes-Based Training Service
 To launch training using DDP on a kubernetes-based service where each process will have its own pod and a dedicated GPU, and there is an existing task manager/scheduler in place, you may submit a script with training command like the following:
@@ -73,7 +71,7 @@ root_folder = <data_dir>
 
 if __name__ == '__main__':
     init_process()
-    subprocess.run(f'python cli.py train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0',shell=True)
+    subprocess.run(f'deepliif train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0',shell=True)
 ```
 Note that
 1. Always provide `--gpu-ids 0` to the training command for each process/pod if the gpu id gets re-named in each pod. If not, you will need to pass the correct gpu id in a dynamic way, possibly through an environment variable in each pod.
@@ -101,14 +99,14 @@ With DDP, each process trains on its own slice of data that is different from th
 
 Currently, if you use multiple processes (DDP), you are suggested to:
 1. pass `--remote True` to the training command, even if you are running on a local machine
-2. open a terminal in an environment you intend to have visdom running (it can be the same place where you train the model, or a separate machine), run a visualizer script:
+2. open a terminal in an environment you intend to have visdom running (it can be the same place where you train the model, or a separate machine), and run `deepliif visualize`:
 ```
-python run_visualizer_local.py --pickle_dir <pickle_dir>
+deepliif visualize --pickle_dir <pickle_dir>
 ```
 
 By default, the pickle files are stored under `<checkpoint_dir_in_training_command>/<name_in_training_command>/pickle`.
 
-`--remote True` triggers DeepLIIF training to i) not start a visdom session and ii) persist the input into the visdom graphs as pickle files. If there are multiple processes, it will **only persist the information such as losses from the first process (process with rank 0)**. The separate script `run_visualizer_local.py` then starts the visdom, scans the pickle directory you provided periodically, and updates the graphs if there is an update in any pickled snapshot.
+`--remote True` in the training command triggers DeepLIIF to i) not start a visdom session and ii) persist the input into the visdom graphs as pickle files. If there are multiple processes, it will **only persist the information such as losses from the first process (process with rank 0)**. The visualize command `deepliif visualize` then starts the visdom, scans the pickle directory you provided periodically, and updates the graphs if there is an update in any pickled snapshot.
 
 If you plan to train the model in a different place from where you would like to host visdom (e.g., situation 2 & 3 in DDP mentioned above), you need to make sure that **this pickle directory is accessible by both the training environment and the visdom environment**. For example:
 - use a storage volume mounted to both environments, so you can access this storage simply using a file path
@@ -150,10 +148,10 @@ If you plan to train the model in a different place from where you would like to
 
     if __name__ == '__main__':
         init_process()
-        subprocess.run(f'python cli.py train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0 --remote True, --remote-transfer-cmd mysave.save_to_s3',shell=True)
+        subprocess.run(f'deepliif train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0 --remote True, --remote-transfer-cmd mysave.save_to_s3',shell=True)
     ```
     - note that this method if used will be applied **not only on the pickled snapshots for visdom input, but also the model files DeepLIIF saves**: DeepLIIF will trigger this provided method to store an **additional copy** of the model files into your external storage
     
   - for visualization
     1. periodically check and download the latest pickle files from your external storage to your local environment
-    2. pass the pickle directory in your local enviroment to `python run_visualizer_local.py`
+    2. pass the pickle directory in your local enviroment to `deepliif visualize`
