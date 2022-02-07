@@ -21,6 +21,9 @@ import numpy as np
 import random
 import torch
 
+from packaging import version
+import subprocess
+
 def set_seed(seed=0,rank=None):
     """
     seed: basic seed
@@ -165,11 +168,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
+    rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
 
     if len(gpu_ids) > 0:
-        local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
-        rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
-
         if local_rank is not None:
             local_rank = int(local_rank)
             torch.cuda.set_device(gpu_ids[local_rank])
@@ -271,6 +273,158 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
             epoch, n_epochs + n_epochs_decay, time.time() - epoch_start_time))
         # update learning rates at the end of every epoch.
         model.update_learning_rate()
+
+
+@cli.command()
+@click.option('--dataroot', required=True, type=str,
+              help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
+@click.option('--name', default='experiment_name',
+              help='name of the experiment. It decides where to store samples and models')
+@click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
+@click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
+@click.option('--targets-no', default=5, help='number of targets')
+# model parameters
+@click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
+@click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
+@click.option('--ngf', default=64, help='# of gen filters in the last conv layer')
+@click.option('--ndf', default=64, help='# of discrim filters in the first conv layer')
+@click.option('--net-d', default='n_layers',
+              help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 '
+                   'PatchGAN. n_layers allows you to specify the layers in the discriminator')
+@click.option('--net-g', default='resnet_9blocks',
+              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+@click.option('--n-layers-d', default=4, help='only used if netD==n_layers')
+@click.option('--norm', default='batch',
+              help='instance normalization or batch normalization [instance | batch | none]')
+@click.option('--init-type', default='normal',
+              help='network initialization [normal | xavier | kaiming | orthogonal]')
+@click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
+@click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
+# dataset parameters
+@click.option('--direction', default='AtoB', help='AtoB or BtoA')
+@click.option('--serial-batches', is_flag=True,
+              help='if true, takes images in order to make batches, otherwise takes them randomly')
+@click.option('--num-threads', default=4, help='# threads for loading data')
+@click.option('--batch-size', default=1, help='input batch size')
+@click.option('--load-size', default=512, help='scale images to this size')
+@click.option('--crop-size', default=512, help='then crop to this size')
+@click.option('--max-dataset-size', type=int,
+              help='Maximum number of samples allowed per dataset. If the dataset directory contains more than '
+                   'max_dataset_size, only a subset is loaded.')
+@click.option('--preprocess', type=str,
+              help='scaling and cropping of images at load time [resize_and_crop | crop | scale_width | '
+                   'scale_width_and_crop | none]')
+@click.option('--no-flip', is_flag=True,
+              help='if specified, do not flip the images for data augmentation')
+@click.option('--display-winsize', default=512, help='display window size for both visdom and HTML')
+# additional parameters
+@click.option('--epoch', default='latest',
+              help='which epoch to load? set to latest to use latest cached model')
+@click.option('--load-iter', default=0,
+              help='which iteration to load? if load_iter > 0, the code will load models by iter_[load_iter]; '
+                   'otherwise, the code will load models by [epoch]')
+@click.option('--verbose', is_flag=True, help='if specified, print more debugging information')
+@click.option('--lambda-L1', default=100.0, help='weight for L1 loss')
+@click.option('--is-train', is_flag=True, default=True)
+@click.option('--continue-train', is_flag=True, help='continue training: load the latest model')
+@click.option('--epoch-count', type=int, default=0,
+              help='the starting  epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>')
+@click.option('--phase', default='train', help='train, val, test, etc')
+# training parameters
+@click.option('--n-epochs', type=int, default=100,
+              help='number of epochs with the initial learning rate')
+@click.option('--n-epochs-decay', type=int, default=100,
+              help='number of epochs to linearly decay learning rate to zero')
+@click.option('--beta1', default=0.5, help='momentum term of adam')
+@click.option('--lr', default=0.0002, help='initial learning rate for adam')
+@click.option('--lr-policy', default='linear',
+              help='learning rate policy. [linear | step | plateau | cosine]')
+@click.option('--lr-decay-iters', type=int, default=50,
+              help='multiply by a gamma every lr_decay_iters iterations')
+# visdom and HTML visualization parameters
+@click.option('--display-freq', default=400, help='frequency of showing training results on screen')
+@click.option('--display-ncols', default=4,
+              help='if positive, display all images in a single visdom web panel with certain number of images per row.')
+@click.option('--display-id', default=1, help='window id of the web display')
+@click.option('--display-server', default="http://localhost", help='visdom server of the web display')
+@click.option('--display-env', default='main',
+              help='visdom display environment name (default is "main")')
+@click.option('--display-port', default=8097, help='visdom port of the web display')
+@click.option('--update-html-freq', default=1000, help='frequency of saving training results to html')
+@click.option('--print-freq', default=100, help='frequency of showing training results on console')
+@click.option('--no-html', is_flag=True,
+              help='do not save intermediate training results to [opt.checkpoints_dir]/[opt.name]/web/')
+# network saving and loading parameters
+@click.option('--save-latest-freq', default=500, help='frequency of saving the latest results')
+@click.option('--save-epoch-freq', default=100,
+              help='frequency of saving checkpoints at the end of epochs')
+@click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
+@click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
+@click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
+@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
+@click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
+def trainlaunch(**kwargs):
+    """
+    A wrapper method that executes deepliif/train.py via subprocess.
+    All options are the same to train() except for the additional `--use-torchrun`.
+    The options received will be parsed and concatenated into a string, appended to `python deepliif/train.py ...`.
+
+    * for developers, this at the moment can only be tested after building and installing deepliif
+      because deepliif/train.py imports deepliif.xyz, and this reference is wrong until the deepliif package is installed
+    """
+    #### parse options
+    options = []
+
+    ## map perceived lowercase back to original uppercase
+    d_map_key = {'lambda_l1':'lambda_L1'} # --lambda-L1 is consumed as lambda_l1
+
+    ## click flags
+    l_flag_default_false = ['no_dropout','serial_batches','no_flip','verbose',
+                           'continue_train','no_html','save_by_iter']
+    l_flag_default_true = ['is_train']
+    d_flag = {**{x:False for x in l_flag_default_false},
+              **{x:True for x in l_flag_default_true}}
+
+    ## args/options not needed in train,py 
+    l_arg_skip = ['use_torchrun']
+
+    ## reconstruct the string of options to be passed to train.py
+    for k,v in kwargs.items():
+        if k not in l_arg_skip:
+            if type(v) != tuple:
+                if v is not None:
+                    k = d_map_key[k] if k in d_map_key.keys() else k
+                    if k in d_flag.keys():
+                        if v == d_flag[k]: # do not append if the value of the flag value is the default value
+                            pass
+                        else:
+                            options.append(f'--{k.replace("_","-")}')
+                    else:
+                        options.append(f'--{k.replace("_","-")} {v}')
+            else:
+                for element in v:
+                    k = d_map_key[k] if k in d_map_key.keys() else k
+                    options.append(f'--{k.replace("_","-")} {element}')
+
+    options = ' '.join(options)
+
+    #### locate train.py
+    import deepliif
+    path_train_py = deepliif.__file__.split('/')
+    path_train_py[-1] = 'train.py'
+    path_train_py = '/'.join(path_train_py)
+
+    #### execute train.py
+    if kwargs['use_torchrun']:
+        if version.parse(torch.__version__) >= version.parse('1.10.0'):
+            subprocess.run(f'torchrun {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+        else:
+            subprocess.run(f'python -m torch.distributed.launch {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+    else:
+        subprocess.run(f'python {path_train_py} {options}',shell=True)
+
+
 
 
 @cli.command()
