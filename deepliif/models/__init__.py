@@ -124,7 +124,7 @@ def load_eager_models(model_dir, devices):
 
 
 @lru_cache
-def init_nets(model_dir, eager_mode=True):
+def init_nets(model_dir, eager_mode=False):
     """
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
