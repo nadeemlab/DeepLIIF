@@ -9,5 +9,6 @@ class Resnet(ResnetGenerator):
             ngf=64,
             norm_layer=get_norm_layer(norm_type='batch'),
             use_dropout=True,
-            n_blocks=9
+            n_blocks=9,
+            padding_type='zero'
         )
