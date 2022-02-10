@@ -28,6 +28,8 @@ def set_seed(seed=0,rank=None):
     """
     seed: basic seed
     rank: rank of the current process, using which to mutate basic seed to have a unique seed per process
+    
+    output: a boolean flag indicating whether deterministic training is enabled (True) or not (False)
     """
     os.environ['DEEPLIIF_SEED'] = str(seed)
 
@@ -47,8 +49,10 @@ def set_seed(seed=0,rank=None):
         torch.backends.cudnn.deterministic = True
         torch.use_deterministic_algorithms(True)
         print(f'deterministic training, seed set to {seed_final}')
+        return True
     else:
         print(f'not using deterministic training')
+        return False
 
 
 def ensure_exists(d):
@@ -183,12 +187,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     if local_rank is not None: # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
         dist.init_process_group(backend='nccl')
         print('local rank:',local_rank)
-        set_seed(seed,local_rank)
+        flag_deterministic = set_seed(seed,local_rank)
     elif rank is not None:
-        set_seed(seed, rank)
+        flag_deterministic = set_seed(seed, rank)
     else:
-        set_seed(seed)
+        flag_deterministic = set_seed(seed)
 
+    if flag_deterministic:
+        padding_type = 'zero'
+        print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # create a dataset given dataset_mode and other options
     dataset = AlignedDataset(dataroot, load_size, crop_size, input_nc, output_nc, direction, targets_no, preprocess,
@@ -300,6 +307,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 @click.option('--init-type', default='normal',
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
+@click.option('--padding-type', default='reflect', help='network padding type.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
