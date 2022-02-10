@@ -90,13 +90,10 @@ def create_model(model, gpu_ids, is_train, checkpoints_dir, name, preprocess, ta
 
 
 def load_torchscript_model(model_pt_path, device):
-    print(f"loading {model_pt_path}")
     return torch.jit.load(model_pt_path, map_location=device)
 
 
 def load_eager_models(model_dir, devices):
-    print("Entering load_eager_models")
-    print("Devices: ", devices)
     input_nc = 3
     output_nc = 3
     ngf = 64
@@ -106,7 +103,6 @@ def load_eager_models(model_dir, devices):
     norm_layer = get_norm_layer(norm_type=norm)
 
     nets = {}
-    print("Init resnets")
     for n in ['G1', 'G2', 'G3', 'G4']:
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
         net.load_state_dict(torch.load(
@@ -114,18 +110,13 @@ def load_eager_models(model_dir, devices):
             map_location=devices[n]
         ))
         nets[n] = net
-    print(f"Keys of nets: {nets.keys()}")
-    print("Init unets")
     for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
-        print(f"Starting unet {n}")
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-        print(f"Loading state dict for {n}")
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
         ))
         nets[n] = net
-    print(f"Keys of nets: {nets.keys()}")
     return nets
 
 
@@ -135,7 +126,6 @@ def init_nets(model_dir, eager_mode=False):
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
     """
-    print("Entering init_nets")
     net_groups = [
         ('G1', 'G52'),
         ('G2', 'G53'),
@@ -146,11 +136,9 @@ def init_nets(model_dir, eager_mode=False):
 
     number_of_gpus = torch.cuda.device_count()
     if number_of_gpus:
-        print(f"Found {number_of_gpus} GPUs.")
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
         devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
-        print("Using cpu for all")
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
     if eager_mode:
