@@ -89,21 +89,30 @@ class CustomDatasetDataLoader(object):
             worker_seed = torch.initial_seed() % 2**32
             np.random.seed(worker_seed)
             random.seed(worker_seed)
+        
+        if os.getenv('DEEPLIIF_SEED',None) is None:
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                sampler=sampler,
+                batch_size=batch_size,
+                shuffle=not serial_batches if sampler is None else False,
+                num_workers=int(num_threads)
+            )
+        else:
+            g = torch.Generator()
+            g.manual_seed(0)
 
-        g = torch.Generator()
-        g.manual_seed(0)
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                sampler=sampler,
+                batch_size=batch_size,
+                shuffle=not serial_batches if sampler is None else False,
+                num_workers=int(num_threads),
+                worker_init_fn=seed_worker,
+                generator=g
+            )
 
-        self.dataloader = torch.utils.data.DataLoader(
-            self.dataset,
-            sampler=sampler,
-            batch_size=batch_size,
-            shuffle=not serial_batches if sampler is None else False,
-            num_workers=int(num_threads),
-            worker_init_fn=seed_worker,
-            generator=g
-        )
-
-        self.sampler=sampler            
+        self.sampler=sampler
 
     def load_data(self):
         return self

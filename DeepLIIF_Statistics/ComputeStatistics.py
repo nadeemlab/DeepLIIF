@@ -6,7 +6,8 @@ import csv
 from numba import cuda
 
 from Segmentation_Metrics import compute_segmentation_metrics
-from fid_official_tf import calculate_fid_given_paths
+#from fid_official_tf import calculate_fid_given_paths
+from fid import calculate_fid_given_paths
 from inception_score import calculate_inception_score
 
 from skimage.metrics import structural_similarity as ssim

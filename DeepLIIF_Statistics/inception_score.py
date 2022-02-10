@@ -10,8 +10,12 @@ from numpy import log
 from numpy import mean
 from numpy import std
 from numpy import exp
-from keras.applications.inception_v3 import InceptionV3
-from keras.applications.inception_v3 import preprocess_input
+try:
+    from tensorflow.keras.applications.inception_v3 import InceptionV3
+    from tensorflow.keras.applications.inception_v3 import preprocess_input
+except:
+    from keras.applications.inception_v3 import InceptionV3
+    from keras.applications.inception_v3 import preprocess_input
 import cv2
 
 
