@@ -122,7 +122,6 @@ If you plan to train the model in a different place from where you would like to
     # make sure that the first argument is the source path
     def save_to_s3(source_path):
       # make sure the file name part is still unchanged, e.g., by keeping source_path.split('/')[-1]
-      # otherwise, you will need to change line 37-38 in run_visualizer_local.py to fit your final file names
       target_path = ... 
       
       s3 = boto3.client('s3')
