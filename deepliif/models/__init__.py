@@ -178,9 +178,11 @@ def run_torchserve(img):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img):
+def run_dask(img, nets=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
-    nets = init_nets(model_dir)
+    
+    if nets is None:
+        nets = init_nets(model_dir)
 
     ts = transform(img.resize((512, 512)))
 
@@ -207,10 +209,20 @@ def run_dask(img):
     return res
 
 
-def inference(img, tile_size, overlap_size, use_torchserve=False):
+def inference(img, tile_size, overlap_size, use_torchserve=False, nets=None):
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
-    run_fn = run_torchserve if use_torchserve else run_dask
+    if use_torchserve:
+        run_fn = run_torchserve
+
+    elif nets is not None:
+        def run_with_initialized_net(img):
+            return run_dask(img, nets=nets)
+
+        run_fn = run_with_initialized_net
+    else:
+        run_fn = run_dask
+
     res = [Tile(t.i, t.j, run_fn(t.img)) for t in tiles]
 
     def get_net_tiles(n):
