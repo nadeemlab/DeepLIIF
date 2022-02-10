@@ -99,12 +99,13 @@ def load_eager_models(model_dir, devices):
     ngf = 64
     norm = 'batch'
     use_dropout = True
+    padding_type='zero'
 
     norm_layer = get_norm_layer(norm_type=norm)
 
     nets = {}
     for n in ['G1', 'G2', 'G3', 'G4']:
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
