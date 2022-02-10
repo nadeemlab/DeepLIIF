@@ -14,15 +14,10 @@ from deepliif.models import inference, postprocess, compute_overlap, init_nets, 
 from deepliif.util import allowed_file, Visualizer
 
 import torch.distributed as dist
-import os
-import torch
-
-import numpy as np
-import random
-import torch
 
 from packaging import version
 import subprocess
+import sys
 
 def set_seed(seed=0,rank=None):
     """
@@ -382,47 +377,36 @@ def trainlaunch(**kwargs):
     * for developers, this at the moment can only be tested after building and installing deepliif
       because deepliif/train.py imports deepliif.xyz, and this reference is wrong until the deepliif package is installed
     """
-    #### parse options
-    options = []
-
-    ## map perceived lowercase back to original uppercase
-    d_map_key = {'lambda_l1':'lambda_L1'} # --lambda-L1 is consumed as lambda_l1
-
-    ## click flags
-    l_flag_default_false = ['no_dropout','serial_batches','no_flip','verbose',
-                           'continue_train','no_html','save_by_iter']
-    l_flag_default_true = ['is_train']
-    d_flag = {**{x:False for x in l_flag_default_false},
-              **{x:True for x in l_flag_default_true}}
-
+        
+    #### process options
+    args = sys.argv[2:]
+    
     ## args/options not needed in train,py 
-    l_arg_skip = ['use_torchrun']
+    l_arg_skip = ['--use-torchrun']
+    
+    ## exclude the options to skip, both the option name and the value if it has
+    args_final = []
+    for i,arg in enumerate(args):
+        if i == 0:
+            if arg not in l_arg_skip:
+                args_final.append(arg)
+        else:
+            if args[i-1] in l_arg_skip and arg.startswith('--'):
+                # if the previous element is an option name to skip AND if the current element is an option name, not a value to the previous option
+                args_final.append(arg)
+            elif args[i-1] not in l_arg_skip and arg not in l_arg_skip:
+                # if the previous element is not an option name to skip AND if the current element is not an option to remove
+                args_final.append(arg)
 
-    ## reconstruct the string of options to be passed to train.py
-    for k,v in kwargs.items():
-        if k not in l_arg_skip:
-            if type(v) != tuple:
-                if v is not None:
-                    k = d_map_key[k] if k in d_map_key.keys() else k
-                    if k in d_flag.keys():
-                        if v == d_flag[k]: # do not append if the value of the flag value is the default value
-                            pass
-                        else:
-                            options.append(f'--{k.replace("_","-")}')
-                    else:
-                        options.append(f'--{k.replace("_","-")} {v}')
-            else:
-                for element in v:
-                    k = d_map_key[k] if k in d_map_key.keys() else k
-                    options.append(f'--{k.replace("_","-")} {element}')
-
-    options = ' '.join(options)
+    ## add quotes back to the input arg that had quotes, e.g., experiment name
+    args_final = [f'"{arg}"' if ' ' in arg else arg for arg in args_final]
+    
+    ## concatenate back to a string
+    options = ' '.join(args_final)
 
     #### locate train.py
     import deepliif
-    path_train_py = deepliif.__file__.split('/')
-    path_train_py[-1] = 'train.py'
-    path_train_py = '/'.join(path_train_py)
+    path_train_py = deepliif.__path__[0]+'/train.py'
 
     #### execute train.py
     if kwargs['use_torchrun']:
