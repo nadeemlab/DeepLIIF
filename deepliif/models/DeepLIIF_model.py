@@ -8,13 +8,14 @@ class DeepLIIFModel(BaseModel):
     for learning a mapping from input images to modalities given paired data. """
 
     def __init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf, net_g,
-                 norm, no_dropout, init_type, init_gain, ndf, net_d, n_layers_d, lr, beta1, lambda_l1, lr_policy):
+                 norm, no_dropout, init_type, init_gain, padding_type, ndf, net_d, n_layers_d, lr, beta1, lambda_l1, lr_policy,
+                 remote_transfer_cmd):
         """Initialize the DeepLIIF class.
 
         Parameters:
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
-        BaseModel.__init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy)
+        BaseModel.__init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy, remote_transfer_cmd)
 
         # weights of the modalities in generating segmentation mask
         self.lambda_L1 = lambda_l1
@@ -52,24 +53,24 @@ class DeepLIIFModel(BaseModel):
 
         # define networks (both generator and discriminator)
         self.netG1 = networks.define_G(input_nc, output_nc, ngf, net_g, norm,
-                                       not no_dropout, init_type, init_gain, self.gpu_ids)
+                                       not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG2 = networks.define_G(input_nc, output_nc, ngf, net_g, norm,
-                                       not no_dropout, init_type, init_gain, self.gpu_ids)
+                                       not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG3 = networks.define_G(input_nc, output_nc, ngf, net_g, norm,
-                                       not no_dropout, init_type, init_gain, self.gpu_ids)
+                                       not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG4 = networks.define_G(input_nc, output_nc, ngf, net_g, norm,
-                                       not no_dropout, init_type, init_gain, self.gpu_ids)
+                                       not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
 
         self.netG51 = networks.define_G(input_nc, output_nc, ngf, 'unet_512', norm,
-                                        not no_dropout, init_type, init_gain, self.gpu_ids)
+                                        not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG52 = networks.define_G(input_nc, output_nc, ngf, 'unet_512', norm,
-                                        not no_dropout, init_type, init_gain, self.gpu_ids)
+                                        not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG53 = networks.define_G(input_nc, output_nc, ngf, 'unet_512', norm,
-                                        not no_dropout, init_type, init_gain, self.gpu_ids)
+                                        not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG54 = networks.define_G(input_nc, output_nc, ngf, 'unet_512', norm,
-                                        not no_dropout, init_type, init_gain, self.gpu_ids)
+                                        not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
         self.netG55 = networks.define_G(input_nc, output_nc, ngf, 'unet_512', norm,
-                                        not no_dropout, init_type, init_gain, self.gpu_ids)
+                                        not no_dropout, init_type, init_gain, padding_type, self.gpu_ids)
 
         # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels
         # for D is input_nc + output_nc

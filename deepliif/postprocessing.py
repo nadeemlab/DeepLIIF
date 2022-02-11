@@ -250,11 +250,11 @@ def create_final_segmentation_mask_with_boundaries(mask_image):
     refined_mask = mask_image.copy()
 
     edges = feature.canny(refined_mask[:, :, 0], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
     edges = feature.canny(refined_mask[:, :, 2], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
     cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
 
     return refined_mask
@@ -266,11 +266,11 @@ def overlay_final_segmentation_mask(img, mask_image):
     overlaid_mask = img.copy()
 
     edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
     cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
 
     edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
     cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
 
     return overlaid_mask

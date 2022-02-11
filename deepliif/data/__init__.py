@@ -21,6 +21,9 @@ from PIL import Image
 from .base_dataset import __make_power_2, BaseDataset
 from .aligned_dataset import AlignedDataset
 
+from torch.utils.data.distributed import DistributedSampler
+import os
+
 
 def find_dataset_using_name(dataset_name):
     """Import the module "data/[dataset_name]_dataset.py".
@@ -52,19 +55,19 @@ def get_option_setter(dataset_name):
     return dataset_class.modify_commandline_options
 
 
-def create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size):
+def create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids):
     """Create a dataset given the option.
 
     This function wraps the class CustomDatasetDataLoader.
         This is the main interface between this package and 'train.py'/'test.py'
     """
-    return CustomDatasetDataLoader(dataset, batch_size, serial_batches, num_threads, max_dataset_size)
+    return CustomDatasetDataLoader(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids)
 
 
 class CustomDatasetDataLoader(object):
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 
-    def __init__(self, dataset, batch_size, serial_batches, num_threads, max_dataset_size):
+    def __init__(self, dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids):
         """Initialize this class
 
         Step 1: create a dataset instance given the name [dataset_mode]
@@ -74,11 +77,42 @@ class CustomDatasetDataLoader(object):
         self.max_dataset_size = max_dataset_size
         self.dataset = dataset
         print("dataset [%s] was created" % type(self.dataset).__name__)
-        self.dataloader = torch.utils.data.DataLoader(
-            self.dataset,
-            batch_size=batch_size,
-            shuffle=not serial_batches,
-            num_workers=int(num_threads))
+
+        sampler = None
+        if os.getenv('LOCAL_RANK') is not None or os.getenv('RANK') is not None:
+            sampler = DistributedSampler(self.dataset) if len(gpu_ids) > 0 else None
+
+        # control randomness: https://pytorch.org/docs/stable/notes/randomness.html#dataloader
+        import numpy as np
+        import random
+        def seed_worker(worker_id):
+            worker_seed = torch.initial_seed() % 2**32
+            np.random.seed(worker_seed)
+            random.seed(worker_seed)
+        
+        if os.getenv('DEEPLIIF_SEED',None) is None:
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                sampler=sampler,
+                batch_size=batch_size,
+                shuffle=not serial_batches if sampler is None else False,
+                num_workers=int(num_threads)
+            )
+        else:
+            g = torch.Generator()
+            g.manual_seed(0)
+
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                sampler=sampler,
+                batch_size=batch_size,
+                shuffle=not serial_batches if sampler is None else False,
+                num_workers=int(num_threads),
+                worker_init_fn=seed_worker,
+                generator=g
+            )
+
+        self.sampler=sampler
 
     def load_data(self):
         return self
