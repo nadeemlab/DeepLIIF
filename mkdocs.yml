@@ -1,0 +1,28 @@
+# Project information
+site_name: DeepLIIF
+#site_url: https://github.com/pages/nadeemlab/DeepLIIF/
+
+# Repo
+repo_name: DeepLIIF
+repo_url: https://github.com/nadeemlab/DeepLIIF
+edit_uri: edit/main/docs
+
+# Navigation
+nav:
+  - Home:
+    - Abstract: README.md
+    - Installation: installation/README.md
+  - Development: development/README.md
+  - Deployment: deployment/README.md
+  - Resources: resources/README.md
+
+# Theme
+theme:
+  name: material
+  features:
+    - navigation.tabs
+  palette:
+    scheme: default
+    primary: white
+    accent: grey
+  logo: images/DeepLIIF_logo.png
