@@ -11,23 +11,23 @@ class AlignedDataset(BaseDataset):
     During test time, you need to prepare a directory '/path/to/data/test'.
     """
 
-    def __init__(self, dataroot, load_size, crop_size, input_nc, output_nc, direction,  targets_no, preprocess, no_flip, phase, max_dataset_size):
+    def __init__(self, opt):
         """Initialize this dataset class.
 
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
-        BaseDataset.__init__(self, dataroot)
-        self.preprocess = preprocess
-        self.dir_AB = os.path.join(dataroot, phase)  # get the image directory
-        self.AB_paths = sorted(make_dataset(self.dir_AB, max_dataset_size))  # get image paths
-        assert(load_size >= crop_size)   # crop_size should be smaller than the size of loaded image
-        self.input_nc = output_nc if direction == 'BtoA' else input_nc
-        self.output_nc = input_nc if direction == 'BtoA' else output_nc
-        self.no_flip = no_flip
-        self.targets_no = targets_no
-        self.load_size = load_size
-        self.crop_size = crop_size
+        BaseDataset.__init__(self, opt.dataroot)
+        self.preprocess = opt.preprocess
+        self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
+        self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size))  # get image paths
+        assert(opt.load_size >= opt.crop_size)   # crop_size should be smaller than the size of loaded image
+        self.input_nc = opt.output_nc if opt.direction == 'BtoA' else opt.input_nc
+        self.output_nc = opt.input_nc if opt.direction == 'BtoA' else opt.output_nc
+        self.no_flip = opt.no_flip
+        self.targets_no = opt.targets_no
+        self.load_size = opt.load_size
+        self.crop_size = opt.crop_size
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.

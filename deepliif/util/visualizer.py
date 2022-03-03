@@ -51,8 +51,7 @@ class Visualizer():
     and a Python library 'dominate' (wrapped in 'HTML') for creating HTML files with images.
     """
 
-    def __init__(self, display_id, is_train, no_html, display_winsize, name, display_port, display_ncols,
-                 display_server, display_env, checkpoints_dir, remote, remote_transfer_cmd):
+    def __init__(self, opt):
         """Initialize the Visualizer class
 
         Parameters:
@@ -66,16 +65,16 @@ class Visualizer():
                      with this mode turned on, we take snapshots of variables to be passed to a visdom app as pickle files, saved under
                      <checkpoints_dir>/pickle/
         """
-        self.display_id = display_id
-        self.use_html = is_train and not no_html
-        self.win_size = display_winsize
-        self.name = name
-        self.port = display_port
+        self.display_id = opt.display_id
+        self.use_html = opt.is_train and not opt.no_html
+        self.win_size = opt.display_winsize
+        self.name = opt.name
+        self.port = opt.display_port
         self.saved = False
-        self.remote = remote # with a remote visdom
-        self.remote_transfer_cmd = remote_transfer_cmd
+        self.remote = opt.remote # with a remote visdom
+        self.remote_transfer_cmd = opt.remote_transfer_cmd
 
-        self.pickle_dir = os.path.join(checkpoints_dir, name, 'pickle') # pickled variables to be passed to a remote visdom
+        self.pickle_dir = os.path.join(opt.checkpoints_dir, opt.name, 'pickle') # pickled variables to be passed to a remote visdom
         self.use_multi_proc = False
         self.rank = None
         
@@ -95,9 +94,9 @@ class Visualizer():
             if (self.use_multi_proc and self.rank == 0) or (not self.use_multi_proc):
                 path_source = os.path.join(self.pickle_dir,fn)
                 
-                opt = {'display_id': display_id, 'is_train': is_train, 'no_html': no_html, 'display_winsize': display_winsize, 'name': name, 
-                       'display_port': display_port, 'display_ncols': display_ncols, 'display_server': display_server, 'display_env': display_env,
-                       'checkpoints_dir': checkpoints_dir, 'remote': remote, 'remote_transfer_cmd': remote_transfer_cmd}
+                # opt = {'display_id': display_id, 'is_train': is_train, 'no_html': no_html, 'display_winsize': display_winsize, 'name': name,
+                #        'display_port': display_port, 'display_ncols': display_ncols, 'display_server': display_server, 'display_env': display_env,
+                #        'checkpoints_dir': checkpoints_dir, 'remote': remote, 'remote_transfer_cmd': remote_transfer_cmd}
                 
                 pickle.dump(opt,open(path_source,'wb'))
                 print(f'Remote mode, snapshot created: {fn}')
@@ -109,19 +108,19 @@ class Visualizer():
 
         if self.display_id > 0:  # connect to a visdom server given <display_port> and <display_server>
             import visdom
-            self.ncols = display_ncols
-            if not remote:
-                self.vis = visdom.Visdom(server=display_server, port=display_port, env=display_env)
+            self.ncols = opt.display_ncols
+            if not opt.remote:
+                self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port, env=opt.display_env)
                 if not self.vis.check_connection():
                     self.create_visdom_connections()
 
         if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under <checkpoints_dir>/web/images/
-            self.web_dir = os.path.join(checkpoints_dir, name, 'web')
+            self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
             self.img_dir = os.path.join(self.web_dir, 'images')
             print('create web directory %s...' % self.web_dir)
             util.mkdirs([self.web_dir, self.img_dir])
         # create a logging file to store training losses
-        self.log_name = os.path.join(checkpoints_dir, name, 'loss_log.txt')
+        self.log_name = os.path.join(opt.checkpoints_dir, opt.name, 'loss_log.txt')
         with open(self.log_name, "a") as log_file:
             now = time.strftime("%c")
             log_file.write('================ Training Loss (%s) ================\n' % now)

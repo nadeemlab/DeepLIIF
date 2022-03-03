@@ -55,32 +55,33 @@ def get_option_setter(dataset_name):
     return dataset_class.modify_commandline_options
 
 
-def create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids):
+def create_dataset(opt):
     """Create a dataset given the option.
 
     This function wraps the class CustomDatasetDataLoader.
         This is the main interface between this package and 'train.py'/'test.py'
     """
-    return CustomDatasetDataLoader(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids)
+    return CustomDatasetDataLoader(opt)
 
 
 class CustomDatasetDataLoader(object):
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 
-    def __init__(self, dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids):
+    def __init__(self, opt):
         """Initialize this class
 
         Step 1: create a dataset instance given the name [dataset_mode]
         Step 2: create a multi-threaded data loader.
         """
-        self.batch_size = batch_size
-        self.max_dataset_size = max_dataset_size
-        self.dataset = dataset
+        self.batch_size = opt.batch_size
+        self.max_dataset_size = opt.max_dataset_size
+        dataset_class = find_dataset_using_name(opt.dataset_mode)
+        self.dataset = dataset_class(opt)
         print("dataset [%s] was created" % type(self.dataset).__name__)
 
         sampler = None
         if os.getenv('LOCAL_RANK') is not None or os.getenv('RANK') is not None:
-            sampler = DistributedSampler(self.dataset) if len(gpu_ids) > 0 else None
+            sampler = DistributedSampler(self.dataset) if len(opt.gpu_ids) > 0 else None
 
         # control randomness: https://pytorch.org/docs/stable/notes/randomness.html#dataloader
         import numpy as np
@@ -94,9 +95,9 @@ class CustomDatasetDataLoader(object):
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 sampler=sampler,
-                batch_size=batch_size,
-                shuffle=not serial_batches if sampler is None else False,
-                num_workers=int(num_threads)
+                batch_size=opt.batch_size,
+                shuffle=not opt.serial_batches if sampler is None else False,
+                num_workers=int(opt.num_threads)
             )
         else:
             g = torch.Generator()
@@ -105,9 +106,9 @@ class CustomDatasetDataLoader(object):
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 sampler=sampler,
-                batch_size=batch_size,
-                shuffle=not serial_batches if sampler is None else False,
-                num_workers=int(num_threads),
+                batch_size=opt.batch_size,
+                shuffle=not opt.serial_batches if sampler is None else False,
+                num_workers=int(opt.num_threads),
                 worker_init_fn=seed_worker,
                 generator=g
             )

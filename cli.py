@@ -19,6 +19,9 @@ from packaging import version
 import subprocess
 import sys
 
+from options import Options
+
+
 def set_seed(seed=0,rank=None):
     """
     seed: basic seed
@@ -148,6 +151,10 @@ def cli():
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
 @click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
 @click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--dataset_mode', type=str, default='aligned',
+              help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
+@click.option('--padding', type=str, default='zero',
+              help='chooses the type of padding used by resnet generator. [reflect | zero]')
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
 @click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
@@ -156,7 +163,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed):
+          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -168,6 +175,13 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    opt = Options(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
+          n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
+          batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
+          verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
+          display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
+          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters, remote_transfer_cmd, dataset_mode, padding)
+
     local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
     rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
 
@@ -193,24 +207,19 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # create a dataset given dataset_mode and other options
-    dataset = AlignedDataset(dataroot, load_size, crop_size, input_nc, output_nc, direction, targets_no, preprocess,
-                             no_flip, phase, max_dataset_size)
+    # dataset = AlignedDataset(opt)
 
-    dataset = create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids)
+    dataset = create_dataset(opt)
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
 
     # create a model given model and other options
-    model = DeepLIIFModel(gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf,
-                          net_g, norm, no_dropout, init_type, init_gain, padding_type, ndf, net_d, n_layers_d, lr, beta1, lambda_l1,
-                          lr_policy, remote_transfer_cmd)
+    model = DeepLIIFModel(opt)
     # regular setup: load and print networks; create schedulers
-    model.setup(lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters, continue_train, load_iter, epoch,
-                verbose)
+    model.setup(opt)
 
     # create a visualizer that display/save images and plots
-    visualizer = Visualizer(display_id, is_train, no_html, display_winsize, name, display_port, display_ncols,
-                            display_server, display_env, checkpoints_dir, remote, remote_transfer_cmd)
+    visualizer = Visualizer(opt)
     # the total number of training iterations
     total_iters = 0
 
