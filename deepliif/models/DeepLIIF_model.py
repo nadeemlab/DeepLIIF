@@ -104,7 +104,7 @@ class DeepLIIFModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
 
-            self.criterionVGG = networks.VGGLoss()
+            self.criterionVGG = networks.VGGLoss().to(self.device)
 
     def set_input(self, input):
         """

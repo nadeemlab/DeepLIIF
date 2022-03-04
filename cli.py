@@ -173,13 +173,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
-    opt = Options(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
-                  n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
-                  batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
-                  verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
-                  display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
-                  continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-                  remote, remote_transfer_cmd, dataset_mode, padding)
 
     local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
     rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
@@ -207,6 +200,14 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
+
+    opt = Options(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
+                  n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
+                  batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch,
+                  load_iter, verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server,
+                  display_env, display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq,
+                  save_by_iter, continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1,
+                  lr, lr_decay_iters, remote, remote_transfer_cmd, dataset_mode, padding)
 
     dataset = create_dataset(opt)
     # get the number of images in the dataset.
@@ -662,6 +663,7 @@ class Options:
         self.netD = 'n_layers'
         self.n_layers_D = 4
         self.lambda_L1 = 100
+        self.lambda_feat = 100
         self.remote = remote
 
 
