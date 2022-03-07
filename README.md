@@ -107,6 +107,12 @@ To train a model:
 deepliif train --dataroot /path/to/input/images 
                 --name Model_Name 
 ```
+or
+```
+python train.py --dataroot /path/to/input/images 
+                --name Model_Name 
+```
+
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
 * Epoch-wise intermediate training results are in `DeepLIIF/checkpoints/Model_Name/web/index.html`.
 * Trained models will be by default be saved in `DeepLIIF/checkpoints/Model_Name`.
@@ -129,6 +135,11 @@ To test the model:
 deepliif test --input-dir /path/to/input/images 
               --output-dir /path/to/output/images 
               --tile-size 512
+```
+or
+```
+python test.py --dataroot /path/to/input/images 
+               --name Model_Name  
 ```
 * The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 * Before running test on images, the model files must be serialized as described above.
@@ -185,7 +196,7 @@ segmentation mask by choosing a percentage of random negative cells in the segme
 converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
 shown in Figure 2.
 
-![IHC_Gen_image](./images/IHC_Gen3.png)**Figure 2**. *Overview of synthetic IHC image generation. (a) A training sample 
+![IHC_Gen_image](./images/IHC_Gen.jpg)**Figure 2**. *Overview of synthetic IHC image generation. (a) A training sample 
 of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
 Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
 
