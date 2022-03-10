@@ -77,7 +77,7 @@ Commands:
   train                  General-purpose training script for multi-task...
 ```
 
-## Training Dataset:
+## Training Dataset
 For training, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched
 together horizontally).
 The data need to be arranged in the following order:

@@ -8,21 +8,14 @@ def create_base_parser():
 
     parser.add_argument('--input_dir', required=True, help='path to input images')
     parser.add_argument('--output_dir', required=False, type=str, default='', help='path to output images')
-    parser.add_argument('--validation_ratio', required=False, type=float, default=0.2,
-                        help='the ratio of the number of the images in the validation set to the total number of images.')
-    parser.add_argument('--input_orig_dir', required=False, type=str, default='',
-                        help='path to original whole slide images')
-    parser.add_argument('--resize_size', required=False, default=None, help='resizing size of the whole slide image')
-    parser.add_argument('--image_size', required=False, default=None, help='size of the original whole slide image')
+    parser.add_argument('--name', type=str, default='experiment_name',
+                        help='name of the experiment. It decides where to store samples and models')
+    parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
     parser.add_argument('--tile_size', required=False, type=int, default=512, help='size of the tiles')
     parser.add_argument('--overlap_size', required=False, type=int, default=50,
                         help='size of the overlapping area between tiles')
-    parser.add_argument('--resize_self', required=False, type=bool, default=True,
-                        help='if want to resize the whole slide to a specific size')
     parser.add_argument('--gpu_ids', required=False, type=str, default='0',
                         help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
-    parser.add_argument('--post_process_seg_mask', action='store_true',
-                        help='if user wants the post-processing script post-processes the segmentation mask')
     parser.add_argument('--epoch_count', type=int, default=0,
                              help='the starting  epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>, ...')
 
