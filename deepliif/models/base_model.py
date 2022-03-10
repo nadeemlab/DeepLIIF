@@ -15,7 +15,7 @@ class BaseModel(ABC):
         -- <modify_commandline_options>:    (optionally) add model-specific options and set default options.
     """
 
-    def __init__(self, gpu_ids, is_train, checkpoints_dir, name, preprocess, lr_policy, remote_transfer_cmd):
+    def __init__(self, opt):
         """Initialize the BaseModel class.
 
         Parameters:
@@ -29,12 +29,12 @@ class BaseModel(ABC):
             -- self.visual_names (str list):        specify the images that you want to display and save.
             -- self.optimizers (optimizer list):    define and initialize optimizers. You can define one optimizer for each network. If two networks are updated at the same time, you can use itertools.chain to group them. See cycle_gan_model.py for an example.
         """
-        self.gpu_ids = gpu_ids
-        self.is_train = is_train
-        self.lr_policy = lr_policy
+        self.opt = opt
+        self.gpu_ids = opt.gpu_ids
+        self.is_train = opt.is_train
         self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')  # get device name: CPU or GPU
-        self.save_dir = os.path.join(checkpoints_dir, name)  # save all the checkpoints to save_dir
-        if preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
+        self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir
+        if opt.preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
             torch.backends.cudnn.benchmark = True
         self.loss_names = []
         self.model_names = []
@@ -42,14 +42,14 @@ class BaseModel(ABC):
         self.optimizers = []
         self.image_paths = []
         self.metric = 0  # used for learning rate policy 'plateau'
-        self.remote_transfer_cmd = remote_transfer_cmd
+        self.remote_transfer_cmd = opt.remote_transfer_cmd
 
         self.remote_transfer_cmd_module = None
         self.remote_transfer_cmd_function = None
 
         if self.remote_transfer_cmd:
-            self.remote_transfer_cmd_module = remote_transfer_cmd.split('.')[0]
-            self.remote_transfer_cmd_function = remote_transfer_cmd.split('.')[1]
+            self.remote_transfer_cmd_module = opt.remote_transfer_cmd.split('.')[0]
+            self.remote_transfer_cmd_function = opt.remote_transfer_cmd.split('.')[1]
 
     @abstractmethod
     def set_input(self, input):
@@ -71,18 +71,18 @@ class BaseModel(ABC):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
 
-    def setup(self, lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters, continue_train, load_iter, epoch, verbose):
+    def setup(self, opt):
         """Load and print networks; create schedulers
 
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         if self.is_train:
-            self.schedulers = [networks.get_scheduler(optimizer, lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters) for optimizer in self.optimizers]
-        if not self.is_train or continue_train:
-            load_suffix = 'iter_%d' % load_iter if load_iter > 0 else epoch
+            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+        if not self.is_train or opt.continue_train:
+            load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
             self.load_networks(load_suffix)
-        self.print_networks(verbose)
+        self.print_networks(opt.verbose)
 
     def eval(self):
         """Make models eval mode during test time"""
@@ -112,7 +112,7 @@ class BaseModel(ABC):
     def update_learning_rate(self):
         """Update learning rates for all the networks; called at the end of every epoch"""
         for scheduler in self.schedulers:
-            if self.lr_policy == 'plateau':
+            if self.opt.lr_policy == 'plateau':
                 scheduler.step(self.metric)
             else:
                 scheduler.step()
