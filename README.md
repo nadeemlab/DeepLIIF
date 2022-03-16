@@ -101,7 +101,7 @@ deepliif prepare-training-data --input-dir /path/to/input/images
                                --validation-ratio 0.2
 ```
 
-## Training:
+## Training
 To train a model:
 ```
 deepliif train --dataroot /path/to/input/images 
@@ -129,7 +129,7 @@ deepliif serialize --models-dir /path/to/input/model/files
 * By default, the model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
 * By default, the serialized files will be saved to the same directory as the input model files.
 
-## Testing:
+## Testing
 To test the model:
 ```
 deepliif test --input-dir /path/to/input/images 
@@ -151,7 +151,6 @@ python test.py --dataroot /path/to/input/images
 If you prefer, it is possible to run the model using Torchserve.
 Please see below for instructions on how to deploy the model with Torchserve and for an example of how to run the inference.
 
-
 ## Docker
 We provide a Dockerfile that can be used to run the DeepLIIF models inside a container.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
@@ -171,7 +170,7 @@ environment in which to run, referred to as a container.
 When you run a container from the image, the `deepliif` CLI will be available.
 You can easily run any CLI command in the activated environment and copy the results from the docker container to the host.
 
-## Google CoLab:
+## Google CoLab
 If you don't have access to GPU or appropriate hardware, we have also created [Google CoLab project](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) 
 for your convenience. 
 Please follow the steps in the provided notebook to install the requirements and run the training and testing scripts.
@@ -184,7 +183,7 @@ If you don't have access to GPU or appropriate hardware and just want to use Ima
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
-## Synthetic Data Generation:
+## Synthetic Data Generation
 The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
 resulting from the absence of clustered positive cells in our training data. To infuse more information about the
 clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using
@@ -210,11 +209,11 @@ We created a new dataset using the original IHC images and synthetic IHC images.
 two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can 
 find the new trained model [here](https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1).
 
-## Registration:
+## Registration
 To register the de novo stained mpIF and IHC images, you can use the registration framework in the 'Registration' 
 directory. Please refer to the README file provided in the same directory for more details.
 
-## Contributing Training Data:
+## Contributing Training Data
 To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and 
 mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC 
 images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of 
@@ -229,7 +228,6 @@ multiplex images and produce the optimal output. If you are generating or have g
 for the same slide (de novo staining) and would like to contribute that data for DeepLIIF, we can perform 
 co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the 
 DeepLIIF model and release back to the community with full credit to the contributors.
-
 
 ## Deploying DeepLIIF with Torchserve
 
@@ -370,7 +368,6 @@ masks = {k: deserialize_tensor(v) for k, v in res.json().items()}
 
 ## Issues
 Please report all issues on the public forum.
-
 
 ## License
 © [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, 
