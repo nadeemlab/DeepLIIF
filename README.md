@@ -8,6 +8,8 @@
     |
     <a href="https://deepliif.org/">AWS Cloud Deployment</a>
     |
+    <a href="https://nadeemlab.github.io/DeepLIIF/">Documentation</a>
+    |
     <a href="#docker">Docker</a>
     |
     <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
@@ -380,4 +382,12 @@ If you find our work useful in your research or if you use parts of this code, p
   journal={Nature Machine Intelligence},
   year={2022}
 }
+
+@article{ghahremani2022deepliifdemo,
+  title={DeepLIIF: An Online Platform for Quantification of Clinical Pathology Slides},
+  author={Ghahremani, Parmida and Marino, Joseph and Dodds, Ricardo and Nadeem, Saad},
+  journal={CVPR},
+  year={2022}
+}
+
 ```
