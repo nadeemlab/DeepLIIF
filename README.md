@@ -6,15 +6,15 @@
     <p align="center">
     <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
-    <a href="https://deepliif.org/">AWS Cloud Deployment</a>
+    <a href="https://deepliif.org/">Cloud Deployment</a>
     |
     <a href="https://nadeemlab.github.io/DeepLIIF/">Documentation</a>
     |
     <a href="#docker">Docker</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
+    <a href="https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin">ImageJ Plugin</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Request Feature</a>
+    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
   </p>
 </p>
 
@@ -177,6 +177,12 @@ for your convenience.
 Please follow the steps in the provided notebook to install the requirements and run the training and testing scripts.
 All the libraries and pretrained models have already been set up there. 
 The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
+
+## ImageJ Plugin
+If you don't have access to GPU or appropriate hardware and just want to use ImageJ to run inference, we have also created an [ImageJ plugin](https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin) for your convenience.
+
+## Cloud Deployment
+If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
 ## Synthetic Data Generation:
 The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
