@@ -383,7 +383,7 @@ If you find our work useful in your research or if you use parts of this code, p
   year={2022}
 }
 
-@article{ghahremani2022deepliifdemo,
+@article{ghahremani2022deepliifui,
   title={DeepLIIF: An Online Platform for Quantification of Clinical Pathology Slides},
   author={Ghahremani, Parmida and Marino, Joseph and Dodds, Ricardo and Nadeem, Saad},
   journal={CVPR},
