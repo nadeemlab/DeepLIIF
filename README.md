@@ -180,8 +180,12 @@ The user can directly run DeepLIIF on their images using the instructions given 
 ## ImageJ Plugin
 If you don't have access to GPU or appropriate hardware and just want to use ImageJ to run inference, we have also created an [ImageJ plugin](https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin) for your convenience.
 
+![DeepLIIF ImageJ Demo](images/deepliif-imagej-demo.gif)
+
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
+
+![DeepLIIF Website Demo](images/deepliif-website-demo.gif)
 
 ## Synthetic Data Generation
 The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
