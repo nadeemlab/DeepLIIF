@@ -14,6 +14,7 @@ nav:
     - Installation: installation/README.md
   - Development: development/README.md
   - Deployment: deployment/README.md
+  - ImageJ Plugin: ImageJ/README.md
   - Resources: resources/README.md
 
 # Theme
