@@ -118,6 +118,34 @@ python train.py --dataroot /path/to/input/images
 * Trained models will be by default be saved in `DeepLIIF/checkpoints/Model_Name`.
 * Training datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
+**DP**: To train a model you can use DP. DP is single-process. It means that **all the GPUs you want to use must be on the same machine** so that they can be included in the same process - you cannot distribute the training across multiple GPU machines, unless you write your own code to handle inter-node (node = machine) communication.
+To split and manage the workload for multiple GPUs within the same process, DP uses multi-threading. 
+You can find more information on DP [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Multi-GPU%20Training.md).
+
+To train a model with DP (Example with 2 GPUs (on 1 machine)):
+```
+deepliif train --dataroot <data_dir> --batch-size 6 --gpu-ids 0 --gpu-ids 1
+```
+Note that `batch-size` is defined per process. Since DP is a single-process method, the `batch-size` you set is the **effective** batch size.
+
+**DDP**: To train a model you can use DDP. DDP usually spawns multiple processes. 
+**DeepLIIF's code follows the PyTorch recommendation to spawn 1 process per GPU** ([doc](https://github.com/pytorch/examples/blob/master/distributed/ddp/README.md#application-process-topologies)). If you want to assign multiple GPUs to each process, you will need to make modifications to DeepLIIF's code (see [doc](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html#combine-ddp-with-model-parallelism)).
+Despite all the benefits of DDP, one drawback is the extra GPU memory needed for dedicated CUDA buffer for communication. See a short discussion [here](https://discuss.pytorch.org/t/do-dataparallel-and-distributeddataparallel-affect-the-batch-size-and-gpu-memory-consumption/97194/2). In the context of DeepLIIF, this means that there might be situations where you could use a *bigger batch size with DP* as compared to DDP, which may actually train faster than using DDP with a smaller batch size.
+You can find more information on DDP [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Multi-GPU%20Training.md).
+
+To launch training using DDP on a local machine, use `deepliif trainlaunch`. Example with 2 GPUs (on 1 machine):
+```
+deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "--nproc_per_node 2"
+```
+Note that
+1. `batch-size` is defined per process. Since DDP is a single-process method, the `batch-size` you set is the batch size for each process, and the **effective** batch size will be `batch-size` multiplied by the number of processes you started. In the above example, it will be 3 * 2 = 6.
+2. You still need to provide **all GPU ids to use** to the training command. Internally, in each process DeepLIIF picks the device using `gpu_ids[local_rank]`. If you provide `--gpu-ids 2 --gpu-ids 3`, the process with local rank 0 will use gpu id 2 and that with local rank 1 will use gpu id 3. 
+3. `-t 3 --log_dir <log_dir>` is not required, but is a useful setting in `torchrun` that saves the log from each process to your target log directory. For example:
+```
+deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "-t 3 --log_dir <log_dir> --nproc_per_node 2"
+```
+4. If your PyTorch is older than 1.10, DeepLIIF calls `torch.distributed.launch` in the backend. Otherwise, DeepLIIF calls `torchrun`.
+
 ## Serialize Model
 The installed `deepliif` uses Dask to perform inference on the input IHC images.
 Before running the `test` command, the model files must be serialized using Torchscript.
