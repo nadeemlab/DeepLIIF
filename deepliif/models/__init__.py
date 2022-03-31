@@ -91,13 +91,36 @@ def load_torchscript_model(model_pt_path, device):
     return torch.jit.load(model_pt_path, map_location=device)
 
 
+def read_model_params(file_addr):
+    with open(file_addr) as f:
+        lines = f.readlines()
+    param_dict = {}
+    for line in lines:
+        if ':' in line:
+            key = line.split(':')[0].strip()
+            val = line.split(':')[1].strip()
+            param_dict[key] = val
+    return param_dict
+
+
 def load_eager_models(model_dir, devices):
     input_nc = 3
     output_nc = 3
     ngf = 64
     norm = 'batch'
     use_dropout = True
-    padding_type='zero'
+    padding_type = 'zero'
+
+    files = os.listdir(model_dir)
+    for f in files:
+        if 'train_opt.txt' in f:
+            param_dict = read_model_params(os.path.join(model_dir, f))
+            input_nc = int(param_dict['input_nc'])
+            output_nc = int(param_dict['output_nc'])
+            ngf = int(param_dict['ngf'])
+            norm = param_dict['norm']
+            use_dropout = False if param_dict['no_dropout'] == 'True' else True
+            padding_type = param_dict['padding']
 
     norm_layer = get_norm_layer(norm_type=norm)
 
