@@ -14,7 +14,7 @@
     |
     <a href="https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin">ImageJ Plugin</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
+    <a href="#support">Support</a>
   </p>
 </p>
 
@@ -315,8 +315,10 @@ for the same slide (de novo staining) and would like to contribute that data for
 co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the 
 DeepLIIF model and release back to the community with full credit to the contributors.
 
-## Issues
-Please report all issues on the public forum.
+## Support
+Please use the [Image.sc Forum](https://forum.image.sc/) for discussion and questions related to DeepLIIF.
+
+Bugs can be reported in the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab.
 
 ## License
 © [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, 

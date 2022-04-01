@@ -12,7 +12,7 @@
     |
     <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Request Feature</a>
+    <a href="https://forum.image.sc/">Image.sc Forum</a>
   </p>
 </p>
 
