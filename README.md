@@ -315,7 +315,7 @@ co-registration, whole-cell multiplex segmentation via [ImPartial](https://githu
 DeepLIIF model and release back to the community with full credit to the contributors.
 
 ## Support
-Please use the [Image.sc Forum](https://forum.image.sc/) for discussion and questions related to DeepLIIF.
+Please use the [Image.sc Forum](https://forum.image.sc/tag/deepliif) for discussion and questions related to DeepLIIF. Just use the deepliif tag and the DeepLIIF Community Forum Team members will address these at the earliest possible.
 
 Bugs can be reported in the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab.
 
