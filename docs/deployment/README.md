@@ -19,7 +19,18 @@ environment in which to run, referred to as a container.
 When you run a container from the image, the `deepliif` CLI will be available.
 You can easily run any CLI command in the activated environment and copy the results from the docker container to the host.
 
-## Deploying DeepLIIF with Torchserve
+## Dask deployment
+
+By default, DeepLIIF networks are deployed using a combination of TorchScript and Dask. Torchscript is used to
+serialize and optimize the models starting from a pre-trained model checkpoint and the Python code that
+describes the models. For more details check out the [Serialize Model](https://nadeemlab.github.io/DeepLIIF/testing/#serialize-model)
+section on the documentation.
+
+Models parallelization and interdependencies are expressed using Dask [Delayed](https://docs.dask.org/en/stable/delayed.html)
+functions that allow us to build a computational graph with minimal code annotations. The concrete implementation
+can be found on the `run_dask()` function under the `deepliif.models` module.
+
+## Torchserve deployment
 
 This section describes how to run DeepLIIF's inference using [Torchserve](https://github.com/pytorch/serve) workflows.
 Workflows con be composed by both PyTorch models and Python functions that can be connected through a DAG.
