@@ -9,12 +9,13 @@ edit_uri: edit/main/docs
 
 # Navigation
 nav:
-  - Home:
-    - Abstract: README.md
-    - Installation: installation/README.md
-  - Development: development/README.md
+  - Home: README.md
+  - Installation: installation/README.md
+  - Training: training/README.md
+  - Testing: testing/README.md
   - Deployment: deployment/README.md
   - ImageJ Plugin: ImageJ/README.md
+  - Cloud Deployment: cloud/README.md
 
 # Theme
 theme:

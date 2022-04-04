@@ -2,6 +2,7 @@
 We provide a Dockerfile that can be used to run the DeepLIIF models inside a container.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
+
 * Download the pretrained model and place them in DeepLIIF/checkpoints/DeepLIIF_Latest_Model.
 * Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
 * To create a docker image from the docker file:
@@ -10,6 +11,7 @@ docker build -t cuda/deepliif .
 ```
 The image is then used as a base. You can copy and use it to run an application. The application needs an isolated 
 environment in which to run, referred to as a container.
+
 * To create and run a container:
 ```
  docker run -it -v `pwd`:`pwd` -w `pwd` cuda/deepliif deepliif test --input-dir Sample_Large_Tissues
@@ -22,27 +24,30 @@ You can easily run any CLI command in the activated environment and copy the res
 This section describes how to run DeepLIIF's inference using [Torchserve](https://github.com/pytorch/serve) workflows.
 Workflows con be composed by both PyTorch models and Python functions that can be connected through a DAG.
 For DeepLIIF there are 4 main stages (see Figure 3): 
+
 * `Pre-process` deserialize the image from the request and return a tensor created from it.
 * `G1-4` run the ResNets to generate the Hematoxylin, DAPI, LAP2 and Ki67 masks.
 * `G51-5` run the UNets and apply `Weighted Average` to generate the Segmentation image.
 * `Aggregate` aggregate and serialize the results and return to user.
 
 ![DeepLIIF Torchserve workflow](./images/deepliif_torchserve_workflow.png)
-**Figure 3**. *Composition of DeepLIIF nets into a Torchserve workflow*
+*Composition of DeepLIIF nets into a Torchserve workflow.*
 
 In practice, users need to call this workflow for each tile generated from the original image.  
 A common use case scenario would be:
+
 1. Load an IHC image and generate the tiles.
-3. For each tile
+2. For each tile:
     1. Resize to 512x512 and transform to tensor.
-    2. Serialize the tensor and use the inference API to generate all the masks
-    3. Deserialize the results
-4. Stitch back the results and apply post-processing operations 
+    2. Serialize the tensor and use the inference API to generate all the masks.
+    3. Deserialize the results.
+3. Stitch back the results and apply post-processing operations.
 
 The next sections show how to deploy the model server.
 
-### Pre-requisites
-1. Install Torchserve and torch-model-archiver following [these instructions](https://github.com/pytorch/serve#install-torchserve-and-torch-model-archiver).
+### Prerequisites
+
+1\. Install Torchserve and torch-model-archiver following [these instructions](https://github.com/pytorch/serve#install-torchserve-and-torch-model-archiver).
 In MacOS, navigate to the `model-server` directory:
 
 ```shell
@@ -52,7 +57,7 @@ source venv/bin/activate
 pip install torch torchserve torch-model-archiver torch-workflow-archiver 
 ```
 
-2. Download and unzip the latest version of the DeepLIIF models from [zenodo](https://zenodo.org/record/4751737#.YXsTuS2cZhF).
+2\. Download and unzip the latest version of the DeepLIIF models from [zenodo](https://zenodo.org/record/4751737#.YXsTuS2cZhF).
 
 ```shell
 wget https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip

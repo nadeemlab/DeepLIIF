@@ -1,6 +1,6 @@
 # Installation
 
-## Pre-requisites
+## Prerequisites
 1. Python 3.8
 2. Docker
 
@@ -14,6 +14,7 @@ $ source venv/bin/activate
 ```
 
 The package is composed of two parts:
+
 1. A library that implements the core functions used to train and test DeepLIIF models. 
 2. A CLI to run common batch operations including training, batch testing and Torchscipt models serialization.
 
@@ -27,7 +28,6 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  prepare-testing-data   Preparing data for testing
   prepare-training-data  Preparing data for training
   serialize              Serialize DeepLIIF models using Torchscript
   test                   Test trained models
