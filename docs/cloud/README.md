@@ -60,3 +60,13 @@ for name, img in data['images'].items():
 
 print(json.dumps(data['scoring'], indent=2))
 ```
+
+## Auto-scaling the service
+
+DeepLIIFs underlying infrastructure is completely defined using [Pulumi](https://www.pulumi.com) stacks.
+Behind the scenes, we use containers to deploy both the web application and the API on top of an
+ECS cluster with an auto-scaling group that runs on G4dns (GPU) machines.
+
+Under stress, the system will autoscale both the compute capacity and the service availability to accommodate
+the incoming requests without affecting the overall performance. The current auto-scaling policy monitors the
+number of requests per target on the application load balancer.
