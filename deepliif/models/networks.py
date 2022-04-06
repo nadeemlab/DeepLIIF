@@ -113,7 +113,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     """
     if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
-        net.to(gpu_ids[0])
+        # net.to(gpu_ids[0])
         if os.getenv('LOCAL_RANK') is not None or os.getenv('RANK') is not None:
             # net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
             # broadcast_buffers=False: https://github.com/pytorch/pytorch/issues/22095#issuecomment-505099500
@@ -672,7 +672,7 @@ class Vgg19(torch.nn.Module):
 class VGGLoss(nn.Module):
     def __init__(self):
         super(VGGLoss, self).__init__()
-        self.vgg = Vgg19().cuda()
+        self.vgg = Vgg19()
         self.criterion = nn.L1Loss()
         self.weights = [1.0/32, 1.0/16, 1.0/8, 1.0/4, 1.0]
 

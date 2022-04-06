@@ -201,8 +201,9 @@ def run_torchserve(img):
 
 
 def run_dask(img):
-    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
-    nets = init_nets(model_dir)
+    # model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
+    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './checkpoints/DeepLIIF_Latest_Model/')
+    nets = init_nets(model_dir, True)
 
     ts = transform(img.resize((512, 512)))
 

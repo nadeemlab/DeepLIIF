@@ -11,7 +11,7 @@ from PIL import Image
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
-from deepliif.util import allowed_file, Visualizer
+from deepliif.util import allowed_file, Visualizer, read_input_image
 
 import torch.distributed as dist
 
@@ -173,6 +173,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+
+    if gpu_ids and gpu_ids[0] == -1:
+        gpu_ids = []
 
     local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
     rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
@@ -428,7 +431,6 @@ def trainlaunch(**kwargs):
 
 
 
-
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
@@ -438,7 +440,8 @@ def test(input_dir, output_dir, tile_size):
     """
     output_dir = output_dir or input_dir
     ensure_exists(output_dir)
-
+    print(input_dir, output_dir)
+    print(os.listdir(input_dir))
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
 
     with click.progressbar(
@@ -447,7 +450,8 @@ def test(input_dir, output_dir, tile_size):
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename))
+            start_time = time.time()
+            img = read_input_image(os.path.join(input_dir, filename))
 
             images = inference(
                 img,
@@ -469,7 +473,9 @@ def test(input_dir, output_dir, tile_size):
                     filename.replace('.' + filename.split('.')[-1], f'.json')
             ), 'w') as f:
                 json.dump(scoring, f, indent=2)
-
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(filename, time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
 @cli.command()
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')

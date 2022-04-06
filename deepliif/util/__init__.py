@@ -5,13 +5,15 @@ import collections
 import torch
 import numpy as np
 from PIL import Image, ImageOps
+import javabridge
+import bioformats
 
 from .visualizer import Visualizer
 
 # Postfixes not to consider for segmentation
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
-image_extensions = ['.png', '.jpg', '.tif']
+image_extensions = ['.png', '.jpg', '.tif', '.czi']
 
 
 def allowed_file(filename):
@@ -67,3 +69,42 @@ def stitch(tiles, tile_size, overlap_size):
         new_im.paste(img, (t.j * tile_size, t.i * tile_size))
 
     return new_im
+
+def read_input_image(input_addr):
+    if input_addr.endswith('.czi'):
+        img = read_czi_file(input_addr)
+    else:
+        img = Image.open(input_addr)
+    return img
+
+def read_czi_file(input_addr):
+    javabridge.start_vm(class_path=bioformats.JARS)
+
+    rootLoggerName = javabridge.get_static_field("org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;")
+    rootLogger = javabridge.static_call("org/slf4j/LoggerFactory", "getLogger",
+                                        "(Ljava/lang/String;)Lorg/slf4j/Logger;", rootLoggerName)
+    logLevel = javabridge.get_static_field("ch/qos/logback/classic/Level", "WARN", "Lch/qos/logback/classic/Level;")
+    javabridge.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
+
+    filename = input_addr
+    metadata = bioformats.get_omexml_metadata(filename)
+    omexml = bioformats.OMEXML(metadata)
+
+    print('SizeX:', omexml.image().Pixels.SizeX)
+    print('SizeY:', omexml.image().Pixels.SizeY)
+    print('SizeZ:', omexml.image().Pixels.SizeZ)
+    print('SizeC:', omexml.image().Pixels.SizeC)
+    print('SizeT:', omexml.image().Pixels.SizeT)
+    print('PixelType:', omexml.image().Pixels.PixelType)
+
+    if omexml.image().Pixels.PixelType == 'uint8':
+        pixels = bioformats.load_image(filename, rescale=False)
+    else:
+        pixels = bioformats.load_image(filename, rescale=True)
+        pixels *= 255
+        pixels = np.rint(pixels).astype(np.uint8)
+
+    javabridge.kill_vm()
+
+    image = Image.fromarray(pixels)
+    return image
