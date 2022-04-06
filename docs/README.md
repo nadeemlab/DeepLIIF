@@ -6,13 +6,13 @@
     <p align="center">
     <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
     |
-    <a href="https://deepliif.org/">AWS Cloud Deployment</a>
+    <a href="https://deepliif.org/">Cloud Deployment</a>
     |
-    <a href="#docker-file">Docker</a>
+    <a href="deployment/#docker">Docker</a>
     |
     <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Request Feature</a>
+    <a href="https://forum.image.sc/">Image.sc Forum</a>
   </p>
 </p>
 
@@ -32,7 +32,7 @@ pathologists' semi-quantitative scoring.*
 
 © This code is made available for non-commercial academic purposes.
 
-![overview_image](./images/overview.png)**Figure 1**. *Overview of DeepLIIF pipeline and sample input IHCs (different 
+![overview_image](./images/overview.png)*Overview of DeepLIIF pipeline and sample input IHCs (different 
 brown/DAB markers -- BCL2, BCL6, CD10, CD3/CD8, Ki67) with corresponding DeepLIIF-generated hematoxylin/mpIF modalities 
 and classified (positive (red) and negative (blue) cell) segmentation masks. (a) Overview of DeepLIIF. Given an IHC 
 input, our multitask deep learning framework simultaneously infers corresponding Hematoxylin channel, mpIF DAPI, mpIF 

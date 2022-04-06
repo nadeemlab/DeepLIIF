@@ -14,7 +14,7 @@
     |
     <a href="https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin">ImageJ Plugin</a>
     |
-    <a href="https://github.com/nadeemlab/DeepLIIF/issues">Report Bug</a>
+    <a href="#support">Support</a>
   </p>
 </p>
 
@@ -34,7 +34,7 @@ pathologists' semi-quantitative scoring.*
 
 © This code is made available for non-commercial academic purposes.
 
-![overview_image](./images/overview.png)**Figure 1**. *Overview of DeepLIIF pipeline and sample input IHCs (different 
+![overview_image](./images/overview.png)*Overview of DeepLIIF pipeline and sample input IHCs (different 
 brown/DAB markers -- BCL2, BCL6, CD10, CD3/CD8, Ki67) with corresponding DeepLIIF-generated hematoxylin/mpIF modalities 
 and classified (positive (red) and negative (blue) cell) segmentation masks. (a) Overview of DeepLIIF. Given an IHC 
 input, our multitask deep learning framework simultaneously infers corresponding Hematoxylin channel, mpIF DAPI, mpIF 
@@ -45,7 +45,7 @@ represent negative cells (blue cells in the input IHC). (b) Example DeepLIIF-gen
 segmentation masks for different IHC markers. DeepLIIF, trained on clean IHC Ki67 nuclear marker images, can generalize 
 to noisier as well as other IHC nuclear/cytoplasmic marker images.*
 
-## Pre-requisites
+## Prerequisites
 1. Python 3.8
 2. Docker
 
@@ -73,7 +73,6 @@ Options:
 
 Commands:
   prepare-testing-data   Preparing data for testing
-  prepare-training-data  Preparing data for training
   serialize              Serialize DeepLIIF models using Torchscript
   test                   Test trained models
   train                  General-purpose training script for multi-task...
@@ -199,13 +198,6 @@ environment in which to run, referred to as a container.
 When you run a container from the image, the `deepliif` CLI will be available.
 You can easily run any CLI command in the activated environment and copy the results from the docker container to the host.
 
-## Google CoLab
-If you don't have access to GPU or appropriate hardware, we have also created [Google CoLab project](https://colab.research.google.com/drive/12zFfL7rDAtXfzBwArh9hb0jvA38L_ODK?usp=sharing) 
-for your convenience. 
-Please follow the steps in the provided notebook to install the requirements and run the training and testing scripts.
-All the libraries and pretrained models have already been set up there. 
-The user can directly run DeepLIIF on their images using the instructions given in the Google CoLab project. 
-
 ## ImageJ Plugin
 If you don't have access to GPU or appropriate hardware and just want to use ImageJ to run inference, we have also created an [ImageJ plugin](https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin) for your convenience.
 
@@ -292,9 +284,9 @@ on the type of the cell (positive cell: a brown hue, negative: a blue hue).
 In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the 
 segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and 
 converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
-shown in Figure 2.
+shown below.
 
-![IHC_Gen_image](docs/development/images/IHC_Gen.jpg)**Figure 2**. *Overview of synthetic IHC image generation. (a) A training sample 
+![IHC_Gen_image](docs/development/images/IHC_Gen.jpg)*Overview of synthetic IHC image generation. (a) A training sample 
 of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
 Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
 
@@ -322,8 +314,10 @@ for the same slide (de novo staining) and would like to contribute that data for
 co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the 
 DeepLIIF model and release back to the community with full credit to the contributors.
 
-## Issues
-Please report all issues on the public forum.
+## Support
+Please use the [Image.sc Forum](https://forum.image.sc/tag/deepliif) for discussion and questions related to DeepLIIF.
+
+Bugs can be reported in the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab.
 
 ## License
 © [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, 
