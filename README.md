@@ -286,7 +286,7 @@ segmentation mask by choosing a percentage of random negative cells in the segme
 converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
 shown below.
 
-![IHC_Gen_image](docs/development/images/IHC_Gen3.png)*Overview of synthetic IHC image generation. (a) A training sample 
+![IHC_Gen_image](docs/training/images/IHC_Gen.jpg)*Overview of synthetic IHC image generation. (a) A training sample 
 of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
 Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.*
 
