@@ -223,7 +223,7 @@ resolution
 string: resolution used to scan the slide (10x, 20x, 40x), defaults to 20x 
 
 pil
-boolean: if true, use PIL.Image.open() to laod the image, instead of python-bioformats
+boolean: if true, use PIL.Image.open() to load the image, instead of python-bioformats
 
 slim
 boolean: if true, return only the segmentation result image
