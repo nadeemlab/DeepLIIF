@@ -4,9 +4,9 @@
     <img src="./images/DeepLIIF_logo.png" width="50%">
     <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
     <p align="center">
-    <a href="https://rdcu.be/cKSBz">Journal</a>
-    |
     <a href="https://doi.org/10.1101/2021.05.01.442219">Preprint</a>
+    |
+    <a href="https://rdcu.be/cKSBz">Journal Link</a>
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
