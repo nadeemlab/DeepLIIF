@@ -332,7 +332,7 @@ and is available for non-commercial academic purposes.
 If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
 @article{ghahremani2022deepliif,
-  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
+  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for Immunohistochemical Image Quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
   journal={Nature Machine Intelligence},
   year={2022}
