@@ -174,6 +174,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     Use '--continue_train' to resume your previous training.
     """
 
+    if gpu_ids and gpu_ids[0] == -1:
+        gpu_ids = []
+        
     local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
     rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
 
