@@ -74,7 +74,7 @@ def read_input_image(input_addr):
     if input_addr.endswith('.czi'):
         img = read_czi_file(input_addr)
     else:
-        img = Image.open(input_addr)
+        img = Image.open(input_addr).convert('RGB')
     return img
 
 def read_czi_file(input_addr):

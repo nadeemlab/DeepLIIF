@@ -229,12 +229,28 @@ def run_dask(img):
 
     return res
 
+def is_empty(tile):
+    return True if np.mean(np.array(tile)) > 240 else False
+
+def run_wrapper(tile, run_fn):
+    if is_empty(tile):
+        return {
+        'G1': Image.new(mode='RGB', size=(512, 512), color=(200, 210, 210)),
+        'G2': Image.new(mode='RGB', size=(512, 512)),
+        'G3': Image.new(mode='RGB', size=(512, 512)),
+        'G4': Image.new(mode='RGB', size=(512, 512)),
+        'G5': Image.new(mode='RGB', size=(512, 512))
+        }
+    else:
+        return run_fn(tile)
+
 
 def inference(img, tile_size, overlap_size, use_torchserve=False):
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
-    res = [Tile(t.i, t.j, run_fn(t.img)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn)) for t in tiles]
+    # res = [Tile(t.i, t.j, run_fn(t.img.convert('RGB'))) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
