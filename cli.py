@@ -433,10 +433,31 @@ def trainlaunch(**kwargs):
 
 
 @cli.command()
+@click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
+@click.option('--output-dir', help='saves results here.')
+def serialize(models_dir, output_dir):
+    """Serialize DeepLIIF models using Torchscript
+    """
+    output_dir = output_dir or models_dir
+
+    sample = transform(Image.new('RGB', (512, 512)))
+
+    with click.progressbar(
+            init_nets(models_dir, eager_mode=True).items(),
+            label='Tracing nets',
+            item_show_func=lambda n: n[0] if n else n
+    ) as bar:
+        for name, net in bar:
+            traced_net = torch.jit.trace(net, sample)
+            traced_net.save(f'{output_dir}/{name}.pt')
+
+
+@cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=512, help='tile size')
-def test(input_dir, output_dir, tile_size):
+@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+def test(input_dir, output_dir, tile_size, model_dir):
     """Test trained models
     """
     output_dir = output_dir or input_dir
@@ -455,7 +476,8 @@ def test(input_dir, output_dir, tile_size):
             images = inference(
                 img,
                 tile_size=tile_size,
-                overlap_size=compute_overlap(img.size, tile_size)
+                overlap_size=compute_overlap(img.size, tile_size),
+                model_path=model_dir
             )
 
             post_images, scoring = postprocess(img, images['Seg'])
@@ -472,26 +494,6 @@ def test(input_dir, output_dir, tile_size):
                     filename.replace('.' + filename.split('.')[-1], f'.json')
             ), 'w') as f:
                 json.dump(scoring, f, indent=2)
-
-
-@cli.command()
-@click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
-@click.option('--output-dir', help='saves results here.')
-def serialize(models_dir, output_dir):
-    """Serialize DeepLIIF models using Torchscript
-    """
-    output_dir = output_dir or models_dir
-
-    sample = transform(Image.new('RGB', (512, 512)))
-
-    with click.progressbar(
-            init_nets(models_dir, eager_mode=True).items(),
-            label='Tracing nets',
-            item_show_func=lambda n: n[0] if n else n
-    ) as bar:
-        for name, net in bar:
-            traced_net = torch.jit.trace(net, sample)
-            traced_net.save(f'{output_dir}/{name}.pt')
 
 
 @cli.command()

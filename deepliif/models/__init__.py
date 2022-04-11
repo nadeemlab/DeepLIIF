@@ -98,8 +98,9 @@ def read_model_params(file_addr):
     for line in lines:
         if ':' in line:
             key = line.split(':')[0].strip()
-            val = line.split(':')[1].strip()
+            val = line.split(':')[1].split('[')[0].strip()
             param_dict[key] = val
+    print(param_dict)
     return param_dict
 
 
@@ -182,7 +183,7 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img):
+def run_torchserve(img, model_path=None):
     buffer = BytesIO()
     torch.save(transform(img.resize((512, 512))), buffer)
 
@@ -200,8 +201,8 @@ def run_torchserve(img):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img):
-    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
+def run_dask(img, model_path):
+    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir)
 
     ts = transform(img.resize((512, 512)))
@@ -229,11 +230,11 @@ def run_dask(img):
     return res
 
 
-def inference(img, tile_size, overlap_size, use_torchserve=False):
+def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
-    res = [Tile(t.i, t.j, run_fn(t.img)) for t in tiles]
+    res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
