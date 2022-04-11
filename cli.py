@@ -471,7 +471,7 @@ def test(input_dir, output_dir, tile_size, model_dir):
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename))
+            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
 
             images = inference(
                 img,
