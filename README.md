@@ -2,9 +2,11 @@
 <br />
 <p align="center">
     <img src="./images/DeepLIIF_logo.png" width="50%">
-    <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for IHC Image Quantification</strong></h3>
+    <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification</strong></h3>
     <p align="center">
-    <a href="https://doi.org/10.1101/2021.05.01.442219">Read Link</a>
+    <a href="https://doi.org/10.1101/2021.05.01.442219">Preprint</a>
+    |
+    <a href="https://rdcu.be/cKSBz">Journal Link</a>
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
@@ -206,7 +208,7 @@ If you don't have access to GPU or appropriate hardware and just want to use Ima
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
-![DeepLIIF Website Demo](images/deepliif-website-demo.gif)
+![DeepLIIF Website Demo](images/deepliif-website-demo-02a.gif)
 
 DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request
 containing the original image file:
@@ -223,7 +225,7 @@ resolution
 string: resolution used to scan the slide (10x, 20x, 40x), defaults to 20x 
 
 pil
-boolean: if true, use PIL.Image.open() to laod the image, instead of python-bioformats
+boolean: if true, use PIL.Image.open() to load the image, instead of python-bioformats
 
 slim
 boolean: if true, return only the segmentation result image
@@ -330,7 +332,7 @@ and is available for non-commercial academic purposes.
 If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
 @article{ghahremani2022deepliif,
-  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for IHC Image Quantification},
+  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for Immunohistochemical Image Quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
   journal={Nature Machine Intelligence},
   year={2022}

@@ -498,6 +498,50 @@ def serialize(models_dir, output_dir):
 
 
 @cli.command()
+@click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
+@click.option('--output-dir', help='saves results here.')
+@click.option('--tile-size', default=512, help='tile size')
+@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+def test(input_dir, output_dir, tile_size, model_dir):
+    """Test trained models
+    """
+    output_dir = output_dir or input_dir
+    ensure_exists(output_dir)
+
+    image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
+
+    with click.progressbar(
+            image_files,
+            label=f'Processing {len(image_files)} images',
+            item_show_func=lambda fn: fn
+    ) as bar:
+        for filename in bar:
+            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+
+            images = inference(
+                img,
+                tile_size=tile_size,
+                overlap_size=compute_overlap(img.size, tile_size),
+                model_path=model_dir
+            )
+
+            post_images, scoring = postprocess(img, images['Seg'])
+            images = {**images, **post_images}
+
+            for name, i in images.items():
+                i.save(os.path.join(
+                    output_dir,
+                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+                ))
+
+            with open(os.path.join(
+                    output_dir,
+                    filename.replace('.' + filename.split('.')[-1], f'.json')
+            ), 'w') as f:
+                json.dump(scoring, f, indent=2)
+
+
+@cli.command()
 @click.option('--input-dir', type=str, required=True, help='Path to input images')
 @click.option('--output-dir', type=str, required=True, help='Path to output images')
 @click.option('--validation-ratio', default=0.2,
