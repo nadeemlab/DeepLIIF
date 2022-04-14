@@ -12,6 +12,7 @@ from PIL import Image
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer
+from deepliif.util.util import mkdirs
 
 import torch.distributed as dist
 
@@ -55,7 +56,29 @@ def ensure_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
 
+def print_options(opt):
+    """Print and save options
 
+    It will print both current options and default values(if different).
+    It will save options into a text file / [checkpoints_dir] / opt.txt
+    """
+    message = ''
+    message += '----------------- Options ---------------\n'
+    for k, v in sorted(vars(opt).items()):
+        comment = ''
+        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
+    message += '----------------- End -------------------'
+    print(message)
+
+    # save to the disk
+    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+    mkdirs(expr_dir)
+    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write(message)
+        opt_file.write('\n')
+        
+        
 @click.group()
 def cli():
     """Commonly used DeepLIIF batch operations"""
@@ -211,7 +234,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
                   display_env, display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq,
                   save_by_iter, continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1,
                   lr, lr_decay_iters, remote, remote_transfer_cmd, dataset_mode, padding)
-
+    print_options(opt)
     dataset = create_dataset(opt)
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
