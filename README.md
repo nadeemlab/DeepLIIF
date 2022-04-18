@@ -107,11 +107,13 @@ To train a model:
 ```
 deepliif train --dataroot /path/to/input/images 
                 --name Model_Name 
+                --modalities-no number_of_modalities_to_be_generated
 ```
 or
 ```
 python train.py --dataroot /path/to/input/images 
                 --name Model_Name 
+                --modalities_no number_of_modalities_to_be_generated
 ```
 
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
@@ -163,12 +165,15 @@ To test the model:
 ```
 deepliif test --input-dir /path/to/input/images 
               --output-dir /path/to/output/images 
-              --tile-size 512
+              --tile-size size_of_the_tile
+              --model-dir /path/to/the/model/files
 ```
 or
 ```
 python test.py --dataroot /path/to/input/images 
                --name Model_Name  
+               --tile-size size_of_the_tile
+               --model_dir /path/to/the/model/files
 ```
 * The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 * Before running test on images, the model files must be serialized as described above.

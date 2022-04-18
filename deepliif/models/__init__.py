@@ -99,8 +99,18 @@ def read_model_params(file_addr):
         if ':' in line:
             key = line.split(':')[0].strip()
             val = line.split(':')[1].split('[')[0].strip()
-            param_dict[key] = val
-    print(param_dict)
+            if 'gpu_ids' in key:
+                val = val.replace('(', '').replace(')', '')
+            param_dict[key] = val.split(',') if ',' in val else val
+    return param_dict
+
+
+def read_train_options(model_dir):
+    files = os.listdir(model_dir)
+    param_dict = None
+    for f in files:
+        if 'train_opt.txt' in f:
+            param_dict = read_model_params(os.path.join(model_dir, f))
     return param_dict
 
 
@@ -111,22 +121,24 @@ def load_eager_models(model_dir, devices):
     norm = 'batch'
     use_dropout = True
     padding_type = 'zero'
+    modalities_no = 4
 
-    files = os.listdir(model_dir)
-    for f in files:
-        if 'train_opt.txt' in f:
-            param_dict = read_model_params(os.path.join(model_dir, f))
-            input_nc = int(param_dict['input_nc'])
-            output_nc = int(param_dict['output_nc'])
-            ngf = int(param_dict['ngf'])
-            norm = param_dict['norm']
-            use_dropout = False if param_dict['no_dropout'] == 'True' else True
-            padding_type = param_dict['padding']
-
+    param_dict = read_train_options(model_dir)
+    if param_dict:
+        input_nc = int(param_dict['input_nc'])
+        output_nc = int(param_dict['output_nc'])
+        ngf = int(param_dict['ngf'])
+        norm = param_dict['norm']
+        use_dropout = False if param_dict['no_dropout'] == 'True' else True
+        padding_type = param_dict['padding']
+        modalities_no = int(param_dict['modalities_no'])
+    # print(param_dict)
+    param_dict['gpu_ids'] = 0
     norm_layer = get_norm_layer(norm_type=norm)
 
     nets = {}
-    for n in ['G1', 'G2', 'G3', 'G4']:
+    for i in range(1, modalities_no + 1):
+        n = 'G_' + str(i)
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
@@ -134,7 +146,8 @@ def load_eager_models(model_dir, devices):
         ))
         nets[n] = net
 
-    for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
+    for i in range(1, modalities_no + 2):
+        n = 'GS_' + str(i)
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
@@ -151,13 +164,18 @@ def init_nets(model_dir, eager_mode=False):
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
     """
-    net_groups = [
-        ('G1', 'G52'),
-        ('G2', 'G53'),
-        ('G3', 'G54'),
-        ('G4', 'G55'),
-        ('G51',)
-    ]
+    param_dict = read_train_options(model_dir)
+    modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+    net_groups = []
+    for i in range(1, modalities_no + 1):
+        net_groups.append(('G_' + str(i), 'GS_' + str(i + 1)))
+    net_groups.append(('GS_1',))
+    #     ('G1', 'G52'),
+    #     ('G2', 'G53'),
+    #     ('G3', 'G54'),
+    #     ('G4', 'G55'),
+    #     ('G51',)
+    # ]
 
     number_of_gpus = torch.cuda.device_count()
     if number_of_gpus:
@@ -183,7 +201,7 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None):
+def run_torchserve(img, model_path=None, param_dict=None):
     buffer = BytesIO()
     torch.save(transform(img.resize((512, 512))), buffer)
 
@@ -201,16 +219,12 @@ def run_torchserve(img, model_path=None):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-<<<<<<< HEAD
-def run_dask(img):
-    # model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './model-server/DeepLIIF_Latest_Model/')
-    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', './checkpoints/DeepLIIF_Latest_Model/')
-    nets = init_nets(model_dir, True)
-=======
-def run_dask(img, model_path):
+def run_dask(img, model_path, param_dict):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir)
->>>>>>> bfc1f61709a20b13e5d6f364a395c9aae6a79530
+
+    modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+    seg_weights = list(map(float, param_dict['seg_weights'])) if param_dict else [1 / (modalities_no + 1)] * (modalities_no + 1)
 
     ts = transform(img.resize((512, 512)))
 
@@ -219,76 +233,57 @@ def run_dask(img, model_path):
         with torch.no_grad():
             return model(input.to(next(model.parameters()).device))
 
-    seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+    # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+    seg_map = {}
+    for i in range(1, modalities_no + 1):
+        seg_map['G_' + str(i)] = 'GS_' + str(i + 1)
 
     lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
     gens = compute(lazy_gens)[0]
 
     lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-    lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+    lazy_segs['GS_1'] = forward(ts, nets['GS_1']).to(torch.device('cpu'))
     segs = compute(lazy_segs)[0]
 
-    seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
     seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
 
     res = {k: tensor_to_pil(v) for k, v in gens.items()}
-    res['G5'] = tensor_to_pil(seg)
+    res['G_' + str(modalities_no + 1)] = tensor_to_pil(seg)
 
     return res
+
 
 def is_empty(tile):
     return True if np.mean(np.array(tile)) > 240 else False
 
-def run_wrapper(tile, run_fn):
+
+def run_wrapper(tile, run_fn, model_path, param_dict):
     if is_empty(tile):
         return {
-        'G1': Image.new(mode='RGB', size=(512, 512), color=(200, 210, 210)),
-        'G2': Image.new(mode='RGB', size=(512, 512)),
-        'G3': Image.new(mode='RGB', size=(512, 512)),
-        'G4': Image.new(mode='RGB', size=(512, 512)),
-        'G5': Image.new(mode='RGB', size=(512, 512))
+            'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, int(param_dict['modalities_no']) + 1)
         }
     else:
-        return run_fn(tile)
+        return run_fn(tile, model_path, param_dict)
 
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
+    param_dict = read_train_options(model_path)
+    modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
-<<<<<<< HEAD
-    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, param_dict)) for t in tiles]
     # res = [Tile(t.i, t.j, run_fn(t.img.convert('RGB'))) for t in tiles]
-=======
-    res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
->>>>>>> bfc1f61709a20b13e5d6f364a395c9aae6a79530
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
 
     images = {}
 
-    images['Hema'] = stitch(get_net_tiles('G1'), tile_size, overlap_size).resize(img.size)
-
-    images['DAPI'] = stitch(
-        [Tile(t.i, t.j, adjust_dapi(dt.img, t.img))
-         for t, dt in zip(tiles, get_net_tiles('G2'))],
-        tile_size, overlap_size).resize(img.size)
-    dapi_pix = np.array(images['DAPI'])
-    dapi_pix[:, :, 0] = 0
-    images['DAPI'] = Image.fromarray(dapi_pix)
-
-    images['Lap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
-
-    images['Marker'] = stitch(
-        [Tile(t.i, t.j, adjust_marker(kt.img, t.img))
-         for t, kt in zip(tiles, get_net_tiles('G4'))],
-        tile_size, overlap_size).resize(img.size)
-    marker_pix = np.array(images['Marker'])
-    marker_pix[:, :, 2] = 0
-    images['Marker'] = Image.fromarray(marker_pix)
-
-    images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
+    for i in range(1, modalities_no + 1):
+        images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize(img.size)
+    images['Seg'] = stitch(get_net_tiles('G_' + str(modalities_no + 1)), tile_size, overlap_size).resize(img.size)
 
     return images
 

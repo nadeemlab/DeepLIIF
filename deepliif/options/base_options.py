@@ -17,7 +17,8 @@ def create_base_parser():
                         help='name of the experiment. It decides where to store samples and models')
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
     parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
-    parser.add_argument('--targets_no', type=int, default=5, help='number of targets')
+    parser.add_argument('--modalities_no', type=int, default=4, help='number of modalities')
+    parser.add_argument('--seg_weights', type=str, default='', help='weights of the modalities')
     # model parameters
     parser.add_argument('--model', type=str, default='DeepLIIF', help='chooses which model to use. [DeepLIIF]')
     parser.add_argument('--input_nc', type=int, default=3,
@@ -26,10 +27,14 @@ def create_base_parser():
                         help='# of output image channels: 3 for RGB and 1 for grayscale')
     parser.add_argument('--ngf', type=int, default=64, help='# of gen filters in the last conv layer')
     parser.add_argument('--ndf', type=int, default=64, help='# of discrim filters in the first conv layer')
-    parser.add_argument('--netD', type=str, default='n_layers',
-                        help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
-    parser.add_argument('--netG', type=str, default='resnet_9blocks',
-                        help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+    parser.add_argument('--net_d', type=str, default='n_layers',
+                        help='specify discriminator architecture for translation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
+    parser.add_argument('--net_ds', type=str, default='n_layers',
+                        help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
+    parser.add_argument('--net_g', type=str, default='resnet_9blocks',
+                        help='specify generator architecture for translation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+    parser.add_argument('--net_gs', type=str, default='unet_512',
+                        help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
     parser.add_argument('--n_layers_D', type=int, default=4, help='only used if netD==n_layers')
     parser.add_argument('--norm', type=str, default='batch',
                         help='instance normalization or batch normalization [instance | batch | none]')
@@ -146,6 +151,9 @@ class BaseOptions():
                 opt.gpu_ids.append(id)
         if len(opt.gpu_ids) > 0:
             torch.cuda.set_device(opt.gpu_ids[0])
+
+        opt.seg_weights = list(map(float, opt.seg_weights.replace(' ', '').split(','))) if opt.seg_weights != '' else \
+                          [1 / (opt.modalities_no + 1)] * (opt.modalities_no + 1)
 
         self.opt = opt
         return self.opt

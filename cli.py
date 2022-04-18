@@ -12,6 +12,7 @@ from PIL import Image
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer, read_input_image
+from deepliif.util.util import mkdirs
 
 import torch.distributed as dist
 
@@ -56,6 +57,35 @@ def ensure_exists(d):
         os.makedirs(d)
 
 
+def print_options(opt):
+    """Print and save options
+
+    It will print both current options and default values(if different).
+    It will save options into a text file / [checkpoints_dir] / opt.txt
+    """
+    message = ''
+    message += '----------------- Options ---------------\n'
+    for k, v in sorted(vars(opt).items()):
+        comment = ''
+        if isinstance(v, list):
+            list_val = ''
+            for v_i in v:
+                list_val += str(v_i) + ','
+            message += '{:>25}: {:<30}{}\n'.format(str(k), str(list_val.strip())[:-1], comment)
+        else:
+            message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
+    message += '----------------- End -------------------'
+    print(message)
+
+    # save to the disk
+    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+    mkdirs(expr_dir)
+    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write(message)
+        opt_file.write('\n')
+
+
 @click.group()
 def cli():
     """Commonly used DeepLIIF batch operations"""
@@ -68,8 +98,9 @@ def cli():
 @click.option('--name', default='experiment_name',
               help='name of the experiment. It decides where to store samples and models')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
-@click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
-@click.option('--targets-no', default=5, help='number of targets')
+@click.option('--checkpoints-dir', default='./../checkpoints', help='models are saved here')
+@click.option('--modalities-no', default=4, help='number of targets')
+@click.option('--seg-weights', type=float, multiple=True, help='weights of the modalities')
 # model parameters
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
 @click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
@@ -78,7 +109,12 @@ def cli():
 @click.option('--net-d', default='n_layers',
               help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 '
                    'PatchGAN. n_layers allows you to specify the layers in the discriminator')
+@click.option('--net-ds', default='n_layers',
+              help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 '
+                   'PatchGAN. n_layers allows you to specify the layers in the discriminator')
 @click.option('--net-g', default='resnet_9blocks',
+              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+@click.option('--net-gs', default='unet_512',
               help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
 @click.option('--n-layers-d', default=4, help='only used if netD==n_layers')
 @click.option('--norm', default='batch',
@@ -86,7 +122,8 @@ def cli():
 @click.option('--init-type', default='normal',
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
-@click.option('--padding-type', default='reflect', help='network padding type.')
+@click.option('--padding-type', type=str, default='zero',
+              help='chooses the type of padding used by resnet generator. [reflect | zero]')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
@@ -151,17 +188,17 @@ def cli():
 @click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
 @click.option('--dataset_mode', type=str, default='aligned',
               help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
-@click.option('--padding', type=str, default='zero',
-              help='chooses the type of padding used by resnet generator. [reflect | zero]')
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
 @click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
-def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
-          n_layers_d, norm, init_type, init_gain, padding_type, no_dropout, direction, serial_batches, num_threads,
+@click.option('--gan_mode', type=str, default='vanilla', help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+@click.option('--gan_mode_s', type=str, default='lsgan', help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+def train(dataroot, name, gpu_ids, checkpoints_dir, modalities_no, input_nc, output_nc, ngf, ndf, net_d, net_ds,
+          net_g, net_gs,n_layers_d, norm, init_type, init_gain, padding_type, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding):
+          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, seg_weights, gan_mode, gan_mode_s):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -173,6 +210,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    if len(seg_weights) == 0:
+        seg_weights = [1 / (modalities_no + 1)] * (modalities_no + 1)
 
     if gpu_ids and gpu_ids[0] == -1:
         gpu_ids = []
@@ -204,13 +243,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
 
-    opt = Options(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
-                  n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
+    opt = Options(dataroot, name, gpu_ids, checkpoints_dir, modalities_no, input_nc, output_nc, ngf, ndf, net_d, net_ds,
+                  net_g, net_gs, n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
                   batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch,
                   load_iter, verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server,
                   display_env, display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq,
                   save_by_iter, continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1,
-                  lr, lr_decay_iters, remote, remote_transfer_cmd, dataset_mode, padding)
+                  lr, lr_decay_iters, remote, remote_transfer_cmd, dataset_mode, padding_type, seg_weights, gan_mode, gan_mode_s)
+
+    print_options(opt)
 
     dataset = create_dataset(opt)
     # get the number of images in the dataset.
@@ -430,53 +471,6 @@ def trainlaunch(**kwargs):
         subprocess.run(f'python {path_train_py} {options}',shell=True)
 
 
-
-@cli.command()
-@click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
-@click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', default=512, help='tile size')
-def test(input_dir, output_dir, tile_size):
-    """Test trained models
-    """
-    output_dir = output_dir or input_dir
-    ensure_exists(output_dir)
-    print(input_dir, output_dir)
-    print(os.listdir(input_dir))
-    image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
-
-    with click.progressbar(
-            image_files,
-            label=f'Processing {len(image_files)} images',
-            item_show_func=lambda fn: fn
-    ) as bar:
-        for filename in bar:
-            start_time = time.time()
-            img = read_input_image(os.path.join(input_dir, filename))
-
-            images = inference(
-                img,
-                tile_size=tile_size,
-                overlap_size=compute_overlap(img.size, tile_size)
-            )
-
-            post_images, scoring = postprocess(img, images['Seg'])
-            images = {**images, **post_images}
-
-            for name, i in images.items():
-                i.save(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                ))
-
-            with open(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'.json')
-            ), 'w') as f:
-                json.dump(scoring, f, indent=2)
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(filename, time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
-
 @cli.command()
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
@@ -645,24 +639,26 @@ def visualize(pickle_dir):
 
 
 class Options:
-    def __init__(self, dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d,
-                 net_g, n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
+    def __init__(self, dataroot, name, gpu_ids, checkpoints_dir, modalities_no, input_nc, output_nc, ngf, ndf, net_d, net_ds,
+                 net_g, net_gs, n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
                  batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch,
                  load_iter, verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
                  display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
                  continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-                 remote, remote_transfer_cmd, dataset_mode, padding):
+                 remote, remote_transfer_cmd, dataset_mode, padding, seg_weights, gan_mode, gan_mode_s):
         self.dataroot = dataroot
         self.name = name
         self.gpu_ids = gpu_ids
         self.checkpoints_dir = checkpoints_dir
-        self.targets_no = targets_no
+        self.modalities_no = modalities_no
         self.input_nc = input_nc
         self.output_nc = output_nc
         self.ngf = ngf
         self.ndf = ndf
         self.net_d = net_d
+        self.net_ds = net_ds
         self.net_g = net_g
+        self.net_gs = net_gs
         self.n_layers_d = n_layers_d
         self.norm = norm
         self.init_type = init_type
@@ -707,10 +703,11 @@ class Options:
         self.dataset_mode = dataset_mode
         self.padding = padding
         self.remote_transfer_cmd = remote_transfer_cmd
+        self.seg_weights = seg_weights
+        self.gan_mode = gan_mode
+        self.gan_mode_s = gan_mode_s
 
         self.isTrain = True
-        self.netG = 'resnet_9blocks'
-        self.netD = 'n_layers'
         self.n_layers_D = 4
         self.lambda_L1 = 100
         self.lambda_feat = 100

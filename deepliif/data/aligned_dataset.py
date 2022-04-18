@@ -2,7 +2,8 @@ import os.path
 from deepliif.data.base_dataset import BaseDataset, get_params, get_transform
 from deepliif.data.image_folder import make_dataset
 from PIL import Image
-
+import cv2
+import numpy as np
 
 class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
@@ -25,7 +26,7 @@ class AlignedDataset(BaseDataset):
         self.input_nc = opt.output_nc if opt.direction == 'BtoA' else opt.input_nc
         self.output_nc = opt.input_nc if opt.direction == 'BtoA' else opt.output_nc
         self.no_flip = opt.no_flip
-        self.targets_no = opt.targets_no
+        self.modalities_no = opt.modalities_no
         self.load_size = opt.load_size
         self.crop_size = opt.crop_size
 
@@ -46,7 +47,7 @@ class AlignedDataset(BaseDataset):
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size
-        w2 = int(w / (self.targets_no + 1))
+        w2 = int(w / (self.modalities_no + 2))
         A = AB.crop((0, 0, w2, h))
 
         # apply the same transform to both A and B
@@ -56,8 +57,10 @@ class AlignedDataset(BaseDataset):
 
         A = A_transform(A)
         B_Array = []
-        for i in range(1, self.targets_no + 1):
+        for i in range(1, self.modalities_no + 2):
             B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+            # cv2.imshow(str(i), np.array(B))
+            # cv2.waitKey(0)
             B = B_transform(B)
             B_Array.append(B)
 

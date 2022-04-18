@@ -32,7 +32,7 @@ class BaseModel(ABC):
         self.opt = opt
         self.gpu_ids = opt.gpu_ids
         self.is_train = opt.is_train
-        self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids and self.gpu_ids[0] > 0 else torch.device('cpu')  # get device name: CPU or GPU
+        self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids and self.gpu_ids[0] >= 0 else torch.device('cpu')  # get device name: CPU or GPU
         self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir
         if opt.preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
             torch.backends.cudnn.benchmark = True
@@ -88,7 +88,7 @@ class BaseModel(ABC):
         """Make models eval mode during test time"""
         for name in self.model_names:
             if isinstance(name, str):
-                net = getattr(self, 'net' + name)
+                net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
                 net.eval()
 
     def test(self):
@@ -125,7 +125,10 @@ class BaseModel(ABC):
         visual_ret = OrderedDict()
         for name in self.visual_names:
             if isinstance(name, str):
-                visual_ret[name] = getattr(self, name)
+                if len(name.split('_')) == 2:
+                    visual_ret[name] = getattr(self, name)
+                else:
+                    visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
         return visual_ret
 
     def get_current_losses(self):
@@ -133,7 +136,12 @@ class BaseModel(ABC):
         errors_ret = OrderedDict()
         for name in self.loss_names:
             if isinstance(name, str):
-                errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
+                if len(name.split('_')) == 2:
+                    errors_ret[name] = float(getattr(self, 'loss_' + name.split('_')[0])[int(
+                        name.split('_')[-1]) - 1])  # float(...) works for both scalar tensor and float number
+                else:
+                    errors_ret[name] = float(getattr(self, 'loss_' + name.split('_')[0] + '_' + name.split('_')[1])[int(
+                        name.split('_')[-1]) - 1])  # float(...) works for both scalar tensor and float number
         return errors_ret
 
     def save_networks(self, epoch, save_from_one_process=False):
@@ -149,7 +157,7 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 save_filename = '%s_net_%s.pth' % (epoch, name)
                 save_path = os.path.join(self.save_dir, save_filename)
-                net = getattr(self, 'net' + name)
+                net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
 
                 if len(self.gpu_ids) > 0 and torch.cuda.is_available():
                     torch.save(net.module.cpu().state_dict(), save_path)
@@ -215,9 +223,11 @@ class BaseModel(ABC):
         """
         for name in self.model_names:
             if isinstance(name, str):
+                print('*********************')
+                print(name)
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)
-                net = getattr(self, 'net' + name)
+                net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
                 print('loading the model from %s' % load_path)
@@ -241,7 +251,7 @@ class BaseModel(ABC):
         print('---------- Networks initialized -------------')
         for name in self.model_names:
             if isinstance(name, str):
-                net = getattr(self, 'net' + name)
+                net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
                 num_params = 0
                 for param in net.parameters():
                     num_params += param.numel()
