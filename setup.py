@@ -33,7 +33,7 @@ setup(
     author = 'Parmida93',
     author_email = 'ghahremani.parmida@gmail.com',
     url = 'https://github.com/nadeemlab/DeepLIIF',
-    download_url = 'Z:/Parmida/DeepLIIF/Releases/DeepLIIF-1.1.0.tar.gz',
+    download_url = 'https://github.com/nadeemlab/DeepLIIF/archive/refs/tags/V1.1.0.tar.gz',
     keywords = ['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
     classifiers = [],
 )
