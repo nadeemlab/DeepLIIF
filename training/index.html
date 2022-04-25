@@ -1,0 +1,1027 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.11">
+    
+    
+      
+        <title>Training - DeepLIIF</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.8c5ef100.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.9647289d.min.css">
+        
+          
+          
+          <meta name="theme-color" content="#ffffff">
+        
+      
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="grey">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#training" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DeepLIIF" class="md-header__button md-logo" aria-label="DeepLIIF" data-md-component="logo">
+      
+  <img src="../images/DeepLIIF_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DeepLIIF
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Training
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/nadeemlab/DeepLIIF" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DeepLIIF
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-tabs__inner md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href=".." class="md-tabs__link">
+      Home
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../installation/" class="md-tabs__link">
+      Installation
+    </a>
+  </li>
+
+      
+        
+  
+  
+    
+  
+
+
+  <li class="md-tabs__item">
+    <a href="./" class="md-tabs__link md-tabs__link--active">
+      Training
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../testing/" class="md-tabs__link">
+      Testing
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../deployment/" class="md-tabs__link">
+      Deployment
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../ImageJ/" class="md-tabs__link">
+      ImageJ Plugin
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../cloud/" class="md-tabs__link">
+      Cloud Deployment
+    </a>
+  </li>
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DeepLIIF" class="md-nav__button md-logo" aria-label="DeepLIIF" data-md-component="logo">
+      
+  <img src="../images/DeepLIIF_logo.png" alt="logo">
+
+    </a>
+    DeepLIIF
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/nadeemlab/DeepLIIF" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DeepLIIF
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        Installation
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Training
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Training
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#training-dataset" class="md-nav__link">
+    Training Dataset
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training_1" class="md-nav__link">
+    Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-gpu-training" class="md-nav__link">
+    Multi-GPU Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-parallel-dp" class="md-nav__link">
+    Data Parallel (DP)
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Parallel (DP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#train-with-dp" class="md-nav__link">
+    Train with DP
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-data-parallel-ddp" class="md-nav__link">
+    Distributed Data Parallel (DDP)
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed Data Parallel (DDP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#train-with-ddp" class="md-nav__link">
+    Train with DDP
+  </a>
+  
+    <nav class="md-nav" aria-label="Train with DDP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-local-machine" class="md-nav__link">
+    1. Local Machine
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-kubernetes-based-training-service" class="md-nav__link">
+    2. Kubernetes-Based Training Service
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multiple-virtual-machines" class="md-nav__link">
+    3. Multiple Virtual Machines
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#move-from-single-gpu-to-multi-gpu-impact-on-hyper-parameters" class="md-nav__link">
+    Move from Single-GPU to Multi-GPU: Impact on Hyper-Parameters
+  </a>
+  
+    <nav class="md-nav" aria-label="Move from Single-GPU to Multi-GPU: Impact on Hyper-Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-size-learning-rate" class="md-nav__link">
+    Batch Size &amp; Learning Rate
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#track-training-progress-in-visualizer" class="md-nav__link">
+    Track Training Progress in Visualizer
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synthetic-data-generation" class="md-nav__link">
+    Synthetic Data Generation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registration" class="md-nav__link">
+    Registration
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-training-data" class="md-nav__link">
+    Contributing Training Data
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        Testing
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        Deployment
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ImageJ/" class="md-nav__link">
+        ImageJ Plugin
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloud/" class="md-nav__link">
+        Cloud Deployment
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#training-dataset" class="md-nav__link">
+    Training Dataset
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training_1" class="md-nav__link">
+    Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-gpu-training" class="md-nav__link">
+    Multi-GPU Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-parallel-dp" class="md-nav__link">
+    Data Parallel (DP)
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Parallel (DP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#train-with-dp" class="md-nav__link">
+    Train with DP
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-data-parallel-ddp" class="md-nav__link">
+    Distributed Data Parallel (DDP)
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed Data Parallel (DDP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#train-with-ddp" class="md-nav__link">
+    Train with DDP
+  </a>
+  
+    <nav class="md-nav" aria-label="Train with DDP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-local-machine" class="md-nav__link">
+    1. Local Machine
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-kubernetes-based-training-service" class="md-nav__link">
+    2. Kubernetes-Based Training Service
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multiple-virtual-machines" class="md-nav__link">
+    3. Multiple Virtual Machines
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#move-from-single-gpu-to-multi-gpu-impact-on-hyper-parameters" class="md-nav__link">
+    Move from Single-GPU to Multi-GPU: Impact on Hyper-Parameters
+  </a>
+  
+    <nav class="md-nav" aria-label="Move from Single-GPU to Multi-GPU: Impact on Hyper-Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-size-learning-rate" class="md-nav__link">
+    Batch Size &amp; Learning Rate
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#track-training-progress-in-visualizer" class="md-nav__link">
+    Track Training Progress in Visualizer
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synthetic-data-generation" class="md-nav__link">
+    Synthetic Data Generation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registration" class="md-nav__link">
+    Registration
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing-training-data" class="md-nav__link">
+    Contributing Training Data
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+  <a href="https://github.com/nadeemlab/DeepLIIF/edit/main/docs/training/README.md" title="Edit this page" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
+  </a>
+
+
+
+<h1 id="training">Training</h1>
+<h2 id="training-dataset">Training Dataset</h2>
+<p>For training, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched
+together horizontally).
+The data need to be arranged in the following order:</p>
+<pre><code>XXX_Dataset 
+    ├── train
+    └── val
+</code></pre>
+<p>We have provided a simple function in the CLI for preparing data for training.</p>
+<ul>
+<li><strong>To prepare data for training</strong>, you need to have the image dataset for each image (including IHC, Hematoxylin Channel, mpIF DAPI, mpIF Lap2, mpIF marker, and segmentation mask) in the input directory.
+Each of the six images for a single image set must have the same naming format, with only the name of the label for the type of image differing between them.  The label names must be, respectively: IHC, Hematoxylin, DAPI, Lap2, Marker, Seg.
+The command takes the address of the directory containing image set data and the address of the output dataset directory.
+It first creates the train and validation directories inside the given output dataset directory.
+It then reads all of the images in the input directory and saves the combined image in the train or validation directory, based on the given <code>validation_ratio</code>.</li>
+</ul>
+<pre><code>deepliif prepare-training-data --input-dir /path/to/input/images
+                               --output-dir /path/to/output/images
+                               --validation-ratio 0.2
+</code></pre>
+<h2 id="training_1">Training</h2>
+<p>To train a model:</p>
+<pre><code>deepliif train --dataroot /path/to/input/images 
+                --name Model_Name 
+</code></pre>
+<ul>
+<li>To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.</li>
+<li>Epoch-wise intermediate training results are in <code>DeepLIIF/checkpoints/Model_Name/web/index.html</code>.</li>
+<li>Trained models will be by default be saved in <code>DeepLIIF/checkpoints/Model_Name</code>.</li>
+<li>Training datasets can be downloaded <a href="https://zenodo.org/record/4751737#.YKRTS0NKhH4">here</a>.</li>
+</ul>
+<h2 id="multi-gpu-training">Multi-GPU Training</h2>
+<p>There are 2 ways you can leverage multiple GPUs to train DeepLIIF, <strong>Data Parallel (DP)</strong> or <strong>Distributed Data Parallel (DDP)</strong>. Both cases are a kind of <strong>data parallelism</strong> supported by PyTorch.</p>
+<p>The key difference is that DP is <strong>single process multi-threading</strong> while DDP can have <strong>multiple processes</strong>.</p>
+<p><strong>TL;DR</strong></p>
+<p>Use DP if you
+- are used to the way to train DeepLIIF on multiple GPUs since its first release, OR
+- do <strong>not</strong> have multiple GPU machines to utilize, OR
+- are fine with the training being a bit slower</p>
+<p>Use DDP if you
+- are willing to try a slightly different way to launch the training than before, OR
+- do have multiple GPU machines for cross-node distribution, OR
+- want to get as fast training as possible</p>
+<h2 id="data-parallel-dp">Data Parallel (DP)</h2>
+<p>DP is single-process. It means that <strong>all the GPUs you want to use must be on the same machine</strong> so that they can be included in the same process - you cannot distribute the training across multiple GPU machines, unless you write your own code to handle inter-node (node = machine) communication.</p>
+<p>To split and manage the workload for multiple GPUs within the same process, DP uses multi-threading. </p>
+<p>It is worth noting that multi-threading in this case can lead to significant performance overhead, and slow down your training. See a short discussion in <a href="https://pytorch.org/docs/stable/notes/cuda.html#use-nn-parallel-distributeddataparallel-instead-of-multiprocessing-or-nn-dataparallel">PyTorch's CUDA Best Practices</a>.</p>
+<h3 id="train-with-dp">Train with DP</h3>
+<p>Example with 2 GPUs (of course on 1 machine):</p>
+<pre><code>deepliif train --dataroot &lt;data_dir&gt; --batch-size 6 --gpu-ids 0 --gpu-ids 1
+</code></pre>
+<p>Note that</p>
+<ol>
+<li><code>batch-size</code> is defined per process. Since DP is a single-process method, the <code>batch-size</code> you set is the <strong>effective</strong> batch size.</li>
+</ol>
+<h2 id="distributed-data-parallel-ddp">Distributed Data Parallel (DDP)</h2>
+<p>DDP usually spawns multiple processes. </p>
+<p><strong>DeepLIIF's code follows the PyTorch recommendation to spawn 1 process per GPU</strong> (<a href="https://github.com/pytorch/examples/blob/master/distributed/ddp/README.md#application-process-topologies">doc</a>). If you want to assign multiple GPUs to each process, you will need to make modifications to DeepLIIF's code (see <a href="https://pytorch.org/tutorials/intermediate/ddp_tutorial.html#combine-ddp-with-model-parallelism">doc</a>).</p>
+<p>Despite all the benefits of DDP, one drawback is the extra GPU memory needed for dedicated CUDA buffer for communication. See a short discussion <a href="https://discuss.pytorch.org/t/do-dataparallel-and-distributeddataparallel-affect-the-batch-size-and-gpu-memory-consumption/97194/2">here</a>. In the context of DeepLIIF, this means that there might be situations where you could use a <em>bigger batch size with DP</em> as compared to DDP, which may actually train faster than using DDP with a smaller batch size.</p>
+<h3 id="train-with-ddp">Train with DDP</h3>
+<h4 id="1-local-machine">1. Local Machine</h4>
+<p>To launch training using DDP on a local machine, use <code>deepliif trainlaunch</code>. Example with 2 GPUs (on 1 machine):</p>
+<pre><code>deepliif trainlaunch --dataroot &lt;data_dir&gt; --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun &quot;--nproc_per_node 2&quot;
+</code></pre>
+<p>Note that</p>
+<ol>
+<li><code>batch-size</code> is defined per process. Since DDP is a single-process method, the <code>batch-size</code> you set is the batch size for each process, and the <strong>effective</strong> batch size will be <code>batch-size</code> multiplied by the number of processes you started. In the above example, it will be 3 * 2 = 6.</li>
+<li>You still need to provide <strong>all GPU ids to use</strong> to the training command. Internally, in each process DeepLIIF picks the device using <code>gpu_ids[local_rank]</code>. If you provide <code>--gpu-ids 2 --gpu-ids 3</code>, the process with local rank 0 will use gpu id 2 and that with local rank 1 will use gpu id 3. </li>
+<li>
+<p><code>-t 3 --log_dir &lt;log_dir&gt;</code> is not required, but is a useful setting in <code>torchrun</code> that saves the log from each process to your target log directory. For example:</p>
+<p><code>deepliif trainlaunch --dataroot &lt;data_dir&gt; --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "-t 3 --log_dir &lt;log_dir&gt; --nproc_per_node 2"</code></p>
+</li>
+<li>
+<p>If your PyTorch is older than 1.10, DeepLIIF calls <code>torch.distributed.launch</code> in the backend. Otherwise, DeepLIIF calls <code>torchrun</code>.</p>
+</li>
+</ol>
+<h4 id="2-kubernetes-based-training-service">2. Kubernetes-Based Training Service</h4>
+<p>To launch training using DDP on a kubernetes-based service where each process will have its own pod and a dedicated GPU, and there is an existing task manager/scheduler in place, you may submit a script with training command like the following:</p>
+<pre><code>import os
+import torch.distributed as dist
+def init_process():
+    dist.init_process_group(
+        backend='nccl',
+        init_method='tcp://' + os.environ['MASTER_ADDR'] + ':' + os.environ['MASTER_PORT'],
+        rank=int(os.environ['RANK']),
+        world_size=int(os.environ['WORLD_SIZE']))
+
+root_folder = &lt;data_dir&gt;
+
+if __name__ == '__main__':
+    init_process()
+    subprocess.run(f'deepliif train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0',shell=True)
+</code></pre>
+<p>Note that</p>
+<ol>
+<li>Always provide <code>--gpu-ids 0</code> to the training command for each process/pod if the gpu id gets re-named in each pod. If not, you will need to pass the correct gpu id in a dynamic way, possibly through an environment variable in each pod.</li>
+</ol>
+<h4 id="3-multiple-virtual-machines">3. Multiple Virtual Machines</h4>
+<p>To launch training across multiple VMs, you can refer to the scheduler framework you use. For each process, similar to the example for kubernetes, you will need to initiate the process group so that the current process knows who it is, where are its peers, etc., and then execute the regular training command in a subprocess.</p>
+<h2 id="move-from-single-gpu-to-multi-gpu-impact-on-hyper-parameters">Move from Single-GPU to Multi-GPU: Impact on Hyper-Parameters</h2>
+<p>To achieve equivalently good training results, you may want to adjust some hyper-parameters you figured out for a single GPU training.</p>
+<h3 id="batch-size-learning-rate">Batch Size &amp; Learning Rate</h3>
+<p>Backward propagation by default runs at the end of every batch to find how much change to make in parameters. An immediate outcome from using multiple GPUs is that we have a larger effective batch size. </p>
+<p>In DDP, this means fewer gradient descent because DDP averages the gradients from all processes (<a href="https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html#torch.nn.parallel.DistributedDataParallel">doc</a>). Assume that in 1 epoch, a single-GPU training does gradient descent for 200 times. Now with 2 GPUs/processes, the training will have 100 batches in each process and does the gradient descent using the averaged gradients of the 2 GPUs/processes, one for each batch, which is 100 times.</p>
+<p>You may want to compensate this by increasing the learning rate proportionally.</p>
+<p>DP is slightly different, in that it sums up the gradients from all GPUs/threads (<a href="https://pytorch.org/docs/stable/generated/torch.nn.DataParallel.html#torch.nn.DataParallel">doc</a>). However, practically the performance (accuracy) still suffers from the larger effective batch size, which can be mitigated by increasing the learning rate.</p>
+<h2 id="track-training-progress-in-visualizer">Track Training Progress in Visualizer</h2>
+<p>When using multiple GPUs for training, tracking training progress in the visdom visualizer can be tricky. It may not be a big issue for DP which uses only 1 process, but definitely the multi-processing in DDP brings a challenge.</p>
+<p>With DDP, each process trains on its own slice of data that is different from the others. If we plot the training progress from the processes in terms of losses, the raw values will not be comparable, and you will see a different graph from each process. These graphs might be close, but will not be exactly the same.</p>
+<p>Currently, if you use multiple processes (DDP), you are suggested to:</p>
+<ol>
+<li>pass <code>--remote True</code> to the training command, even if you are running on a local machine</li>
+<li>
+<p>open a terminal in an environment you intend to have visdom running (it can be the same place where you train the model, or a separate machine), and run <code>deepliif visualize</code>:</p>
+<p><code>deepliif visualize --pickle_dir &lt;pickle_dir&gt;</code></p>
+</li>
+</ol>
+<p>By default, the pickle files are stored under <code>&lt;checkpoint_dir_in_training_command&gt;/&lt;name_in_training_command&gt;/pickle</code>.</p>
+<p><code>--remote True</code> in the training command triggers DeepLIIF to i) not start a visdom session and ii) persist the input into the visdom graphs as pickle files. If there are multiple processes, it will <strong>only persist the information such as losses from the first process (process with rank 0)</strong>. The visualize command <code>deepliif visualize</code> then starts the visdom, scans the pickle directory you provided periodically, and updates the graphs if there is an update in any pickled snapshot.</p>
+<p>If you plan to train the model in a different place from where you would like to host visdom (e.g., situation 2 &amp; 3 in DDP mentioned above), you need to make sure that <strong>this pickle directory is accessible by both the training environment and the visdom environment</strong>. For example:</p>
+<ul>
+<li>use a storage volume mounted to both environments, so you can access this storage simply using a file path</li>
+<li>use an external storage of your choice</li>
+</ul>
+<p><strong>For training</strong></p>
+<p>1. write a script that contains one function DeepLIIF can call to transfer the files like the following:</p>
+<pre><code>import boto3
+
+credentials = &lt;s3 credentials&gt;
+
+# make sure that the first argument is the source path
+def save_to_s3(source_path):
+# make sure the file name part is still unchanged, e.g., by keeping source_path.split('/')[-1]
+target_path = ... 
+
+s3 = boto3.client('s3')
+with open(source_path, &quot;rb&quot;) as f:
+    s3.upload_fileobj(f, credentials[&quot;bucket_name&quot;], target_path)
+</code></pre>
+<p>2. save it in a directory where you will call the training command; let's say the script is called <code>mysave.py</code></p>
+<p>3. tell DeepLIIF to use this by passing <code>--remote-transfer-cmd mysave.save_to_s3</code> to the training command (take kubernetes-based training service as an example):</p>
+<pre><code>import os
+import torch.distributed as dist
+def init_process():
+    dist.init_process_group(
+        backend='nccl',
+        init_method='tcp://' + os.environ['MASTER_ADDR'] + ':' + os.environ['MASTER_PORT'],
+        rank=int(os.environ['RANK']),
+        world_size=int(os.environ['WORLD_SIZE']))
+
+root_folder = &lt;data_dir&gt;
+
+if __name__ == '__main__':
+    init_process()
+    subprocess.run(f'deepliif train --dataroot {root_folder} --remote True --batch-size 3 --gpu-ids 0 --remote True, --remote-transfer-cmd mysave.save_to_s3',shell=True)
+</code></pre>
+<ul>
+<li>note that this method if used will be applied <strong>not only on the pickled snapshots for visdom input, but also the model files DeepLIIF saves</strong>: DeepLIIF will trigger this provided method to store an <strong>additional copy</strong> of the model files into your external storage</li>
+</ul>
+<p><strong>For visualization</strong></p>
+<ol>
+<li>periodically check and download the latest pickle files from your external storage to your local environment</li>
+<li>pass the pickle directory in your local enviroment to <code>deepliif visualize</code></li>
+</ol>
+<h2 id="synthetic-data-generation">Synthetic Data Generation</h2>
+<p>The first version of DeepLIIF model suffered from its inability to separate IHC positive cells in some large clusters,
+resulting from the absence of clustered positive cells in our training data. To infuse more information about the
+clustered positive cells into our model, we present a novel approach for the synthetic generation of IHC images using
+co-registered data. 
+We design a GAN-based model that receives the Hematoxylin channel, the mpIF DAPI image, and the segmentation mask and
+generates the corresponding IHC image. The model converts the Hematoxylin channel to gray-scale to infer more helpful
+information such as the texture and discard unnecessary information such as color. The Hematoxylin image guides the
+network to synthesize the background of the IHC image by preserving the shape and texture of the cells and artifacts in
+the background. The DAPI image assists the network in identifying the location, shape, and texture of the cells to
+better isolate the cells from the background. The segmentation mask helps the network specify the color of cells based 
+on the type of the cell (positive cell: a brown hue, negative: a blue hue).</p>
+<p>In the next step, we generate synthetic IHC images with more clustered positive cells. To do so, we change the 
+segmentation mask by choosing a percentage of random negative cells in the segmentation mask (called as Neg-to-Pos) and 
+converting them into positive cells. Some samples of the synthesized IHC images along with the original IHC image are 
+shown below.</p>
+<p><img alt="IHC_Gen_image" src="images/IHC_Gen.jpg" /><em>Overview of synthetic IHC image generation. (a) A training sample 
+of the IHC-generator model. (b) Some samples of synthesized IHC images using the trained IHC-Generator model. The 
+Neg-to-Pos shows the percentage of the negative cells in the segmentation mask converted to positive cells.</em></p>
+<p>We created a new dataset using the original IHC images and synthetic IHC images. We synthesize each image in the dataset 
+two times by setting the Neg-to-Pos parameter to %50 and %70. We re-trained our network with the new dataset. You can 
+find the new trained model <a href="https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip?download=1">here</a>.</p>
+<h2 id="registration">Registration</h2>
+<p>To register the de novo stained mpIF and IHC images, you can use the registration framework in the 'Registration' 
+directory. Please refer to the README file provided in the same directory for more details.</p>
+<h2 id="contributing-training-data">Contributing Training Data</h2>
+<p>To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and 
+mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC 
+images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of 
+size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. 
+We also randomly selected and segmented 41 images of size 640x640 from recently released <a href="https://sites.google.com/view/bcdataset">BCDataset</a> 
+which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (for cell 
+detection rather than cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test 
+set varies widely in the density of tumor cells and the Ki67 index. You can find this dataset <a href="https://zenodo.org/record/4751737#.YKRTS0NKhH4">here</a>.</p>
+<p>We are also creating a self-configurable version of DeepLIIF which will take as input any co-registered H&amp;E/IHC and 
+multiplex images and produce the optimal output. If you are generating or have generated H&amp;E/IHC and multiplex staining 
+for the same slide (de novo staining) and would like to contribute that data for DeepLIIF, we can perform 
+co-registration, whole-cell multiplex segmentation via <a href="https://github.com/nadeemlab/ImPartial">ImPartial</a>, train the 
+DeepLIIF model and release back to the community with full credit to the contributors.</p>
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href="../installation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Installation" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Installation
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../testing/" class="md-footer__link md-footer__link--next" aria-label="Next: Testing" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Testing
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs"], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.748e2769.min.js"></script>
+      
+    
+  </body>
+</html>
