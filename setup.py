@@ -1,5 +1,7 @@
 from setuptools import setup
 
+from distutils.core import setup
+
 setup(
     name='deepliif',
     version='0.0.1',
@@ -21,4 +23,17 @@ setup(
             'deepliif = cli:cli'
         ]
     }
+)
+
+setup(
+    name = 'deepliif',
+    packages = ['deepliif'],
+    version = '1.1.0',  # Ideally should be same as your GitHub release tag varsion
+    description = 'DeepLIIF',
+    author = 'Parmida93',
+    author_email = 'ghahremani.parmida@gmail.com',
+    url = 'https://github.com/nadeemlab/DeepLIIF',
+    download_url = 'Z:/Parmida/DeepLIIF/Releases/DeepLIIF-1.1.0.tar.gz',
+    keywords = ['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
+    classifiers = [],
 )
