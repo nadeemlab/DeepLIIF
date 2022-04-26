@@ -62,7 +62,7 @@ DeepLIIF can be `pip` installed:
 ```shell
 $ python3.8 -m venv venv
 $ source venv/bin/activate
-(venv) $ pip install git+https://github.com/nadeemlab/DeepLIIF.git
+(venv) $ pip install deepliif
 ```
 
 The package is composed of two parts:
