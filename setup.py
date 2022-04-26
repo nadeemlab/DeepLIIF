@@ -1,11 +1,19 @@
 from setuptools import setup
 
-from distutils.core import setup
 
 setup(
     name='deepliif',
-    version='1.1.1',
+    version='1.1.1.0',
     packages=['deepliif', 'deepliif.data', 'deepliif.models', 'deepliif.util', 'deepliif.options'],
+
+    description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
+    author='Parmida93',
+    author_email='ghahremani.parmida@gmail.com',
+    url='https://github.com/nadeemlab/DeepLIIF',
+    download_url='https://github.com/nadeemlab/DeepLIIF/archive/refs/tags/V1.1.1.0.tar.gz',
+    keywords=['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
+    classifiers=[],
+
     py_modules=['cli'],
     install_requires=[
         'opencv-python==4.5.3.56',
@@ -23,17 +31,4 @@ setup(
             'deepliif = cli:cli'
         ]
     }
-)
-
-setup(
-    name='deepliif',
-    packages=['deepliif'],
-    version='1.1.1',  # Ideally should be same as your GitHub release tag varsion
-    description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
-    author='Parmida93',
-    author_email='ghahremani.parmida@gmail.com',
-    url='https://github.com/nadeemlab/DeepLIIF',
-    download_url='https://github.com/nadeemlab/DeepLIIF/archive/refs/tags/V1.1.1.tar.gz',
-    keywords=['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
-    classifiers=[],
 )
