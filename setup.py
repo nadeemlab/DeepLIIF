@@ -26,14 +26,14 @@ setup(
 )
 
 setup(
-    name = 'deepliif',
-    packages = ['deepliif'],
-    version = '1.1.0',  # Ideally should be same as your GitHub release tag varsion
-    description = 'DeepLIIF',
-    author = 'Parmida93',
-    author_email = 'ghahremani.parmida@gmail.com',
-    url = 'https://github.com/nadeemlab/DeepLIIF',
-    download_url = 'https://github.com/nadeemlab/DeepLIIF/archive/refs/tags/V1.1.0.tar.gz',
-    keywords = ['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
-    classifiers = [],
+    name='deepliif',
+    packages=['deepliif'],
+    version='V1.1.1',  # Ideally should be same as your GitHub release tag varsion
+    description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
+    author='Parmida93',
+    author_email='ghahremani.parmida@gmail.com',
+    url='https://github.com/nadeemlab/DeepLIIF',
+    download_url='https://github.com/nadeemlab/DeepLIIF/archive/refs/tags/V1.1.1.tar.gz',
+    keywords=['DeepLIIF', 'IHC', 'Segmentation', 'Classification'],
+    classifiers=[],
 )
