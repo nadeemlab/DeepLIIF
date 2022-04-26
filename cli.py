@@ -598,8 +598,8 @@ def visualize(pickle_dir):
         time.sleep(1)
 
     params_opt = pickle.load(open(path_init,'rb'))
-    params_opt['remote'] = False
-    visualizer = Visualizer(**params_opt)   # create a visualizer that display/save images and plots
+    params_opt.remote = False
+    visualizer = Visualizer(params_opt)   # create a visualizer that display/save images and plots
 
     paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
                 'plot_current_losses':os.path.join(pickle_dir,'plot_current_losses.pickle')}
