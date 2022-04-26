@@ -19,6 +19,7 @@ import torch.distributed as dist
 from packaging import version
 import subprocess
 import sys
+import pickle
 
 
 def set_seed(seed=0,rank=None):
@@ -586,6 +587,13 @@ def prepare_testing_data(input_dir, dataset_dir):
             image = cv2.resize(cv2.imread(os.path.join(input_dir, img)), (512, 512))
             cv2.imwrite(os.path.join(test_dir, img), np.concatenate([image, image, image, image, image, image], 1))
 
+# to load pickle file saved from gpu in a cpu environment: https://github.com/pytorch/pytorch/issues/16797#issuecomment-633423219
+from io import BytesIO
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
 
 @cli.command()
 @click.option('--pickle-dir', required=True, help='directory where the pickled snapshots are stored')
@@ -611,7 +619,7 @@ def visualize(pickle_dir):
             try:
                 last_modified_time_plot = os.path.getmtime(path_plot)
                 if last_modified_time_plot > last_modified_time[method]:
-                    params_plot = pickle.load(open(path_plot,'rb'))
+                    params_plot = CPU_Unpickler(open(path_plot,'rb')).load()
                     last_modified_time[method] = last_modified_time_plot
                     getattr(visualizer,method)(**params_plot)
                     print(f'{method} refreshed, last modified time {time.ctime(last_modified_time[method])}')
