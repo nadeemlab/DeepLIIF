@@ -4,8 +4,8 @@ from distutils.core import setup
 
 setup(
     name='deepliif',
-    version='0.0.1',
-    packages=['deepliif', 'deepliif.data', 'deepliif.models', 'deepliif.util'],
+    version='1.1.1',
+    packages=['deepliif', 'deepliif.data', 'deepliif.models', 'deepliif.util', 'deepliif.options'],
     py_modules=['cli'],
     install_requires=[
         'opencv-python==4.5.3.56',
@@ -28,7 +28,7 @@ setup(
 setup(
     name='deepliif',
     packages=['deepliif'],
-    version='V1.1.1',  # Ideally should be same as your GitHub release tag varsion
+    version='1.1.1',  # Ideally should be same as your GitHub release tag varsion
     description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
     author='Parmida93',
     author_email='ghahremani.parmida@gmail.com',
