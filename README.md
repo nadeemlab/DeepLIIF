@@ -58,7 +58,7 @@ to noisier as well as other IHC nuclear/cytoplasmic marker images.*
 
 ## Installing `deepliif`
 
-DeepLIIF can be `pip` installed:
+DeepLIIF can be `pip` installed from [PyPI](https://pypi.org/project/deepliif/):
 ```shell
 $ python3.8 -m venv venv
 $ source venv/bin/activate
