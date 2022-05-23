@@ -334,7 +334,7 @@ and is available for non-commercial academic purposes.
 * This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 
 ## Reference
-If you find our work useful in your research or if you use parts of this code, please cite our paper:
+If you find our work useful in your research or if you use parts of this code, please cite the following papers:
 ```
 @article{ghahremani2022deepliif,
   title={Deep Learning-Inferred Multiplex ImmunoFluorescence for Immunohistochemical Image Quantification},
