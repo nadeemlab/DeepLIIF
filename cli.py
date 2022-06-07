@@ -12,14 +12,13 @@ from PIL import Image
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
 from deepliif.util import allowed_file, Visualizer
-from deepliif.util.util import mkdirs
+from deepliif.util.util import mkdirs, check_multi_scale
 
 import torch.distributed as dist
 
 from packaging import version
 import subprocess
 import sys
-
 
 def set_seed(seed=0,rank=None):
     """
@@ -478,7 +477,7 @@ def serialize(models_dir, output_dir):
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', default=512, help='tile size')
+@click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
 def test(input_dir, output_dir, tile_size, model_dir):
     """Test trained models
@@ -496,6 +495,11 @@ def test(input_dir, output_dir, tile_size, model_dir):
         for filename in bar:
             img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
 
+            if not tile_size:
+                tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
+                                              img.convert('L'))
+            tile_size = int(tile_size)
+
             images = inference(
                 img,
                 tile_size=tile_size,
@@ -503,7 +507,7 @@ def test(input_dir, output_dir, tile_size, model_dir):
                 model_path=model_dir
             )
 
-            post_images, scoring = postprocess(img, images['Seg'])
+            post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)
             images = {**images, **post_images}
 
             for name, i in images.items():

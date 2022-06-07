@@ -243,7 +243,7 @@ class GANLoss(nn.Module):
             self.loss = nn.MSELoss()
         elif gan_mode == 'vanilla':
             self.loss = nn.BCEWithLogitsLoss()
-        elif gan_mode in ['wgangp']:
+        elif gan_mode in ['wgangp', 'poly_ce']:
             self.loss = None
         else:
             raise NotImplementedError('gan mode %s not implemented' % gan_mode)
@@ -265,7 +265,7 @@ class GANLoss(nn.Module):
             target_tensor = self.fake_label
         return target_tensor.expand_as(prediction)
 
-    def __call__(self, prediction, target_is_real):
+    def __call__(self, prediction, target_is_real, epsilon=1.0):
         """Calculate loss given Discriminator's output and grount truth labels.
 
         Parameters:
@@ -283,6 +283,11 @@ class GANLoss(nn.Module):
                 loss = -prediction.mean()
             else:
                 loss = prediction.mean()
+        elif self.gan_mode == 'poly_ce':
+            target_tensor = self.get_target_tensor(prediction, target_is_real)
+            CE = nn.BCEWithLogitsLoss()(prediction, target_tensor)
+            pt = torch.sum(target_tensor * nn.Softmax()(prediction), axis=-1)
+            loss = CE + epsilon * (1 - pt)
         return loss
 
 

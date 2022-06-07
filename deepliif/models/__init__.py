@@ -30,7 +30,8 @@ from PIL import Image
 import numpy as np
 from dask import delayed, compute
 
-from deepliif.util import generate_tiles, stitch, Tile, chunker
+from deepliif.util import generate_tiles, stitch, Tile, chunker, calculate_background_mean_value, \
+    calculate_background_area, adjust_background_tile
 from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
@@ -160,8 +161,10 @@ def init_nets(model_dir, eager_mode=False):
     ]
 
     number_of_gpus = torch.cuda.device_count()
+    # number_of_gpus = 0
     if number_of_gpus:
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
+        # chunks = chunks[1:]
         devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
@@ -221,7 +224,7 @@ def run_dask(img, model_path):
     lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
     segs = compute(lazy_segs)[0]
 
-    seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+    seg_weights = [0.25, 0.25, 0.25, 0, 0.25]
     seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
 
     res = {k: tensor_to_pil(v) for k, v in gens.items()}
@@ -230,11 +233,32 @@ def run_dask(img, model_path):
     return res
 
 
+def is_empty(tile, mean_background_val):
+    # return True if np.mean(np.array(tile) - np.array(mean_background_val)) < 40 else False
+    return True if calculate_background_area(tile) > 98 else False
+
+
+def run_wrapper(tile, run_fn, model_path, mean_background_val):
+    if is_empty(tile, mean_background_val):
+        return {
+            'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
+            'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+            'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+            'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+            'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
+        }
+    else:
+        return run_fn(tile, model_path)
+
+
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
-    tiles = list(generate_tiles(img, tile_size, overlap_size))
+
+    mean_background_val = calculate_background_mean_value(img)
+    tiles = list(generate_tiles(img, tile_size, overlap_size, mean_background_val))
 
     run_fn = run_torchserve if use_torchserve else run_dask
-    res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
+    # res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, mean_background_val)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
@@ -243,23 +267,28 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
 
     images['Hema'] = stitch(get_net_tiles('G1'), tile_size, overlap_size).resize(img.size)
 
-    images['DAPI'] = stitch(
-        [Tile(t.i, t.j, adjust_dapi(dt.img, t.img))
-         for t, dt in zip(tiles, get_net_tiles('G2'))],
-        tile_size, overlap_size).resize(img.size)
-    dapi_pix = np.array(images['DAPI'])
+    # images['DAPI'] = stitch(
+    #     [Tile(t.i, t.j, adjust_background_tile(dt.img))
+    #      for t, dt in zip(tiles, get_net_tiles('G2'))],
+    #     tile_size, overlap_size).resize(img.size)
+    # dapi_pix = np.array(images['DAPI'])
+    # dapi_pix[:, :, 0] = 0
+    # images['DAPI'] = Image.fromarray(dapi_pix)
+
+    images['DAPI'] = stitch(get_net_tiles('G2'), tile_size, overlap_size).resize(img.size)
+    dapi_pix = np.array(images['DAPI'].convert('L').convert('RGB'))
     dapi_pix[:, :, 0] = 0
     images['DAPI'] = Image.fromarray(dapi_pix)
-
     images['Lap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
-
-    images['Marker'] = stitch(
-        [Tile(t.i, t.j, adjust_marker(kt.img, t.img))
-         for t, kt in zip(tiles, get_net_tiles('G4'))],
-        tile_size, overlap_size).resize(img.size)
-    marker_pix = np.array(images['Marker'])
+    images['Marker'] = stitch(get_net_tiles('G4'), tile_size, overlap_size).resize(img.size)
+    marker_pix = np.array(images['Marker'].convert('L').convert('RGB'))
     marker_pix[:, :, 2] = 0
     images['Marker'] = Image.fromarray(marker_pix)
+
+    # images['Marker'] = stitch(
+    #     [Tile(t.i, t.j, kt.img)
+    #      for t, kt in zip(tiles, get_net_tiles('G4'))],
+    #     tile_size, overlap_size).resize(img.size)
 
     images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
 
