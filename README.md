@@ -310,7 +310,7 @@ To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC,
 mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC 
 images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of 
 size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. 
-We also randomly selected and segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) 
+We also randomly selected and manually segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) 
 which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (for cell 
 detection rather than cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test 
 set varies widely in the density of tumor cells and the Ki67 index. You can find this dataset [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
