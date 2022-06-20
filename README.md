@@ -9,7 +9,7 @@
     |
     <a href="https://rdcu.be/cKSBz">Journal Link</a>
     |
-    <a href="https://arxiv.org/abs/2204.04494">CVPR Link</a>
+    <a href="https://openaccess.thecvf.com/content/CVPR2022/html/Ghahremani_DeepLIIF_An_Online_Platform_for_Quantification_of_Clinical_Pathology_Slides_CVPR_2022_paper.html">CVPR Link</a>
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
@@ -337,17 +337,22 @@ and is available for non-commercial academic purposes.
 ## Reference
 If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
-@article{ghahremani2022deepliif,
-  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for Immunohistochemical Image Quantification},
+@article{ghahremani2022deep,
+  title={Deep learning-inferred multiplex immunofluorescence for immunohistochemical image quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
   journal={Nature Machine Intelligence},
-  year={2022}
+  volume={4},
+  number={4},
+  pages={401--412},
+  year={2022},
+  publisher={Nature Publishing Group}
 }
 
 @article{ghahremani2022deepliifui,
   title={DeepLIIF: An Online Platform for Quantification of Clinical Pathology Slides},
   author={Ghahremani, Parmida and Marino, Joseph and Dodds, Ricardo and Nadeem, Saad},
-  journal={CVPR},
+  journal={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages={21399--21405},
   year={2022}
 }
 
