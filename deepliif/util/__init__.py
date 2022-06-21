@@ -39,7 +39,8 @@ def output_size(img, tile_size):
             max(round(img.height / tile_size) * tile_size, tile_size))
 
 
-def generate_tiles(img, tile_size, overlap_size, mean_background_val):
+def generate_tiles(img, tile_size, overlap_size):
+    mean_background_val = calculate_background_mean_value(img)
     img = img.resize(output_size(img, tile_size))
     # Adding borders with size of given overlap around the whole slide image
     img = ImageOps.expand(img, border=overlap_size, fill=tuple(mean_background_val))

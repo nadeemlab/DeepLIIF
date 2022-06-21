@@ -233,13 +233,13 @@ def run_dask(img, model_path):
     return res
 
 
-def is_empty(tile, mean_background_val):
+def is_empty(tile):
     # return True if np.mean(np.array(tile) - np.array(mean_background_val)) < 40 else False
     return True if calculate_background_area(tile) > 98 else False
 
 
-def run_wrapper(tile, run_fn, model_path, mean_background_val):
-    if is_empty(tile, mean_background_val):
+def run_wrapper(tile, run_fn, model_path):
+    if is_empty(tile):
         return {
             'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
             'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
@@ -253,12 +253,12 @@ def run_wrapper(tile, run_fn, model_path, mean_background_val):
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
 
-    mean_background_val = calculate_background_mean_value(img)
-    tiles = list(generate_tiles(img, tile_size, overlap_size, mean_background_val))
+    
+    tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
     # res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
-    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, mean_background_val)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
