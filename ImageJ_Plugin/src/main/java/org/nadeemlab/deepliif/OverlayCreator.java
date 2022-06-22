@@ -8,27 +8,25 @@ import ij.ImagePlus;
 
 public class OverlayCreator
 {
-    private ImagePlus impOverlay;
     private int width, height;
-    int[] pixOrig, pixSeg, pixOverlay;
+    int[] pixOrig, pixSeg, pixOverlaid;
     byte[] posneg;
 
 
-    OverlayCreator(ImagePlus orig, ImagePlus seg, ImagePlus overlay) throws DeepliifException
+    OverlayCreator(ImagePlus orig, ImagePlus seg, ImagePlus overlaid) throws DeepliifException
     {
-        impOverlay = overlay;
-        width = overlay.getWidth();
-        height = overlay.getHeight();
+        width = overlaid.getWidth();
+        height = overlaid.getHeight();
 
         if (width != orig.getWidth() || width != seg.getWidth() || height != orig.getHeight() || height != seg.getHeight())
             throw new DeepliifException("Images do not have the same dimensions.");
-        if (orig.getType() != ImagePlus.COLOR_RGB || seg.getType() != ImagePlus.COLOR_RGB || overlay.getType() != ImagePlus.COLOR_RGB)
+        if (orig.getType() != ImagePlus.COLOR_RGB || seg.getType() != ImagePlus.COLOR_RGB || overlaid.getType() != ImagePlus.COLOR_RGB)
             throw new DeepliifException("Images are not all of type RGB.");
 
         pixOrig = (int[])orig.getChannelProcessor().getPixels();
         pixSeg = (int[])seg.getChannelProcessor().getPixels();
-        pixOverlay = (int[])overlay.getChannelProcessor().getPixels();
-        posneg = new byte[pixOverlay.length];
+        pixOverlaid = (int[])overlaid.getChannelProcessor().getPixels();
+        posneg = new byte[pixOverlaid.length];
     }
 
 
@@ -37,7 +35,6 @@ public class OverlayCreator
         createPosNegMask(segThresh);
         computeCellMapping(sizeThresh);
         createOverlay();
-        impOverlay.updateAndDraw();
     }
 
 
@@ -114,7 +111,7 @@ public class OverlayCreator
     private void createOverlay()
     {
         for (int i = 0; i < pixOrig.length; ++i)
-            pixOverlay[i] = pixOrig[i];
+            pixOverlaid[i] = pixOrig[i];
 
         for (int y = 0, i = 0; y < height-1; ++y, ++i)
             for (int x = 0; x < width-1; ++x, ++i)
@@ -124,16 +121,16 @@ public class OverlayCreator
                 if (sumX == 2 || sumY == 2 || sumX == -2 || sumY == -2) {
                     int overlayColor = (sumX == 2 || sumY == 2) ? 0xFFFF0000 : 0xFF0000FF;
                     if (y > 0)
-                        pixOverlay[i-width] = overlayColor;
+                        pixOverlaid[i-width] = overlayColor;
                     if (x > 0)
-                        pixOverlay[i-1] = overlayColor;
-                    pixOverlay[i] = overlayColor;
-                    pixOverlay[i+1] = overlayColor;
+                        pixOverlaid[i-1] = overlayColor;
+                    pixOverlaid[i] = overlayColor;
+                    pixOverlaid[i+1] = overlayColor;
                     if (x < width-2)
-                        pixOverlay[i+2] = overlayColor;
-                    pixOverlay[i+width] = overlayColor;
+                        pixOverlaid[i+2] = overlayColor;
+                    pixOverlaid[i+width] = overlayColor;
                     if (y < height-2)
-                        pixOverlay[i+width+width] = overlayColor;
+                        pixOverlaid[i+width+width] = overlayColor;
                 }
             }
     }

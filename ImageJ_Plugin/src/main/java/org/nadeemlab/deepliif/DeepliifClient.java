@@ -17,6 +17,10 @@ import org.apache.commons.io.FilenameUtils;
 
 public class DeepliifClient
 {
+    public static final int maxWidth = 3000;
+    public static final int maxHeight = 3000;
+    public static final String[] allowedResolutions = new String[]{"10x", "20x", "40x"};
+
     private static final OkHttpClient httpClient = new OkHttpClient.Builder().readTimeout(0, TimeUnit.SECONDS).build();
 
 
@@ -112,4 +116,9 @@ public class DeepliifClient
     public static String name;
     public static String directory;
     public static MutableHTMLDialog scoreDialog;
+
+    public static String[] roiNames;
+    public static String[] roiDirectories;
+    public static int[] roiOffsetsX;
+    public static int[] roiOffsetsY;
 }

@@ -76,6 +76,9 @@ public class InferencePlugin implements PlugIn, WindowListener
             DeepliifClient.name = name;
             DeepliifClient.directory = outputDirectory;
             DeepliifClient.scoreDialog = scoreDialog;
+
+            DeepliifClient.roiNames = null;
+            DeepliifClient.roiDirectories = null;
         }
         catch (DeepliifException e) {
             UIHelper.showStatusAndProgress("DeepLIIF error.", 1.0);

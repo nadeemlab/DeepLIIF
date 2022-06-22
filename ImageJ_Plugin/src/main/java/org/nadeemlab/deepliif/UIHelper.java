@@ -6,7 +6,7 @@ import ij.gui.MessageDialog;
 
 public class UIHelper
 {
-    private static final boolean debug = false;
+    private static final boolean debug = true;
 
 
     public static void log(String message)
