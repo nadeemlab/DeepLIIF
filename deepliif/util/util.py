@@ -6,6 +6,8 @@ from functools import wraps
 import torch
 import numpy as np
 from PIL import Image
+import cv2
+from skimage.metrics import structural_similarity as ssim
 
 
 def timeit(f):
@@ -120,3 +122,28 @@ def tensor2im(input_image, imtype=np.uint8):
 def tensor_to_pil(t):
     return Image.fromarray(tensor2im(t))
 
+
+def calculate_ssim(img1, img2):
+    return ssim(img1, img2, data_range=img2.max() - img2.min())
+
+
+def check_multi_scale(img1, img2):
+    img1 = np.array(img1)
+    img2 = np.array(img2)
+    max_ssim = (512, 0)
+    for tile_size in range(100, 1000, 100):
+        image_ssim = 0
+        tile_no = 0
+        for i in range(0, img2.shape[0], tile_size):
+            for j in range(0, img2.shape[1], tile_size):
+                if i + tile_size <= img2.shape[0] and j + tile_size <= img2.shape[1]:
+                    tile = img2[i: i + tile_size, j: j + tile_size]
+                    tile = cv2.resize(tile, (img1.shape[0], img1.shape[1]))
+                    tile_ssim = calculate_ssim(img1, tile)
+                    image_ssim += tile_ssim
+                    tile_no += 1
+        if tile_no > 0:
+            image_ssim /= tile_no
+            if max_ssim[1] < image_ssim:
+                max_ssim = (tile_size, image_ssim)
+    return max_ssim[0]

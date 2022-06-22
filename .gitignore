@@ -133,4 +133,5 @@ dmypy.json
 
 # Checkpoints and results
 /checkpoints/
+/model-server/
 /results/*
