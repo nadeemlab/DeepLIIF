@@ -211,6 +211,10 @@ If you don't have access to GPU or appropriate hardware and just want to use Ima
 
 ![DeepLIIF ImageJ Demo](images/deepliif-imagej-demo.gif)
 
+The plugin also supports submitting multiple ROIs at once:
+
+![DeepLIIF ImageJ ROI Demo](images/deepliif-imagej-roi-demo.gif)
+
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
