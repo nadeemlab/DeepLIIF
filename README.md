@@ -218,7 +218,7 @@ The plugin also supports submitting multiple ROIs at once:
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
-![DeepLIIF Website Demo](images/deepliif-website-demo-02a.gif)
+![DeepLIIF Website Demo](images/deepliif-website-demo-03.gif)
 
 DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request
 containing the original image file:
