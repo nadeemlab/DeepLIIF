@@ -17,8 +17,6 @@ import ij.process.ImageProcessor;
 
 public class InferencePlugin implements PlugIn, WindowListener
 {
-    private static final int maxWidth = 3000;
-    private static final int maxHeight = 3000;
     private static final String[] allowedResolutions = new String[]{"10x", "20x", "40x"};
 
     ImageWindow overlayWindow = null;
@@ -93,15 +91,15 @@ public class InferencePlugin implements PlugIn, WindowListener
     private boolean checkImageSize(ImagePlus imp)
     {
         if (imp.getRoi() == null) {
-            if (imp.getWidth() <= maxWidth && imp.getHeight() <= maxHeight)
+            if (imp.getWidth() <= DeepliifClient.maxWidth && imp.getHeight() <= DeepliifClient.maxHeight)
                 return true;
-            UIHelper.showErrorDialog("Image size is larger than " + maxWidth + " x " + maxHeight + " pixels.  Please select a smaller ROI.");
+            UIHelper.showErrorDialog("Image size is larger than " + DeepliifClient.maxWidth + " x " + DeepliifClient.maxHeight + " pixels.  Please select a smaller ROI.");
             return false;
         }
         Rectangle bounds = imp.getRoi().getBounds();
-        if (bounds.getWidth() <= maxWidth && bounds.getHeight() <= maxHeight)
+        if (bounds.getWidth() <= DeepliifClient.maxWidth && bounds.getHeight() <= DeepliifClient.maxHeight)
             return true;
-        UIHelper.showErrorDialog("ROI size is larger than " + maxWidth + " x " + maxHeight + " pixels.  Please select a smaller ROI.");
+        UIHelper.showErrorDialog("ROI size is larger than " + DeepliifClient.maxWidth + " x " + DeepliifClient.maxHeight + " pixels.  Please select a smaller ROI.");
         return false;
     }
 
