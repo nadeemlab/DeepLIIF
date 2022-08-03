@@ -10,15 +10,19 @@ import numpy as np
 from PIL import Image
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
-from deepliif.util import allowed_file, Visualizer
+from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi
+from deepliif.util import allowed_file, Visualizer, get_information
 from deepliif.util.util import mkdirs, check_multi_scale
+# from deepliif.util import infer_results_for_wsi
 
 import torch.distributed as dist
 
 from packaging import version
 import subprocess
 import sys
+
+import pickle
+
 
 def set_seed(seed=0,rank=None):
     """
@@ -472,7 +476,7 @@ def serialize(models_dir, output_dir):
         for name, net in bar:
             traced_net = torch.jit.trace(net, sample)
             traced_net.save(f'{output_dir}/{name}.pt')
-
+         
 
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
@@ -480,6 +484,7 @@ def serialize(models_dir, output_dir):
 @click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
 def test(input_dir, output_dir, tile_size, model_dir):
+    
     """Test trained models
     """
     output_dir = output_dir or input_dir
@@ -493,35 +498,25 @@ def test(input_dir, output_dir, tile_size, model_dir):
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+            if '.svs' in filename:
+                start_time = time.time()
+                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size)
+                print(time.time() - start_time)
+            else:
+                img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+                images, scoring = infer_modalities(img, tile_size, model_dir)
 
-            if not tile_size:
-                tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
-                                              img.convert('L'))
-            tile_size = int(tile_size)
+                for name, i in images.items():
+                    i.save(os.path.join(
+                        output_dir,
+                        filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+                    ))
 
-            images = inference(
-                img,
-                tile_size=tile_size,
-                overlap_size=compute_overlap(img.size, tile_size),
-                model_path=model_dir
-            )
-
-            post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)
-            images = {**images, **post_images}
-
-            for name, i in images.items():
-                i.save(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                ))
-
-            with open(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'.json')
-            ), 'w') as f:
-                json.dump(scoring, f, indent=2)
-
+                with open(os.path.join(
+                        output_dir,
+                        filename.replace('.' + filename.split('.')[-1], f'.json')
+                ), 'w') as f:
+                    json.dump(scoring, f, indent=2)
 
 @cli.command()
 @click.option('--input-dir', type=str, required=True, help='Path to input images')
@@ -594,7 +589,6 @@ def prepare_testing_data(input_dir, dataset_dir):
 @cli.command()
 @click.option('--pickle-dir', required=True, help='directory where the pickled snapshots are stored')
 def visualize(pickle_dir):
-    import pickle
 
     path_init = os.path.join(pickle_dir,'opt.pickle')
     print(f'waiting for initialization signal from {path_init}')
