@@ -136,3 +136,12 @@ dmypy.json
 /checkpoints/
 /model-server/
 /results/*
+
+**/.ipynb_checkpoints/*
+**/.virtual_documents/*
+assets/.METADATA/job_run.*
+assets/job_run
+cover/
+.pybuilder/
+.pytype/
+cython_debug/
