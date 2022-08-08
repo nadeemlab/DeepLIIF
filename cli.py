@@ -483,7 +483,10 @@ def serialize(models_dir, output_dir):
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
-def test(input_dir, output_dir, tile_size, model_dir):
+@click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
+                                                   'So the WSI image is read region by region. '
+                                                   'This parameter specifies the size each region to be read into GPU for inferrence.')
+def test(input_dir, output_dir, tile_size, model_dir, region_size):
     
     """Test trained models
     """
@@ -500,7 +503,7 @@ def test(input_dir, output_dir, tile_size, model_dir):
         for filename in bar:
             if '.svs' in filename:
                 start_time = time.time()
-                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size)
+                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size)
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')

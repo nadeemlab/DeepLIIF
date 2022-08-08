@@ -169,6 +169,7 @@ To test the model:
 ```
 deepliif test --input-dir /path/to/input/images 
               --output-dir /path/to/output/images 
+              --model-dir path/to/the/serialized/model
               --tile-size 512
 ```
 or
@@ -182,6 +183,23 @@ python test.py --dataroot /path/to/input/images
 * The test results will be saved to the specified output directory, which defaults to the input directory.
 * The default tile size is 512.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+
+**Whole Slide Image (WSI) Inference:**  
+For translation and segmentation of whole slide images, 
+you can simply use the same test command 
+giving path to the directory containing your whole slide images as the input-dir.
+DeepLIIF automatically reads the WSI region by region, 
+and translate and segment each region separately and stitches the regions 
+to create the translation and segmentation for whole slide image, 
+then saves all masks in the format of ome.tiff in the given output-dir. 
+Based on the available GPU resources, the region-size can be changed.
+```
+deepliif test --input-dir /path/to/input/images 
+              --output-dir /path/to/output/images 
+              --model-dir path/to/the/serialized/model
+              --tile-size 512
+              --region-size 20000
+```
 
 If you prefer, it is possible to run the models using Torchserve.
 Please see [the documentation](https://nadeemlab.github.io/DeepLIIF/deployment/#deploying-deepliif-with-torchserve)
