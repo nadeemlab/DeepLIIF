@@ -437,11 +437,85 @@ def get_ome_information(filename):
     print('PixelType:', pixel_type)
     return size_x, size_y, size_z, size_c, size_t, pixel_type
 
+
+def create_dataset_from_ome_multi_channel_image(ome_dir, output_addr, tile_size=1024, img_channel_modality=None):
+    """
+    This function creates a dataset from given directory containing OME tiff files with multiple channels.
+    The user can specify the size of the tiles to be extracted from the OME image and saved in the output directory.
+    The user must give the information of the channels of the OME tiff files in the format of the dictionary,
+    where the key is the channel name and the value is the corresponding channel number.
+    If multiple channels should be stacked to create the final image, the user can give all the channel numbers in a list.
+    For example, channels of the IHC image are saved independently in the OME tiff file.
+    So, the user can specify the R, G, and B channel numbers as a list ('IHC':[2,3,4]).
+
+    :param ome_dir: The path to the directory containing ome tiffs.
+    :param output_addr: The path to the directory containing the output tiles.
+    :param tile_size: The size of the tiles extracted from the WSI.
+    :param img_channel_modality: A dictionary containing the information about channels in OME file.
+                                 The keys are channel names and values are the corresponding channel numbers.
+                                 Sample img_channel_modality: {'DAPI': 0, 'PD1': 1, 'IHC': [2, 3, 4]}
+    :return: 
+    """
+    if img_channel_modality is None:
+        print('img_channel_modality not given!')
+        return 
+    if not os.path.exists(output_addr):
+        os.makedirs(output_addr)
+    region_size = 10240
+    omes = os.listdir(ome_dir)
+    for ome in omes:
+        current_addr = os.path.join(ome_dir, ome)
+        size_x, size_y, size_z, size_c, size_t, pixel_type = get_ome_information(current_addr)
+        images_dict = {}
+        for i in range(0, size_x, region_size):
+            for j in range(0, size_y, region_size):
+                for img_type in img_channel_modality:
+                    img_channels = img_channel_modality[img_type]
+                    images = []
+                    if type(img_channels) == list:
+                        for img_channel in img_channels:
+                            images.append(read_region_of_image_using_bioformats(current_addr,
+                                                                                channel=img_channel,
+                                                                                region=(i, j, min(region_size, size_x - i), min(region_size, size_y - j))))
+                        
+                        images_dict[img_type] = np.dstack(images)
+                    else:
+                        images_dict[img_type] = read_region_of_image_using_bioformats(current_addr,
+                                                                                      channel=img_channels,
+                                                                                      region=(i, j, min(region_size, size_x - i), min(region_size, size_y - j)))
+
+                create_dataset_from_WSI_regions(images_dict, output_addr,
+                                                ome.split('_')[0], tile_size=tile_sicdze, start_i=i, start_j=j)
+
+    javabridge.kill_vm()
+
+
+def create_dataset_from_WSI_regions(WSI_images, output_addr, ome_name, tile_size=1024, start_i=0, start_j=0):
+    start_index = [0, 0]
+    image_shape = list(WSI_images.values())[0].shape
+    print(ome_name, start_i, start_j, image_shape)
+    while start_index[0] + tile_size <= image_shape[0]:
+        while start_index[1] + tile_size <= image_shape[1]:
+            dapi_tile = None
+            if 'DAPI' in WSI_images.keys():
+                dapi_tile = WSI_images['DAPI'][start_index[0]: start_index[0] + tile_size, start_index[1]: start_index[1] + tile_size]
+            if (dapi_tile.any() and np.mean(dapi_tile) > 0.0) or not dapi_tile.any():
+                for img_type, WSI_image in WSI_images.items():
+                    tile = WSI_image[start_index[0]: start_index[0] + tile_size, start_index[1]: start_index[1] + tile_size]
+                    tile = (imadjust(tile, 1, 0, 255)).astype(np.uint8)
+                    Image.fromarray(tile).save(os.path.join(output_addr, ome_name + '_' +
+                                                            str(start_i + start_index[0]) + '_' + str(start_j + start_index[1]) + '_' + img_type + '.png'))
+            start_index[1] += tile_size
+        start_index[1] = 0
+        start_index[0] += tile_size
+
+
 # input_dir = '/Users/pghahremani/Documents/test_dataset'
 # output_dir = '/Users/pghahremani/Documents/results/'
 # create_training_testing_dataset_from_given_directory(input_dir, output_dir,
 #                                                      post_fix_names=['DAPI', 'hematoxylin', 'CD3', 'CD8', 'DAPI', 'FoxP3', 'PDL1', 'PanCK'],
 #                                                      subsets={'train': 0.8, 'test': 0.1, 'val': 0.1})
+
 
 # input_dir = '/Users/pghahremani/Documents/results/'
 # output_dir = '/Users/pghahremani/Documents/augmented/'
@@ -457,6 +531,7 @@ def get_ome_information(filename):
 # cv2.imshow('adjusted image (gamma=1.4)', cv2.cvtColor(adjusted_image2, cv2.COLOR_RGB2BGR))
 # cv2.waitKey(0)
 
+
 # image_addr = '/Volumes/NadeemLab/Parmida/Projects-Datasets-BestPractices/DeepLIIF/images/target.png'
 # image = Image.open(image_addr)
 # deconvolved_stain = stain_deconvolution(np.array(image)).astype(np.uint8)
@@ -464,13 +539,20 @@ def get_ome_information(filename):
 # cv2.imshow('deconvolved image', cv2.cvtColor(deconvolved_stain, cv2.COLOR_RGB2BGR))
 # cv2.waitKey(0)
 
-create_multi_channel_image('/nadeem_lab/Parmida/DeepLIIF/results/Travis_All_Markers/test_latest/images',
-                           '/nadeem_lab/NadeemLab/Parmida/DeepLIIF/results/Travis_All_Markers/test_latest/stacked3', stacked=True,
-                           image_channels_names={'real_A': ['IHC_R', 'IHC_G', 'IHC_B'],
-                                                 'real_B_1': ['DAPI_Orig'], 'fake_B_1': ['DAPI_Gen'],
-                                                 'real_B_2': ['CD3_Orig'], 'fake_B_2': ['CD3_Gen'],
-                                                 'real_B_3': ['CD68_Orig'], 'fake_B_3': ['CD68_Gen'],
-                                                 'real_B_4': ['Sox10_Orig'], 'fake_B_4': ['Sox10_Gen'],
-                                                 'real_B_5': ['PDL1_Orig'], 'fake_B_5': ['PDL1_Gen'],
-                                                 'real_B_6': ['CD8_Orig'], 'fake_B_6': ['CD8_Gen']})
 
+# create_multi_channel_image('/nadeem_lab/Parmida/DeepLIIF/results/Travis_All_Markers/test_latest/images',
+#                            '/nadeem_lab/NadeemLab/Parmida/DeepLIIF/results/Travis_All_Markers/test_latest/stacked3', stacked=True,
+#                            image_channels_names={'real_A': ['IHC_R', 'IHC_G', 'IHC_B'],
+#                                                  'real_B_1': ['DAPI_Orig'], 'fake_B_1': ['DAPI_Gen'],
+#                                                  'real_B_2': ['CD3_Orig'], 'fake_B_2': ['CD3_Gen'],
+#                                                  'real_B_3': ['CD68_Orig'], 'fake_B_3': ['CD68_Gen'],
+#                                                  'real_B_4': ['Sox10_Orig'], 'fake_B_4': ['Sox10_Gen'],
+#                                                  'real_B_5': ['PDL1_Orig'], 'fake_B_5': ['PDL1_Gen'],
+#                                                  'real_B_6': ['CD8_Orig'], 'fake_B_6': ['CD8_Gen']})
+
+# input_dir = ''
+# output_dir = ''
+# create_dataset_from_ome_multi_channel_image(input_dir, output_dir, tile_size=1024,
+#                                             img_channel_modality={'DAPI': 0, 'PD1': 1, 'PDL1': 2, 'CD68': 3, 'CD8': 4,
+#                                                                   'CD4': 6, 'FoxP3': 7, 'Sox10': 8, 'CD3': 9,
+#                                                                   'IHC': [13, 12, 11]})
