@@ -6,7 +6,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='deepliif',
-    version='1.1.2',
+    version='1.1.4',
     packages=['deepliif', 'deepliif.data', 'deepliif.models', 'deepliif.util', 'deepliif.options'],
 
     description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
@@ -28,7 +28,8 @@ setup(
         "Click==8.0.3",
         "requests==2.26.0",
         "dask==2021.11.2",
-        "visdom>=0.1.8.3"
+        "visdom>=0.1.8.3",
+        "python-bioformats>=4.0.6"
     ],
     entry_points={
         'console_scripts': [

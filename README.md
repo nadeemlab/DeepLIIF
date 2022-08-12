@@ -61,9 +61,10 @@ to noisier as well as other IHC nuclear/cytoplasmic marker images.*
 
 DeepLIIF can be `pip` installed:
 ```shell
-$ python3.8 -m venv venv
-$ source venv/bin/activate
-(venv) $ pip install deepliif
+$ conda create --name deepliif_env python=3.8
+$ conda activate deepliif_env
+(deepliif_env) $ pip install deepliif
+(deepliif_env) $ conda install -c conda-forge openjdk
 ```
 
 The package is composed of two parts:
