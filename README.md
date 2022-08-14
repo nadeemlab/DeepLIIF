@@ -63,8 +63,8 @@ DeepLIIF can be `pip` installed:
 ```shell
 $ conda create --name deepliif_env python=3.8
 $ conda activate deepliif_env
-(deepliif_env) $ pip install deepliif
 (deepliif_env) $ conda install -c conda-forge openjdk
+(deepliif_env) $ pip install deepliif
 ```
 
 The package is composed of two parts:
