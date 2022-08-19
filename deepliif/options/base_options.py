@@ -16,8 +16,10 @@ def create_base_parser():
     parser.add_argument('--name', type=str, default='experiment_name',
                         help='name of the experiment. It decides where to store samples and models')
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
-    parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
+    parser.add_argument('--checkpoints_dir', type=str, default='./../checkpoints', help='models are saved here')
     parser.add_argument('--modalities_no', type=int, default=4, help='number of modalities')
+    parser.add_argument('--seg_gen', type=bool, default=True,
+                        help='True (Translation and Segmentation), False (Only Translation).')
     parser.add_argument('--seg_weights', type=str, default='', help='weights of the modalities')
     # model parameters
     parser.add_argument('--model', type=str, default='DeepLIIF', help='chooses which model to use. [DeepLIIF]')

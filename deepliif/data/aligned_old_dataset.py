@@ -5,7 +5,7 @@ from PIL import Image
 import cv2
 import numpy as np
 
-class AlignedDataset(BaseDataset):
+class AlignedOldDataset(BaseDataset):
     """A dataset class for paired image dataset.
 
     It assumes that the directory '/path/to/data/train' contains image pairs in the form of {A,B}.
@@ -44,11 +44,10 @@ class AlignedDataset(BaseDataset):
         """
         # read a image given a random integer index
         AB_path = self.AB_paths[index]
-
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size
-        w2 = int(w / (self.modalities_no * 2 + 1))
+        w2 = int(w / (self.modalities_no + 2))
         A = AB.crop((0, 0, w2, h))
 
         # apply the same transform to both A and B
@@ -58,18 +57,14 @@ class AlignedDataset(BaseDataset):
 
         A = A_transform(A)
         B_Array = []
-        for i in range(1, self.modalities_no + 1):
+        for i in range(1, self.modalities_no + 2):
             B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+            # cv2.imshow(str(i), np.array(B))
+            # cv2.waitKey(0)
             B = B_transform(B)
             B_Array.append(B)
 
-        BS_Array = []
-        for i in range(self.modalities_no + 1, self.modalities_no * 2 + 1):
-            BS = AB.crop((w2 * i, 0, w2 * (i + 1), h))
-            BS = B_transform(BS)
-            BS_Array.append(BS)
-
-        return {'A': A, 'B': B_Array, 'BS': BS_Array,'A_paths': AB_path, 'B_paths': AB_path}
+        return {'A': A, 'B': B_Array, 'A_paths': AB_path, 'B_paths': AB_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""

@@ -135,20 +135,21 @@ def load_eager_models(model_dir, devices):
     # print(param_dict)
     param_dict['gpu_ids'] = 0
     norm_layer = get_norm_layer(norm_type=norm)
-
     nets = {}
     for i in range(1, modalities_no + 1):
         n = 'G_' + str(i)
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
+        net.eval()
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
         ))
         nets[n] = net
 
-    for i in range(1, modalities_no + 2):
+    for i in range(1, modalities_no + 1):
         n = 'GS_' + str(i)
-        net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net = UnetGenerator(input_nc * 3, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net.eval()
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
@@ -168,14 +169,8 @@ def init_nets(model_dir, eager_mode=False):
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
     net_groups = []
     for i in range(1, modalities_no + 1):
-        net_groups.append(('G_' + str(i), 'GS_' + str(i + 1)))
-    net_groups.append(('GS_1',))
-    #     ('G1', 'G52'),
-    #     ('G2', 'G53'),
-    #     ('G3', 'G54'),
-    #     ('G4', 'G55'),
-    #     ('G51',)
-    # ]
+        net_groups.append(('G_' + str(i), 'GS_' + str(i)))
+    # net_groups.append(('GS_1',))
 
     number_of_gpus = torch.cuda.device_count()
     if number_of_gpus:
@@ -224,7 +219,7 @@ def run_dask(img, model_path, param_dict):
     nets = init_nets(model_dir)
 
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
-    seg_weights = list(map(float, param_dict['seg_weights'])) if param_dict else [1 / (modalities_no + 1)] * (modalities_no + 1)
+    # seg_weights = list(map(float, param_dict['seg_weights'])) if param_dict else [1 / 3] * (modalities_no + 1)
 
     ts = transform(img.resize((512, 512)))
 
@@ -236,19 +231,23 @@ def run_dask(img, model_path, param_dict):
     # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
     seg_map = {}
     for i in range(1, modalities_no + 1):
-        seg_map['G_' + str(i)] = 'GS_' + str(i + 1)
+        seg_map['G_' + str(i)] = 'GS_' + str(i)
 
     lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
     gens = compute(lazy_gens)[0]
-
-    lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-    lazy_segs['GS_1'] = forward(ts, nets['GS_1']).to(torch.device('cpu'))
-    segs = compute(lazy_segs)[0]
-
-    seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
-
     res = {k: tensor_to_pil(v) for k, v in gens.items()}
-    res['G_' + str(modalities_no + 1)] = tensor_to_pil(seg)
+
+    lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+    # lazy_segs['GS_1'] = forward(ts, nets['GS_1']).to(torch.device('cpu'))
+    segs = compute(lazy_segs)[0]
+    res.update({k: tensor_to_pil(v) for k, v in segs.items()})
+    # res['GS_1'] = tensor_to_pil(segs.values()[0])
+    # res['GS_2'] = tensor_to_pil(segs.values()[1])
+    # for i in range(1, modalities_no + 1):
+    #     seg = torch.stack([torch.mul(segs.values()[0], seg_weights[0]),
+    #                             torch.mul(segs.values()[1], seg_weights[1]),
+    #                             torch.mul(segs.values()[i], seg_weights[i])]).sum(dim=0)
+    #     res['GS_' + str(i + 1)] = tensor_to_pil(seg)
 
     return res
 
@@ -259,9 +258,11 @@ def is_empty(tile):
 
 def run_wrapper(tile, run_fn, model_path, param_dict):
     if is_empty(tile):
-        return {
-            'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, int(param_dict['modalities_no']) + 1)
-        }
+        res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, int(param_dict['modalities_no']) + 1)}
+        res.update({
+            'GS_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in
+            range(1, int(param_dict['modalities_no']) + 1)})
+        return res
     else:
         return run_fn(tile, model_path, param_dict)
 
@@ -274,7 +275,6 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
 
     run_fn = run_torchserve if use_torchserve else run_dask
     res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, param_dict)) for t in tiles]
-    # res = [Tile(t.i, t.j, run_fn(t.img.convert('RGB'))) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
@@ -283,24 +283,31 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
 
     for i in range(1, modalities_no + 1):
         images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize(img.size)
-    images['Seg'] = stitch(get_net_tiles('G_' + str(modalities_no + 1)), tile_size, overlap_size).resize(img.size)
+
+    for i in range(1, modalities_no + 1):
+        images['Seg' + str(i)] = stitch(get_net_tiles('GS_' + str(i)), tile_size, overlap_size).resize(img.size)
 
     return images
 
 
-def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
-    mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
-                                                thresh, noise_objects_size, small_object_size)
-    images = {}
-    images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
-    images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
+def postprocess(img, images, thresh=80, noise_objects_size=20, small_object_size=50):
+    processed_images = {}
+    scoring = {}
+    for img_name in list(images.keys()):
+        if 'Seg' in img_name:
+            seg_img = images[img_name]
+            mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
+                                                        thresh, noise_objects_size, small_object_size)
 
-    all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
-    scoring = {
-        'num_total': all_cells_no,
-        'num_pos': positive_cells_no,
-        'num_neg': negative_cells_no,
-        'percent_pos': IHC_score
-    }
+            processed_images[img_name + '_Overlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
+            processed_images[img_name + '_Refined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
 
-    return images, scoring
+            all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
+            scoring[img_name] = {
+                'num_total': all_cells_no,
+                'num_pos': positive_cells_no,
+                'num_neg': negative_cells_no,
+                'percent_pos': IHC_score
+            }
+
+    return processed_images, scoring

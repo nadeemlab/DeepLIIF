@@ -19,6 +19,7 @@ import torch.distributed as dist
 from packaging import version
 import subprocess
 import sys
+import shutil
 
 
 def set_seed(seed=0,rank=None):
@@ -478,6 +479,8 @@ def serialize(models_dir, output_dir):
     """Serialize DeepLIIF models using Torchscript
     """
     output_dir = output_dir or models_dir
+    if os.path.exists(os.path.join(models_dir, 'train_opt.txt')):
+        shutil.copy2(os.path.join(models_dir, 'train_opt.txt'), os.path.join(output_dir, 'train_opt.txt'))
 
     sample = transform(Image.new('RGB', (512, 512)))
 
@@ -487,7 +490,10 @@ def serialize(models_dir, output_dir):
             item_show_func=lambda n: n[0] if n else n
     ) as bar:
         for name, net in bar:
-            traced_net = torch.jit.trace(net, sample)
+            if name.startswith('GS'):
+                traced_net = torch.jit.trace(net, torch.cat([sample, sample, sample], 1))
+            else:
+                traced_net = torch.jit.trace(net, sample)
             traced_net.save(f'{output_dir}/{name}.pt')
 
 
@@ -519,7 +525,7 @@ def test(input_dir, output_dir, tile_size, model_dir):
                 model_path=model_dir
             )
 
-            post_images, scoring = postprocess(img, images['Seg'])
+            post_images, scoring = postprocess(img, images)
             images = {**images, **post_images}
 
             for name, i in images.items():
