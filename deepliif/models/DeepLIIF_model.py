@@ -15,6 +15,7 @@ class DeepLIIFModel(BaseModel):
         BaseModel.__init__(self, opt)
 
         self.mod_gen_no = self.opt.modalities_no
+        self.seg_gen_no = 0
         # self.seg_gen_no = self.opt.modalities_no + 1
 
         # weights of the modalities in generating segmentation mask
@@ -22,6 +23,7 @@ class DeepLIIFModel(BaseModel):
         if opt.seg_gen:
             self.seg_weights = [0.3] * self.mod_gen_no
             self.seg_weights[1] = 0.4
+            self.seg_gen_no = self.mod_gen_no
 
         # self.seg_weights = opt.seg_weights
         # assert len(self.seg_weights) == self.seg_gen_no, 'The number of the segmentation weights (seg_weights) is not equal to the number of target images (modalities_no)!'
@@ -158,7 +160,7 @@ class DeepLIIFModel(BaseModel):
 
         self.fake_BS = []
 
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netGS[i]:
                 # if i == 0:
                 #     self.fake_BS.append(self.netGS[i](self.fake_B[0]))
@@ -174,7 +176,7 @@ class DeepLIIFModel(BaseModel):
             pred_fake.append(self.netD[i](torch.cat((self.real_A, self.fake_B[i]), 1).detach()))
 
         pred_fake_s = []
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netDS[i]:
                 pred_fake_s.append(self.netDS[i](torch.cat((self.real_concatenated[i], self.fake_BS[i]), 1).detach()))
 
@@ -184,7 +186,7 @@ class DeepLIIFModel(BaseModel):
             self.loss_D_fake.append(self.criterionGAN_mod(pred_fake[i], False))
 
         self.loss_DS_fake = []
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             self.loss_DS_fake.append(self.criterionGAN_seg(pred_fake_s[i], False))
 
         pred_real = []
@@ -192,7 +194,7 @@ class DeepLIIFModel(BaseModel):
             pred_real.append(self.netD[i](torch.cat((self.real_A, self.real_B[i]), 1)))
 
         pred_real_s = []
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netDS[i]:
                 pred_real_s.append(self.netDS[i](torch.cat((self.real_concatenated[i], self.real_BS[i]), 1)))
 
@@ -202,7 +204,7 @@ class DeepLIIFModel(BaseModel):
             self.loss_D_real.append(self.criterionGAN_mod(pred_real[i], True))
 
         self.loss_DS_real = []
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             self.loss_DS_real.append(self.criterionGAN_seg(pred_real_s[i], True))
 
         # combine losses and calculate gradients
@@ -210,7 +212,7 @@ class DeepLIIFModel(BaseModel):
         self.loss_D = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
             self.loss_D += (self.loss_D_fake[i] + self.loss_D_real[i]) * 0.5 * self.loss_D_weights[i]
-        for i in range(0, self.mod_gen_no):
+        for i in range(0, self.seg_gen_no):
             self.loss_D += (self.loss_DS_fake[i] + self.loss_DS_real[i]) * 0.5 * self.loss_DS_weights[i]
 
         self.loss_D.backward()
@@ -222,7 +224,7 @@ class DeepLIIFModel(BaseModel):
             pred_fake.append(self.netD[i](torch.cat((self.real_A, self.fake_B[i]), 1)))
 
         pred_fake_s = []
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netDS[i]:
                 pred_fake_s.append(self.netDS[i](torch.cat((self.real_concatenated[i], self.fake_BS[i]), 1)))
 
@@ -231,7 +233,7 @@ class DeepLIIFModel(BaseModel):
         self.loss_GS_GAN = []
         for i in range(self.mod_gen_no):
             self.loss_G_GAN.append(self.criterionGAN_mod(pred_fake[i], True))
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             self.loss_GS_GAN.append(self.criterionGAN_mod(pred_fake_s[i], True))
 
         # Second, G(A) = B
@@ -239,7 +241,7 @@ class DeepLIIFModel(BaseModel):
         self.loss_GS_L1 = []
         for i in range(self.mod_gen_no):
             self.loss_G_L1.append(self.criterionSmoothL1(self.fake_B[i], self.real_B[i]) * self.opt.lambda_L1)
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             self.loss_GS_L1.append(self.criterionSmoothL1(self.fake_BS[i], self.real_BS[i]) * self.opt.lambda_L1)
 
         self.loss_G_VGG = []
@@ -250,7 +252,7 @@ class DeepLIIFModel(BaseModel):
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
             self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
-        for i in range(0, self.mod_gen_no):
+        for i in range(0, self.seg_gen_no):
             self.loss_G += (self.loss_GS_GAN[i] + self.loss_GS_L1[i]) * self.loss_GS_weights[i]
         self.loss_G.backward()
 
@@ -259,7 +261,7 @@ class DeepLIIFModel(BaseModel):
         # update D
         for i in range(self.mod_gen_no):
             self.set_requires_grad(self.netD[i], True)  # enable backprop for D1
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netDS[i]:
                 self.set_requires_grad(self.netDS[i], True)
 
@@ -270,7 +272,7 @@ class DeepLIIFModel(BaseModel):
         # update G
         for i in range(self.mod_gen_no):
             self.set_requires_grad(self.netD[i], False)
-        for i in range(self.mod_gen_no):
+        for i in range(self.seg_gen_no):
             if self.netDS[i]:
                 self.set_requires_grad(self.netDS[i], False)
 
