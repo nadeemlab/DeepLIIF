@@ -122,6 +122,7 @@ def load_eager_models(model_dir, devices):
     use_dropout = True
     padding_type = 'zero'
     modalities_no = 4
+    seg_gen = True
 
     param_dict = read_train_options(model_dir)
     if param_dict:
@@ -132,6 +133,7 @@ def load_eager_models(model_dir, devices):
         use_dropout = False if param_dict['no_dropout'] == 'True' else True
         padding_type = param_dict['padding']
         modalities_no = int(param_dict['modalities_no'])
+        seg_gen = (param_dict['seg_gen'] == 'True')
     # print(param_dict)
     param_dict['gpu_ids'] = 0
     norm_layer = get_norm_layer(norm_type=norm)
@@ -146,15 +148,16 @@ def load_eager_models(model_dir, devices):
         ))
         nets[n] = net
 
-    for i in range(1, modalities_no + 1):
-        n = 'GS_' + str(i)
-        net = UnetGenerator(input_nc * 3, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-        net.eval()
-        net.load_state_dict(torch.load(
-            os.path.join(model_dir, f'latest_net_{n}.pth'),
-            map_location=devices[n]
-        ))
-        nets[n] = net
+    if seg_gen:
+        for i in range(1, modalities_no + 1):
+            n = 'GS_' + str(i)
+            net = UnetGenerator(input_nc * 3, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+            net.eval()
+            net.load_state_dict(torch.load(
+                os.path.join(model_dir, f'latest_net_{n}.pth'),
+                map_location=devices[n]
+            ))
+            nets[n] = net
 
     return nets
 
@@ -167,9 +170,13 @@ def init_nets(model_dir, eager_mode=False):
     """
     param_dict = read_train_options(model_dir)
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+    seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
     net_groups = []
     for i in range(1, modalities_no + 1):
-        net_groups.append(('G_' + str(i), 'GS_' + str(i)))
+        if seg_gen:
+            net_groups.append(('G_' + str(i), 'GS_' + str(i)))
+        else:
+            net_groups.append(('G_' + str(i),))
     # net_groups.append(('GS_1',))
 
     number_of_gpus = torch.cuda.device_count()
@@ -219,6 +226,7 @@ def run_dask(img, model_path, param_dict):
     nets = init_nets(model_dir)
 
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+    seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
     # seg_weights = list(map(float, param_dict['seg_weights'])) if param_dict else [1 / 3] * (modalities_no + 1)
 
     ts = transform(img.resize((512, 512)))
@@ -237,17 +245,18 @@ def run_dask(img, model_path, param_dict):
     gens = compute(lazy_gens)[0]
     res = {k: tensor_to_pil(v) for k, v in gens.items()}
 
-    lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-    # lazy_segs['GS_1'] = forward(ts, nets['GS_1']).to(torch.device('cpu'))
-    segs = compute(lazy_segs)[0]
-    res.update({k: tensor_to_pil(v) for k, v in segs.items()})
-    # res['GS_1'] = tensor_to_pil(segs.values()[0])
-    # res['GS_2'] = tensor_to_pil(segs.values()[1])
-    # for i in range(1, modalities_no + 1):
-    #     seg = torch.stack([torch.mul(segs.values()[0], seg_weights[0]),
-    #                             torch.mul(segs.values()[1], seg_weights[1]),
-    #                             torch.mul(segs.values()[i], seg_weights[i])]).sum(dim=0)
-    #     res['GS_' + str(i + 1)] = tensor_to_pil(seg)
+    if seg_gen:
+        lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+        # lazy_segs['GS_1'] = forward(ts, nets['GS_1']).to(torch.device('cpu'))
+        segs = compute(lazy_segs)[0]
+        res.update({k: tensor_to_pil(v) for k, v in segs.items()})
+        # res['GS_1'] = tensor_to_pil(segs.values()[0])
+        # res['GS_2'] = tensor_to_pil(segs.values()[1])
+        # for i in range(1, modalities_no + 1):
+        #     seg = torch.stack([torch.mul(segs.values()[0], seg_weights[0]),
+        #                             torch.mul(segs.values()[1], seg_weights[1]),
+        #                             torch.mul(segs.values()[i], seg_weights[i])]).sum(dim=0)
+        #     res['GS_' + str(i + 1)] = tensor_to_pil(seg)
 
     return res
 
@@ -270,6 +279,7 @@ def run_wrapper(tile, run_fn, model_path, param_dict):
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
     param_dict = read_train_options(model_path)
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+    seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
 
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
@@ -284,8 +294,9 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
     for i in range(1, modalities_no + 1):
         images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize(img.size)
 
-    for i in range(1, modalities_no + 1):
-        images['Seg' + str(i)] = stitch(get_net_tiles('GS_' + str(i)), tile_size, overlap_size).resize(img.size)
+    if seg_gen:
+        for i in range(1, modalities_no + 1):
+            images['Seg' + str(i)] = stitch(get_net_tiles('GS_' + str(i)), tile_size, overlap_size).resize(img.size)
 
     return images
 

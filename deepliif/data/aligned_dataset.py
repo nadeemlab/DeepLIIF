@@ -27,6 +27,7 @@ class AlignedDataset(BaseDataset):
         self.output_nc = opt.input_nc if opt.direction == 'BtoA' else opt.output_nc
         self.no_flip = opt.no_flip
         self.modalities_no = opt.modalities_no
+        self.seg_gen = opt.seg_gen
         self.load_size = opt.load_size
         self.crop_size = opt.crop_size
 
@@ -48,7 +49,7 @@ class AlignedDataset(BaseDataset):
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size
-        w2 = int(w / (self.modalities_no * 2 + 1))
+        w2 = int(w / (self.modalities_no * 2 + 1)) if self.seg_gen else int(w / (self.modalities_no + 1))
         A = AB.crop((0, 0, w2, h))
 
         # apply the same transform to both A and B
@@ -64,10 +65,11 @@ class AlignedDataset(BaseDataset):
             B_Array.append(B)
 
         BS_Array = []
-        for i in range(self.modalities_no + 1, self.modalities_no * 2 + 1):
-            BS = AB.crop((w2 * i, 0, w2 * (i + 1), h))
-            BS = B_transform(BS)
-            BS_Array.append(BS)
+        if self.seg_gen:
+            for i in range(self.modalities_no + 1, self.modalities_no * 2 + 1):
+                BS = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+                BS = B_transform(BS)
+                BS_Array.append(BS)
 
         return {'A': A, 'B': B_Array, 'BS': BS_Array,'A_paths': AB_path, 'B_paths': AB_path}
 
