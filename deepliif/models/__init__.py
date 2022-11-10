@@ -30,7 +30,7 @@ from PIL import Image
 import numpy as np
 from dask import delayed, compute
 
-from deepliif.util import generate_tiles, stitch, Tile, chunker
+from deepliif.util import *
 from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
@@ -263,6 +263,8 @@ def run_dask(img, model_path, param_dict):
 
 def is_empty(tile):
     return True if np.mean(np.array(tile)) > 240 else False
+    # return True if np.mean(np.array(tile) - np.array(mean_background_val)) < 40 else False
+    # return True if calculate_background_area(tile) > 98 else False
 
 
 def run_wrapper(tile, run_fn, model_path, param_dict):
