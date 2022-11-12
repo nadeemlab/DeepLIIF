@@ -59,6 +59,7 @@ coverage.xml
 
 # Django stuff:
 *.log
+*.out
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -135,3 +136,12 @@ dmypy.json
 /checkpoints/
 /model-server/
 /results/*
+
+**/.ipynb_checkpoints/*
+**/.virtual_documents/*
+assets/.METADATA/job_run.*
+assets/job_run
+cover/
+.pybuilder/
+.pytype/
+cython_debug/

@@ -324,3 +324,74 @@ def postprocess(img, images, thresh=80, noise_objects_size=20, small_object_size
             }
 
     return processed_images, scoring
+
+
+def infer_modalities(img, tile_size, model_dir):
+    """
+    This function is used to infer modalities for the given image using a trained model.
+    :param img: The input image.
+    :param tile_size: The tile size.
+    :param model_dir: The directory containing serialized model files.
+    :return: The inferred modalities and the segmentation mask.
+    """
+    if not tile_size:
+        tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
+                                      img.convert('L'))
+    tile_size = int(tile_size)
+
+    images = inference(
+        img,
+        tile_size=tile_size,
+        overlap_size=compute_overlap(img.size, tile_size),
+        model_path=model_dir
+    )
+
+    post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)
+    images = {**images, **post_images}
+    return images, scoring
+
+
+def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000):
+    """
+    This function infers modalities and segmentation mask for the given WSI image. It
+
+    :param input_dir: The directory containing the WSI.
+    :param filename: The WSI name.
+    :param output_dir: The directory for saving the inferred modalities.
+    :param model_dir: The directory containing the serialized model files.
+    :param tile_size: The tile size.
+    :param region_size: The size of each individual region to be processed at once.
+    :return:
+    """
+    results_dir = os.path.join(output_dir, filename)
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(os.path.join(input_dir, filename))
+    print(filename, size_x, size_y, size_z, size_c, size_t, pixel_type)
+    results = {}
+    start_x, start_y = 0, 0
+    while start_x < size_x:
+        while start_y < size_y:
+            print(start_x, start_y)
+            region_XYWH = (start_x, start_y, min(region_size, size_x - start_x), min(region_size, size_y - start_y))
+            region = read_bioformats_image_with_reader(os.path.join(input_dir, filename), region=region_XYWH)
+
+            region_modalities, region_scoring = infer_modalities(Image.fromarray((region * 255).astype(np.uint8)), tile_size, model_dir)
+
+            for name, img in region_modalities.items():
+                if name not in results:
+                    results[name] = np.zeros((size_y, size_x, 3), dtype=np.uint8)
+                results[name][region_XYWH[1]: region_XYWH[1] + region_XYWH[3],
+                region_XYWH[0]: region_XYWH[0] + region_XYWH[2]] = np.array(img)
+            start_y += region_size
+        start_y = 0
+        start_x += region_size
+
+    write_results_to_pickle_file(os.path.join(results_dir, "results.pickle"), results)
+    # read_results_from_pickle_file(os.path.join(results_dir, "results.pickle"))
+
+    for name, img in results.items():
+        write_big_tiff_file(os.path.join(results_dir, filename.replace('.svs', '_' + name + '.ome.tiff')), img,
+                            tile_size)
+
+    javabridge.kill_vm()

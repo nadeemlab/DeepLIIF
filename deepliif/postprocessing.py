@@ -152,7 +152,7 @@ def apply_original_image_intensity2(gray, channel, channel2, orig_image_intensit
     return red_image_value.astype(np.uint8)
 
 
-def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=100, noise_objects_size=50):
+def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=100, noise_objects_size=20):
     positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
     negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
 

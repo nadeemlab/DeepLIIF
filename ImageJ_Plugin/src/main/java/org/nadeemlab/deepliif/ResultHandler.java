@@ -35,6 +35,30 @@ public class ResultHandler
     }
 
 
+    public int getNumTotal() throws DeepliifException
+    {
+        try {
+            JSONObject scoring = json.getJSONObject("scoring");
+            return scoring.getInt("num_total");
+        }
+        catch (JSONException e) {
+            throw new DeepliifException("Error in parsing JSON.");
+        }
+    }
+
+
+    public int getNumPos() throws DeepliifException
+    {
+        try {
+            JSONObject scoring = json.getJSONObject("scoring");
+            return scoring.getInt("num_pos");
+        }
+        catch (JSONException e) {
+            throw new DeepliifException("Error in parsing JSON.");
+        }
+    }
+
+
     public String[] getImageNames() throws DeepliifException
     {
         try {
@@ -109,7 +133,7 @@ public class ResultHandler
         String html = "<table>";
         html += "<tr><td>Number of total nuclei:</td><td style=\"text-align: right\">" + numTotal + "</td></tr>";
         html += "<tr><td>Number of IHC+ cells:</td><td style=\"text-align: right\">" + numPos + "</td></tr>";
-        html += "<tr><td>Percentage of IHC+ cells:</td><td style=\"text-align: right\">" + percentPos + " %</td></tr>";
+        html += "<tr><td>Percentage of IHC+ cells:</td><td style=\"text-align: right\">" + String.format("%.1f", percentPos) + " %</td></tr>";
         html += "</table>";
         return html;
     }
