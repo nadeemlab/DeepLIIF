@@ -146,7 +146,7 @@ def load_eager_models(model_dir, devices):
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
         ))
-        nets[n] = net
+        nets[n] = disable_batchnorm_tracking_stats(net)
 
     if seg_gen:
         for i in range(1, modalities_no + 1):
@@ -157,7 +157,7 @@ def load_eager_models(model_dir, devices):
                 os.path.join(model_dir, f'latest_net_{n}.pth'),
                 map_location=devices[n]
             ))
-            nets[n] = net
+            nets[n] = disable_batchnorm_tracking_stats(net)
 
     return nets
 
@@ -188,11 +188,20 @@ def init_nets(model_dir, eager_mode=False):
 
     if eager_mode:
         return load_eager_models(model_dir, devices)
-
-    return {
-        n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
-        for n, d in devices.items()
-    }
+    
+    return {n:disable_batchnorm_tracking_stats(load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)) for n, d in devices.items()}
+    
+    # # disable tracking running stats in batchnorm 
+    # # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/16
+    # d_models = {}
+    # for n, d in devices.items():
+    #     model = load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
+    #     for child in model.children():
+    #         for ii in range(len(child)):
+    #             if type(child[ii])==nn.BatchNorm2d:
+    #                 child[ii].track_running_stats = False
+    #     d_models[n] = model
+    # return d_models
 
 
 def compute_overlap(img_size, tile_size):
@@ -203,7 +212,12 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, param_dict=None):
+def run_torchserve(img, model_path=None, param_dict=None, eager_mode=False):
+    """
+    eager_mode: not used in this function; put in place to be consistent with run_dask
+           so that run_wrapper() could call either this function or run_dask with
+           same syntax
+    """
     buffer = BytesIO()
     torch.save(transform(img.resize((512, 512))), buffer)
 
@@ -221,9 +235,9 @@ def run_torchserve(img, model_path=None, param_dict=None):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path, param_dict):
+def run_dask(img, model_path, param_dict, eager_mode=False):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
-    nets = init_nets(model_dir)
+    nets = init_nets(model_dir, eager_mode)
 
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
     seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
@@ -267,7 +281,7 @@ def is_empty(tile):
     # return True if calculate_background_area(tile) > 98 else False
 
 
-def run_wrapper(tile, run_fn, model_path, param_dict):
+def run_wrapper(tile, run_fn, model_path, param_dict, eager_mode=False):
     if is_empty(tile):
         res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, int(param_dict['modalities_no']) + 1)}
         res.update({
@@ -275,10 +289,10 @@ def run_wrapper(tile, run_fn, model_path, param_dict):
             range(1, int(param_dict['modalities_no']) + 1)})
         return res
     else:
-        return run_fn(tile, model_path, param_dict)
+        return run_fn(tile, model_path, param_dict, eager_mode)
 
 
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
+def inference(img, tile_size, overlap_size, model_path, eager_mode=False, use_torchserve=False):
     param_dict = read_train_options(model_path)
     modalities_no = int(param_dict['modalities_no']) if param_dict else 4
     seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
@@ -286,7 +300,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
-    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, param_dict)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, param_dict, eager_mode)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]

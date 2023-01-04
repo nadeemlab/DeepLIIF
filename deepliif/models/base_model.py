@@ -3,7 +3,7 @@ import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
-
+from ..util import disable_batchnorm_tracking_stats
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
@@ -90,6 +90,7 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
                 net.eval()
+                net = disable_batchnorm_tracking_stats(net)
 
     def test(self):
         """Forward function used in test time.
