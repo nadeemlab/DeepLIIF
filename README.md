@@ -1,12 +1,15 @@
+
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
     <img src="./images/DeepLIIF_logo.png" width="50%">
     <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification</strong></h3>
     <p align="center">
-    <a href="https://doi.org/10.1101/2021.05.01.442219">Preprint</a>
+    <a href="https://doi.org/10.1101/2021.05.01.442219">Journal Preprint</a>
     |
     <a href="https://rdcu.be/cKSBz">Journal Link</a>
+    |
+    <a href="https://openaccess.thecvf.com/content/CVPR2022/html/Ghahremani_DeepLIIF_An_Online_Platform_for_Quantification_of_Clinical_Pathology_Slides_CVPR_2022_paper.html">CVPR Link</a>
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
@@ -32,7 +35,10 @@ expression quantification on IHC slides. By simultaneously translating input IHC
 and performing cell segmentation/classification, we show that our model trained on clean IHC Ki67 data can generalize to 
 more noisy and artifact-ridden images as well as other nuclear and non-nuclear markers such as CD3, CD8, BCL2, BCL6, 
 MYC, MUM1, CD10, and TP53. We thoroughly evaluate our method on publicly available benchmark datasets as well as against 
-pathologists' semi-quantitative scoring.*
+pathologists' semi-quantitative scoring. Trained on IHC, DeepLIIF generalizes well to H&E images for out-of-the-box nuclear 
+segmentation.*
+
+**DeepLIIF** is deployed as a free publicly available cloud-native platform (https://deepliif.org) with Bioformats (more than 150 input formats supported) and MLOps pipeline. We also release **DeepLIIF** implementations for single/multi-GPU training, Torchserve/Dask+Torchscript deployment, and auto-scaling via Pulumi (1000s of concurrent connections supported); details can be found in our [documentation](https://nadeemlab.github.io/DeepLIIF/). **DeepLIIF** can be run locally (GPU required) by [pip installing the package](https://github.com/nadeemlab/DeepLIIF/edit/main/README.md#installing-deepliif) and using the deepliif CLI command. **DeepLIIF** can be used remotely (no GPU required) through the https://deepliif.org website, calling the [cloud API via Python](https://github.com/nadeemlab/DeepLIIF/edit/main/README.md#cloud-deployment), or via the [ImageJ/Fiji plugin](https://github.com/nadeemlab/DeepLIIF/edit/main/README.md#imagej-plugin); details for the free cloud-native platform can be found in our [CVPR'22 paper](https://arxiv.org/pdf/2204.04494.pdf).
 
 © This code is made available for non-commercial academic purposes.
 
@@ -55,9 +61,10 @@ to noisier as well as other IHC nuclear/cytoplasmic marker images.*
 
 DeepLIIF can be `pip` installed:
 ```shell
-$ python3.8 -m venv venv
-$ source venv/bin/activate
-(venv) $ pip install git+https://github.com/nadeemlab/DeepLIIF.git
+$ conda create --name deepliif_env python=3.8
+$ conda activate deepliif_env
+(deepliif_env) $ conda install -c conda-forge openjdk
+(deepliif_env) $ pip install deepliif
 ```
 
 The package is composed of two parts:
@@ -182,6 +189,23 @@ python test.py --dataroot /path/to/input/images
 * The default tile size is 512.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
+**Whole Slide Image (WSI) Inference:**  
+For translation and segmentation of whole slide images, 
+you can simply use the same test command 
+giving path to the directory containing your whole slide images as the input-dir.
+DeepLIIF automatically reads the WSI region by region, 
+and translate and segment each region separately and stitches the regions 
+to create the translation and segmentation for whole slide image, 
+then saves all masks in the format of ome.tiff in the given output-dir. 
+Based on the available GPU resources, the region-size can be changed.
+```
+deepliif test --input-dir /path/to/input/images 
+              --output-dir /path/to/output/images 
+              --model-dir path/to/the/serialized/model
+              --tile-size 512
+              --region-size 20000
+```
+
 If you prefer, it is possible to run the models using Torchserve.
 Please see [the documentation](https://nadeemlab.github.io/DeepLIIF/deployment/#deploying-deepliif-with-torchserve)
 on how to deploy the model with Torchserve and for an example of how to run the inference.
@@ -210,10 +234,14 @@ If you don't have access to GPU or appropriate hardware and just want to use Ima
 
 ![DeepLIIF ImageJ Demo](images/deepliif-imagej-demo.gif)
 
+The plugin also supports submitting multiple ROIs at once:
+
+![DeepLIIF ImageJ ROI Demo](images/deepliif-imagej-roi-demo.gif)
+
 ## Cloud Deployment
 If you don't have access to GPU or appropriate hardware and don't want to install ImageJ, we have also created a [cloud-native DeepLIIF deployment](https://deepliif.org) with a user-friendly interface to upload images, visualize, interact, and download the final results.
 
-![DeepLIIF Website Demo](images/deepliif-website-demo-02a.gif)
+![DeepLIIF Website Demo](images/deepliif-website-demo-03.gif)
 
 DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request
 containing the original image file:
@@ -308,9 +336,9 @@ directory. Please refer to the README file provided in the same directory for mo
 ## Contributing Training Data
 To train DeepLIIF, we used a dataset of lung and bladder tissues containing IHC, hematoxylin, mpIF DAPI, mpIF Lap2, and 
 mpIF Ki67 of the same tissue scanned using ZEISS Axioscan. These images were scaled and co-registered with the fixed IHC 
-images using affine transformations, resulting in 1667 co-registered sets of IHC and corresponding multiplex images of 
-size 512x512. We randomly selected 709 sets for training, 358 sets for validation, and 600 sets for testing the model. 
-We also randomly selected and segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) 
+images using affine transformations, resulting in 1264 co-registered sets of IHC and corresponding multiplex images of 
+size 512x512. We randomly selected 575 sets for training, 91 sets for validation, and 598 sets for testing the model. 
+We also randomly selected and manually segmented 41 images of size 640x640 from recently released [BCDataset](https://sites.google.com/view/bcdataset) 
 which contains Ki67 stained sections of breast carcinoma with Ki67+ and Ki67- cell centroid annotations (for cell 
 detection rather than cell instance segmentation task). We split these tiles into 164 images of size 512x512; the test 
 set varies widely in the density of tumor cells and the Ki67 index. You can find this dataset [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
@@ -336,17 +364,22 @@ and is available for non-commercial academic purposes.
 ## Reference
 If you find our work useful in your research or if you use parts of this code, please cite our paper:
 ```
-@article{ghahremani2022deepliif,
-  title={Deep Learning-Inferred Multiplex ImmunoFluorescence for Immunohistochemical Image Quantification},
+@article{ghahremani2022deep,
+  title={Deep learning-inferred multiplex immunofluorescence for immunohistochemical image quantification},
   author={Ghahremani, Parmida and Li, Yanyun and Kaufman, Arie and Vanguri, Rami and Greenwald, Noah and Angelo, Michael and Hollmann, Travis J and Nadeem, Saad},
   journal={Nature Machine Intelligence},
-  year={2022}
+  volume={4},
+  number={4},
+  pages={401--412},
+  year={2022},
+  publisher={Nature Publishing Group}
 }
 
 @article{ghahremani2022deepliifui,
   title={DeepLIIF: An Online Platform for Quantification of Clinical Pathology Slides},
   author={Ghahremani, Parmida and Marino, Joseph and Dodds, Ricardo and Nadeem, Saad},
-  journal={CVPR},
+  journal={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages={21399--21405},
   year={2022}
 }
 

@@ -10,9 +10,11 @@ import numpy as np
 from PIL import Image
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
-from deepliif.util import allowed_file, Visualizer, read_input_image
-from deepliif.util.util import mkdirs
+from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi
+from deepliif.util import allowed_file, Visualizer, read_input_image, get_information
+from deepliif.util.util import mkdirs, check_multi_scale
+# from deepliif.util import infer_results_for_wsi
+
 
 import torch.distributed as dist
 
@@ -20,6 +22,8 @@ from packaging import version
 import subprocess
 import sys
 import shutil
+
+import pickle
 
 
 def set_seed(seed=0,rank=None):
@@ -56,7 +60,6 @@ def set_seed(seed=0,rank=None):
 def ensure_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
-
 
 def print_options(opt):
     """Print and save options
@@ -495,14 +498,18 @@ def serialize(models_dir, output_dir):
             else:
                 traced_net = torch.jit.trace(net, sample)
             traced_net.save(f'{output_dir}/{name}.pt')
-
+         
 
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', default=512, help='tile size')
+@click.option('--tile-size', required=True, type=int, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
-def test(input_dir, output_dir, tile_size, model_dir):
+@click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
+                                                   'So the WSI image is read region by region. '
+                                                   'This parameter specifies the size each region to be read into GPU for inferrence.')
+def test(input_dir, output_dir, tile_size, model_dir, region_size):
+    
     """Test trained models
     """
     output_dir = output_dir or input_dir
@@ -516,30 +523,34 @@ def test(input_dir, output_dir, tile_size, model_dir):
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+            if '.svs' in filename:
+                start_time = time.time()
+                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size)
+                print(time.time() - start_time)
+            else:
+                img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
 
-            images = inference(
-                img,
-                tile_size=tile_size,
-                overlap_size=compute_overlap(img.size, tile_size),
-                model_path=model_dir
-            )
+                images = inference(
+                    img,
+                    tile_size=tile_size,
+                    overlap_size=compute_overlap(img.size, tile_size),
+                    model_path=model_dir
+                )
 
-            post_images, scoring = postprocess(img, images)
-            images = {**images, **post_images}
+                post_images, scoring = postprocess(img, images)
+                images = {**images, **post_images}
 
-            for name, i in images.items():
-                i.save(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                ))
+                for name, i in images.items():
+                    i.save(os.path.join(
+                        output_dir,
+                        filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+                    ))
 
-            with open(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'.json')
-            ), 'w') as f:
-                json.dump(scoring, f, indent=2)
-
+                with open(os.path.join(
+                        output_dir,
+                        filename.replace('.' + filename.split('.')[-1], f'.json')
+                ), 'w') as f:
+                    json.dump(scoring, f, indent=2)
 
 @cli.command()
 @click.option('--input-dir', type=str, required=True, help='Path to input images')
@@ -609,10 +620,18 @@ def prepare_testing_data(input_dir, dataset_dir):
             cv2.imwrite(os.path.join(test_dir, img), np.concatenate([image, image, image, image, image, image], 1))
 
 
+# to load pickle file saved from gpu in a cpu environment: https://github.com/pytorch/pytorch/issues/16797#issuecomment-633423219
+from io import BytesIO
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
+
+
 @cli.command()
 @click.option('--pickle-dir', required=True, help='directory where the pickled snapshots are stored')
 def visualize(pickle_dir):
-    import pickle
 
     path_init = os.path.join(pickle_dir,'opt.pickle')
     print(f'waiting for initialization signal from {path_init}')
@@ -620,8 +639,8 @@ def visualize(pickle_dir):
         time.sleep(1)
 
     params_opt = pickle.load(open(path_init,'rb'))
-    params_opt['remote'] = False
-    visualizer = Visualizer(**params_opt)   # create a visualizer that display/save images and plots
+    params_opt.remote = False
+    visualizer = Visualizer(params_opt)   # create a visualizer that display/save images and plots
 
     paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
                 'plot_current_losses':os.path.join(pickle_dir,'plot_current_losses.pickle')}
@@ -633,7 +652,7 @@ def visualize(pickle_dir):
             try:
                 last_modified_time_plot = os.path.getmtime(path_plot)
                 if last_modified_time_plot > last_modified_time[method]:
-                    params_plot = pickle.load(open(path_plot,'rb'))
+                    params_plot = CPU_Unpickler(open(path_plot,'rb')).load()
                     last_modified_time[method] = last_modified_time_plot
                     getattr(visualizer,method)(**params_plot)
                     print(f'{method} refreshed, last modified time {time.ctime(last_modified_time[method])}')
