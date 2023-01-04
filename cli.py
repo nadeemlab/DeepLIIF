@@ -532,7 +532,10 @@ def serialize(models_dir, output_dir, device, verbose):
         print(name,':')
         model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
         model_serialized = models_serialized[name].cuda() if device=='gpu' else models_serialized[name].cpu().eval()
-        test_diff_original_serialized(model_original,model_serialized,sample,verbose)
+        if name.startswith('GS'):
+            test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
+        else:
+            test_diff_original_serialized(model_original,model_serialized,sample,verbose)
         print('PASS')
 
 
