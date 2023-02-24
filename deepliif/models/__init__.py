@@ -185,7 +185,12 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None):
+def run_torchserve(img, model_path=None, eager_mode=False):
+    """
+    eager_mode: not used in this function; put in place to be consistent with run_dask
+           so that run_wrapper() could call either this function or run_dask with
+           same syntax
+    """
     buffer = BytesIO()
     torch.save(transform(img.resize((512, 512))), buffer)
 
@@ -203,9 +208,9 @@ def run_torchserve(img, model_path=None):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path):
+def run_dask(img, model_path, eager_mode=False):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
-    nets = init_nets(model_dir)
+    nets = init_nets(model_dir, eager_mode)
 
     ts = transform(img.resize((512, 512)))
 
@@ -237,7 +242,7 @@ def is_empty(tile):
     return True if calculate_background_area(tile) > 98 else False
 
 
-def run_wrapper(tile, run_fn, model_path):
+def run_wrapper(tile, run_fn, model_path, eager_mode=False):
     if is_empty(tile):
         return {
             'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
@@ -247,17 +252,17 @@ def run_wrapper(tile, run_fn, model_path):
             'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
         }
     else:
-        return run_fn(tile, model_path)
+        return run_fn(tile, model_path, eager_mode)
 
 
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False):
+def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False):
 
     
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
     run_fn = run_torchserve if use_torchserve else run_dask
     # res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
-    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, eager_mode)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
@@ -312,7 +317,7 @@ def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_siz
     return images, scoring
 
 
-def infer_modalities(img, tile_size, model_dir):
+def infer_modalities(img, tile_size, model_dir, eager_mode=False):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -329,7 +334,8 @@ def infer_modalities(img, tile_size, model_dir):
         img,
         tile_size=tile_size,
         overlap_size=compute_overlap(img.size, tile_size),
-        model_path=model_dir
+        model_path=model_dir,
+        eager_mode=eager_mode
     )
 
     post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)

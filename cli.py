@@ -486,7 +486,8 @@ def serialize(models_dir, output_dir):
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
-def test(input_dir, output_dir, tile_size, model_dir, region_size):
+@click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
+def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode):
     
     """Test trained models
     """
@@ -507,7 +508,7 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size):
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir)
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode)
 
                 for name, i in images.items():
                     i.save(os.path.join(
