@@ -349,3 +349,39 @@ def read_results_from_pickle_file(input_addr):
     pickle_obj.close()
     return results
 
+def test_diff_original_serialized(model_original,model_serialized,example,verbose=0):
+    threshold = 10
+
+    orig_res = model_original(example)
+    if verbose > 0:
+        print('Original:')
+        print(orig_res.shape)
+        print(orig_res[0, 0:10])
+        print('min abs value:{}'.format(torch.min(torch.abs(orig_res))))
+
+    ts_res = model_serialized(example)
+    if verbose > 0:
+        print('Torchscript:')
+        print(ts_res.shape)
+        print(ts_res[0, 0:10])
+        print('min abs value:{}'.format(torch.min(torch.abs(ts_res))))
+
+    abs_diff = torch.abs(orig_res-ts_res)
+    if verbose > 0:
+        print('Dif sum:')
+        print(torch.sum(abs_diff))
+        print('max dif:{}'.format(torch.max(abs_diff)))
+
+    assert torch.sum(abs_diff) <= threshold, f"Sum of difference in predicted values {torch.sum(abs_diff)} is larger than threshold {threshold}"
+
+def disable_batchnorm_tracking_stats(model):
+    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/16
+    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/67
+    # https://github.com/pytorch/pytorch/blob/ca39c5b04e30a67512589cafbd9d063cc17168a5/torch/nn/modules/batchnorm.py#L158
+    for m in model.modules():
+        for child in m.children():
+            if type(child) == torch.nn.BatchNorm2d:
+                child.track_running_stats = False
+                child.running_mean = None
+                child.running_var = None
+    return model

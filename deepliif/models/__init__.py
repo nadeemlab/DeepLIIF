@@ -88,7 +88,10 @@ def create_model(opt):
 
 
 def load_torchscript_model(model_pt_path, device):
-    return torch.jit.load(model_pt_path, map_location=device)
+    net = torch.jit.load(model_pt_path, map_location=device)
+    net = disable_batchnorm_tracking_stats(net)
+    net.eval()
+    return net
 
 
 def read_model_params(file_addr):
@@ -132,7 +135,8 @@ def load_eager_models(model_dir, devices):
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
         ))
-        nets[n] = net
+        nets[n] = disable_batchnorm_tracking_stats(net)
+        nets[n].eval()
 
     for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
@@ -140,7 +144,8 @@ def load_eager_models(model_dir, devices):
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
         ))
-        nets[n] = net
+        nets[n] = disable_batchnorm_tracking_stats(net)
+        nets[n].eval()
 
     return nets
 
@@ -255,7 +260,8 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False):
         return run_fn(tile, model_path, eager_mode)
 
 
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False):
+def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
+              color_dapi=False, color_marker=False):
 
     
     tiles = list(generate_tiles(img, tile_size, overlap_size))
@@ -281,12 +287,14 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
 
     images['DAPI'] = stitch(get_net_tiles('G2'), tile_size, overlap_size).resize(img.size)
     dapi_pix = np.array(images['DAPI'].convert('L').convert('RGB'))
-    dapi_pix[:, :, 0] = 0
+    if color_dapi:
+      dapi_pix[:, :, 0] = 0
     images['DAPI'] = Image.fromarray(dapi_pix)
     images['Lap2'] = stitch(get_net_tiles('G3'), tile_size, overlap_size).resize(img.size)
     images['Marker'] = stitch(get_net_tiles('G4'), tile_size, overlap_size).resize(img.size)
     marker_pix = np.array(images['Marker'].convert('L').convert('RGB'))
-    marker_pix[:, :, 2] = 0
+    if color_marker:
+      marker_pix[:, :, 2] = 0
     images['Marker'] = Image.fromarray(marker_pix)
 
     # images['Marker'] = stitch(
@@ -317,7 +325,8 @@ def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_siz
     return images, scoring
 
 
-def infer_modalities(img, tile_size, model_dir, eager_mode=False):
+def infer_modalities(img, tile_size, model_dir, eager_mode=False,
+                     color_dapi=False, color_marker=False):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -335,7 +344,9 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False):
         tile_size=tile_size,
         overlap_size=compute_overlap(img.size, tile_size),
         model_path=model_dir,
-        eager_mode=eager_mode
+        eager_mode=eager_mode,
+        color_dapi=color_dapi,
+        color_marker=color_marker
     )
 
     post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)

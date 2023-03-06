@@ -11,7 +11,7 @@ from PIL import Image
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi
-from deepliif.util import allowed_file, Visualizer, get_information
+from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi
 
@@ -461,21 +461,51 @@ def trainlaunch(**kwargs):
 @cli.command()
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
-def serialize(models_dir, output_dir):
+@click.option('--device', default='cpu', type=str, help='device to load model, either cpu or gpu')
+@click.option('--verbose', default=0, type=int,help='saves results here.')
+def serialize(models_dir, output_dir, device, verbose):
     """Serialize DeepLIIF models using Torchscript
     """
     output_dir = output_dir or models_dir
+    ensure_exists(output_dir)
 
     sample = transform(Image.new('RGB', (512, 512)))
-
+    
     with click.progressbar(
             init_nets(models_dir, eager_mode=True).items(),
             label='Tracing nets',
             item_show_func=lambda n: n[0] if n else n
     ) as bar:
         for name, net in bar:
-            traced_net = torch.jit.trace(net, sample)
+            # the model should be in eval model so that there won't be randomness in tracking brought by dropout etc. layers
+            # https://github.com/pytorch/pytorch/issues/23999#issuecomment-747832122
+            net = net.eval()
+            net = disable_batchnorm_tracking_stats(net)
+            net = net.cpu()
+            if name.startswith('GS'):
+                traced_net = torch.jit.trace(net, torch.cat([sample, sample, sample], 1))
+            else:
+                traced_net = torch.jit.trace(net, sample)
+                # traced_net = torch.jit.script(net)
             traced_net.save(f'{output_dir}/{name}.pt')
+    
+    # test: whether the original and the serialized model produces highly similar predictions
+    print('testing similarity between prediction from original vs serialized models...')
+    models_original = init_nets(models_dir,eager_mode=True)
+    models_serialized = init_nets(output_dir,eager_mode=False)
+    if device == 'gpu':
+        sample = sample.cuda()
+    else:
+        sample = sample.cpu()
+    for name in models_serialized.keys():
+        print(name,':')
+        model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
+        model_serialized = models_serialized[name].cuda() if device=='gpu' else models_serialized[name].cpu().eval()
+        if name.startswith('GS'):
+            test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
+        else:
+            test_diff_original_serialized(model_original,model_serialized,sample,verbose)
+        print('PASS')
          
 
 @cli.command()
@@ -486,8 +516,11 @@ def serialize(models_dir, output_dir):
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
-@click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
-def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode):
+@click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones')
+@click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
+@click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
+def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
+         color_dapi, color_marker):
     
     """Test trained models
     """
@@ -508,7 +541,7 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode):
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode)
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker)
 
                 for name, i in images.items():
                     i.save(os.path.join(
