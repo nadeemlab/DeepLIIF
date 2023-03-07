@@ -40,7 +40,9 @@ if __name__ == '__main__':
     
     # retrieve options used in training setting, similar to 
     # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/__init__.py#L115
-    model_dir = opt.checkpoints_dir
+    # model_dir in init_nets() is equivalent to save_dir in basemodel init
+    # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/base_model.py#L36
+    model_dir = os.path.join(opt.checkpoints_dir, opt.name)
     files = os.listdir(model_dir)
     for f in files:
         if 'train_opt.txt' in f:
