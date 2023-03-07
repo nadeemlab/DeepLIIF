@@ -30,13 +30,31 @@ import os
 import time
 from deepliif.options.test_options import TestOptions
 from deepliif.data import create_dataset
-from deepliif.models import create_model
+from deepliif.models import create_model, read_model_params
 from deepliif.util.visualizer import save_images
 from deepliif.util import html
 
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
+    
+    # retrieve options used in training setting, similar to 
+    # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/__init__.py#L115
+    # model_dir in init_nets() is equivalent to save_dir in basemodel init
+    # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/base_model.py#L36
+    model_dir = os.path.join(opt.checkpoints_dir, opt.name)
+    files = os.listdir(model_dir)
+    for f in files:
+        if 'train_opt.txt' in f:
+            param_dict = read_model_params(os.path.join(model_dir, f))
+            opt.input_nc = int(param_dict['input_nc'])
+            opt.output_nc = int(param_dict['output_nc'])
+            opt.ngf = int(param_dict['ngf'])
+            opt.norm = param_dict['norm']
+            # opt.use_dropout = False if param_dict['no_dropout'] == 'True' else True # in DeepLIIFModel(), the option used is opt.no_dropout not opt.use_dropout
+            # opt.padding_type = param_dict['padding'] # in DeepLIIFModel(), the option used is opt.padding not opt.padding_type
+            opt.padding = param_dict['padding'] 
+    
     # hard-code some parameters for test
     opt.num_threads = 0   # test code only supports num_threads = 1
     opt.batch_size = 1    # test code only supports batch_size = 1
@@ -55,8 +73,9 @@ if __name__ == '__main__':
     # test with eval mode. This only affects layers like batchnorm and dropout.
     # For [pix2pix]: we use batchnorm and dropout in the original pix2pix. You can experiment it with and without eval() mode.
     # For [CycleGAN]: It should not affect CycleGAN as CycleGAN uses instancenorm without dropout.
-    if opt.eval:
-        model.eval()
+    model.eval()
+    # if opt.eval:
+    #     model.eval()
 
     _start_time = time.time()
 
