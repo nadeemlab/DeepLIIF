@@ -516,7 +516,7 @@ def serialize(models_dir, output_dir, device, verbose):
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
-@click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones')
+@click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
 def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
