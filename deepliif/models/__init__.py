@@ -260,9 +260,8 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False):
         return run_fn(tile, model_path, eager_mode)
 
 
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
-              color_dapi=False, color_marker=False):
-
+def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
+                  color_dapi=False, color_marker=False):
     
     tiles = list(generate_tiles(img, tile_size, overlap_size))
 
@@ -303,6 +302,52 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
     #     tile_size, overlap_size).resize(img.size)
 
     images['Seg'] = stitch(get_net_tiles('G5'), tile_size, overlap_size).resize(img.size)
+
+    return images
+
+
+def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
+              color_dapi=False, color_marker=False):
+
+    rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
+
+    run_fn = run_torchserve if use_torchserve else run_dask
+
+    images = {}
+    images['Hema'] = create_image_for_stitching(tile_size, rows, cols)
+    images['DAPI'] = create_image_for_stitching(tile_size, rows, cols)
+    images['Lap2'] = create_image_for_stitching(tile_size, rows, cols)
+    images['Marker'] = create_image_for_stitching(tile_size, rows, cols)
+    images['Seg'] = create_image_for_stitching(tile_size, rows, cols)
+
+    for i in range(cols):
+        for j in range(rows):
+            tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
+            res = run_fn(tile, model_path, eager_mode)
+
+            stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
+            stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
+            stitch_tile(images['Lap2'], res['G3'], tile_size, overlap_size, i, j)
+            stitch_tile(images['Marker'], res['G4'], tile_size, overlap_size, i, j)
+            stitch_tile(images['Seg'], res['G5'], tile_size, overlap_size, i, j)
+
+    images['Hema'] = images['Hema'].resize(img.size)
+    images['DAPI'] = images['DAPI'].resize(img.size)
+    images['Lap2'] = images['Lap2'].resize(img.size)
+    images['Marker'] = images['Marker'].resize(img.size)
+    images['Seg'] = images['Seg'].resize(img.size)
+
+    if color_dapi:
+        matrix = (       0,        0,        0, 0,
+                  299/1000, 587/1000, 114/1000, 0,
+                  299/1000, 587/1000, 114/1000, 0)
+        images['DAPI'] = images['DAPI'].convert('RGB', matrix)
+
+    if color_marker:
+        matrix = (299/1000, 587/1000, 114/1000, 0,
+                  299/1000, 587/1000, 114/1000, 0,
+                         0,        0,        0, 0)
+        images['Marker'] = images['Marker'].convert('RGB', matrix)
 
     return images
 

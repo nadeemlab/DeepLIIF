@@ -88,6 +88,36 @@ def stitch(tiles, tile_size, overlap_size):
     return new_im
 
 
+def format_image_for_tiling(img, tile_size, overlap_size):
+    mean_background_val = calculate_background_mean_value(img)
+    img = img.resize(output_size(img, tile_size))
+    # Adding borders with size of given overlap around the whole slide image
+    img = ImageOps.expand(img, border=overlap_size, fill=tuple(mean_background_val))
+    rows = int(img.height / tile_size)
+    cols = int(img.width / tile_size)
+    return img, rows, cols
+
+
+def extract_tile(img, tile_size, overlap_size, i, j):
+    return img.crop((
+        i * tile_size, j * tile_size,
+        i * tile_size + tile_size + 2 * overlap_size,
+        j * tile_size + tile_size + 2 * overlap_size
+    ))
+
+
+def create_image_for_stitching(tile_size, rows, cols):
+    width = tile_size * cols
+    height = tile_size * rows
+    return Image.new('RGB', (width, height))
+
+
+def stitch_tile(img, tile, tile_size, overlap_size, i, j):
+    tile = tile.resize((tile_size + 2 * overlap_size, tile_size + 2 * overlap_size))
+    tile = tile.crop((overlap_size, overlap_size, overlap_size + tile_size, overlap_size + tile_size))
+    img.paste(tile, (i * tile_size, j * tile_size))
+
+
 def calculate_background_mean_value(img):
     img = cv2.fastNlMeansDenoisingColored(np.array(img), None, 10, 10, 7, 21)
     img = np.array(img, dtype=float)
