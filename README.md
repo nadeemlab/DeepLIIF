@@ -5,19 +5,15 @@
     <img src="./images/DeepLIIF_logo.png" width="50%">
     <h3 align="center"><strong>Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification</strong></h3>
     <p align="center">
-    <a href="https://doi.org/10.1101/2021.05.01.442219">Journal Preprint</a>
+    <a href="https://rdcu.be/cKSBz">Nature MI'22 Link</a>
     |
-    <a href="https://rdcu.be/cKSBz">Journal Link</a>
+    <a href="https://openaccess.thecvf.com/content/CVPR2022/html/Ghahremani_DeepLIIF_An_Online_Platform_for_Quantification_of_Clinical_Pathology_Slides_CVPR_2022_paper.html">CVPR'22 Link</a>
     |
-    <a href="https://openaccess.thecvf.com/content/CVPR2022/html/Ghahremani_DeepLIIF_An_Online_Platform_for_Quantification_of_Clinical_Pathology_Slides_CVPR_2022_paper.html">CVPR Link</a>
+    MICCAI'23 link
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
     <a href="https://nadeemlab.github.io/DeepLIIF/">Documentation</a>
-    |
-    <a href="#docker">Docker</a>
-    |
-    <a href="https://github.com/nadeemlab/DeepLIIF/tree/main/ImageJ_Plugin">ImageJ Plugin</a>
     |
     <a href="#support">Support</a>
   </p>
@@ -345,6 +341,9 @@ for the same slide (de novo staining) and would like to contribute that data for
 co-registration, whole-cell multiplex segmentation via [ImPartial](https://github.com/nadeemlab/ImPartial), train the 
 DeepLIIF model and release back to the community with full credit to the contributors.
 
+- [x] **Memorial Sloan Kettering Cancer Center** [AI-ready immunohistochemistry and multiplex immunofluorescence dataset](https://zenodo.org/record/4751737#.YKRTS0NKhH4) for breast, lung, and bladder cancers (**Nature Machine Intelligence'22**)
+- [x] **Moffitt Cancer Center** AI-ready multiplex immunofluorescence and multiplex immunohistochemistry dataset for head-and-neck squamous cell carcinoma (**MICCAI'23**)   
+
 ## Support
 Please use the [Image.sc Forum](https://forum.image.sc/tag/deepliif) for discussion and questions related to DeepLIIF.
 
@@ -358,7 +357,7 @@ and is available for non-commercial academic purposes.
 * This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 
 ## Reference
-If you find our work useful in your research or if you use parts of this code, please cite our paper:
+If you find our work useful in your research or if you use parts of this code or our released dataset, please cite the following papers:
 ```
 @article{ghahremani2022deep,
   title={Deep learning-inferred multiplex immunofluorescence for immunohistochemical image quantification},
@@ -379,4 +378,10 @@ If you find our work useful in your research or if you use parts of this code, p
   year={2022}
 }
 
+@article{ghahremani2023deepliifdataset,
+  title={An AI-Ready Multiplex Staining Dataset for Reproducible and Accurate Characterization of Tumor Immune Microenvironment},
+  author={Ghahremani, Parmida and Marino, Joseph and Hernandez-Prera, Juan and V. de la Iglesia, Janis and JC Slebos, Robbert and H. Chung, Christine and Nadeem, Saad},
+  journal={International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
+  year={2023}
+}
 ```
