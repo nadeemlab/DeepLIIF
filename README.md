@@ -9,7 +9,7 @@
     |
     <a href="https://openaccess.thecvf.com/content/CVPR2022/html/Ghahremani_DeepLIIF_An_Online_Platform_for_Quantification_of_Clinical_Pathology_Slides_CVPR_2022_paper.html">CVPR'22 Link</a>
     |
-    MICCAI'23 link
+    <a href="https://arxiv.org/abs/2305.16465">MICCAI'23 link</a>
     |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
