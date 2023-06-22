@@ -26,8 +26,11 @@ class AlignedDataset(BaseDataset):
         self.output_nc = opt.input_nc if opt.direction == 'BtoA' else opt.output_nc
         self.no_flip = opt.no_flip
         self.targets_no = opt.targets_no
+        self.modalities_no = opt.modalities_no
+        self.seg_gen = opt.seg_gen
         self.load_size = opt.load_size
         self.crop_size = opt.crop_size
+        self.model = opt.model
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -46,7 +49,12 @@ class AlignedDataset(BaseDataset):
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size
-        w2 = int(w / (self.targets_no + 1))
+        if self.model == 'DeepLIIF':
+            w2 = int(w / (self.targets_no + 1))
+        elif self.model == 'DeepLIIFExt':
+            w2 = int(w / (self.modalities_no * 2 + 1)) if self.seg_gen else int(w / (self.modalities_no + 1))
+        else:
+            raise Exception(f'model class {self.model} does not have corresponding implementation in deepliif/data/aligned_dataset.py')
         A = AB.crop((0, 0, w2, h))
 
         # apply the same transform to both A and B
@@ -56,12 +64,30 @@ class AlignedDataset(BaseDataset):
 
         A = A_transform(A)
         B_Array = []
-        for i in range(1, self.targets_no + 1):
-            B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
-            B = B_transform(B)
-            B_Array.append(B)
+        if self.model == 'DeepLIIF':
+            for i in range(1, self.targets_no + 1):
+                B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+                B = B_transform(B)
+                B_Array.append(B)
 
-        return {'A': A, 'B': B_Array, 'A_paths': AB_path, 'B_paths': AB_path}
+            return {'A': A, 'B': B_Array, 'A_paths': AB_path, 'B_paths': AB_path}
+        elif self.model == 'DeepLIIFExt':
+            for i in range(1, self.modalities_no + 1):
+                B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+                B = B_transform(B)
+                B_Array.append(B)
+            
+            BS_Array = []
+            if self.seg_gen:
+                for i in range(self.modalities_no + 1, self.modalities_no * 2 + 1):
+                    BS = AB.crop((w2 * i, 0, w2 * (i + 1), h))
+                    BS = B_transform(BS)
+                    BS_Array.append(BS)
+
+            return {'A': A, 'B': B_Array, 'BS': BS_Array,'A_paths': AB_path, 'B_paths': AB_path}
+        else:
+            raise Exception(f'model class {self.model} does not have corresponding implementation in deepliif/data/aligned_dataset.py')
+        
 
     def __len__(self):
         """Return the total number of images in the dataset."""

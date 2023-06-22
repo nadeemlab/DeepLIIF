@@ -89,7 +89,10 @@ class BaseModel(ABC):
         """Make models eval mode during test time"""
         for name in self.model_names:
             if isinstance(name, str):
-                net = getattr(self, 'net' + name)
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
                 net.eval()
                 net = disable_batchnorm_tracking_stats(net)
 
@@ -151,7 +154,10 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 save_filename = '%s_net_%s.pth' % (epoch, name)
                 save_path = os.path.join(self.save_dir, save_filename)
-                net = getattr(self, 'net' + name)
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
 
                 if len(self.gpu_ids) > 0 and torch.cuda.is_available():
                     torch.save(net.module.cpu().state_dict(), save_path)
@@ -219,7 +225,10 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)
-                net = getattr(self, 'net' + name)
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
                 print('loading the model from %s' % load_path)
@@ -243,7 +252,10 @@ class BaseModel(ABC):
         print('---------- Networks initialized -------------')
         for name in self.model_names:
             if isinstance(name, str):
-                net = getattr(self, 'net' + name)
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
                 num_params = 0
                 for param in net.parameters():
                     num_params += param.numel()

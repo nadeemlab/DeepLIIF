@@ -96,6 +96,7 @@ def cli():
               help='name of the experiment. It decides where to store samples and models')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
+@click.option('--modalities-no', default=4, help='number of targets')
 @click.option('--targets-no', default=5, help='number of targets')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
@@ -176,19 +177,30 @@ def cli():
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
 @click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
 @click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
-@click.option('--dataset_mode', type=str, default='aligned',
+@click.option('--dataset-mode', type=str, default='aligned',
               help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
 @click.option('--padding', type=str, default='zero',
               help='chooses the type of padding used by resnet generator. [reflect | zero]')
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
 @click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
+# DeepLIIFExt params
+@click.option('--seg-gen', type=bool, default=True, help='True (Translation and Segmentation), False (Only Translation).')
+@click.option('--net-ds', type=str, default='n_layers',
+              help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
+@click.option('--net-gs', type=str, default='unet_512',
+              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+@click.option('--gan-mode', type=str, default='vanilla',
+              help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+@click.option('--gan-mode-s', type=str, default='lsgan',
+              help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding, model):
+          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding, model, 
+          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and

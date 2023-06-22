@@ -40,7 +40,7 @@ from .base_model import BaseModel
 
 # import for init purpose, not used in this script
 from .DeepLIIF_model import DeepLIIFModel
-
+from .DeepLIIFExt_model import DeepLIIFExtModel
 
 
 def find_model_using_name(model_name):
