@@ -37,8 +37,10 @@ from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scor
     overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
 
 from .base_model import BaseModel
+
+# import for init purpose, not used in this script
 from .DeepLIIF_model import DeepLIIFModel
-from .networks import get_norm_layer, ResnetGenerator, UnetGenerator
+
 
 
 def find_model_using_name(model_name):
@@ -94,52 +96,16 @@ def load_torchscript_model(model_pt_path, device):
     return net
 
 
-def read_model_params(file_addr):
-    with open(file_addr) as f:
-        lines = f.readlines()
-    param_dict = {}
-    for line in lines:
-        if ':' in line:
-            key = line.split(':')[0].strip()
-            val = line.split(':')[1].split('[')[0].strip()
-            param_dict[key] = val
-    print(param_dict)
-    return param_dict
 
-
-def load_eager_models(model_dir, devices):
-    input_nc = 3
-    output_nc = 3
-    ngf = 64
-    norm = 'batch'
-    use_dropout = True
-    padding_type = 'zero'
-
-    files = os.listdir(model_dir)
-    for f in files:
-        if 'train_opt.txt' in f:
-            param_dict = read_model_params(os.path.join(model_dir, f))
-            input_nc = int(param_dict['input_nc'])
-            output_nc = int(param_dict['output_nc'])
-            ngf = int(param_dict['ngf'])
-            norm = param_dict['norm']
-            use_dropout = False if param_dict['no_dropout'] == 'True' else True
-            padding_type = param_dict['padding']
-
-    norm_layer = get_norm_layer(norm_type=norm)
+def load_eager_models(model_dir, devices, opt):
+    # create a model given model and other options
+    model = create_model(opt)
+    # regular setup: load and print networks; create schedulers
+    model.setup(opt)
 
     nets = {}
-    for n in ['G1', 'G2', 'G3', 'G4']:
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
-        net.load_state_dict(torch.load(
-            os.path.join(model_dir, f'latest_net_{n}.pth'),
-            map_location=devices[n]
-        ))
-        nets[n] = disable_batchnorm_tracking_stats(net)
-        nets[n].eval()
-
-    for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
-        net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    for n in ['G1', 'G2', 'G3', 'G4','G51', 'G52', 'G53', 'G54', 'G55']:
+        net = getattr(model,'net'+n)
         net.load_state_dict(torch.load(
             os.path.join(model_dir, f'latest_net_{n}.pth'),
             map_location=devices[n]
@@ -151,7 +117,7 @@ def load_eager_models(model_dir, devices):
 
 
 @lru_cache
-def init_nets(model_dir, eager_mode=False):
+def init_nets(model_dir, eager_mode=False, opt=None):
     """
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
@@ -174,7 +140,7 @@ def init_nets(model_dir, eager_mode=False):
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
     if eager_mode:
-        return load_eager_models(model_dir, devices)
+        return load_eager_models(model_dir, devices, opt)
 
     return {
         n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
@@ -190,11 +156,12 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, eager_mode=False):
+def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
     """
     eager_mode: not used in this function; put in place to be consistent with run_dask
            so that run_wrapper() could call either this function or run_dask with
            same syntax
+    opt: same as eager_mode
     """
     buffer = BytesIO()
     torch.save(transform(img.resize((512, 512))), buffer)
@@ -213,9 +180,9 @@ def run_torchserve(img, model_path=None, eager_mode=False):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path, eager_mode=False):
+def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
-    nets = init_nets(model_dir, eager_mode)
+    nets = init_nets(model_dir, eager_mode, opt)
 
     ts = transform(img.resize((512, 512)))
 
@@ -247,7 +214,7 @@ def is_empty(tile):
     return True if calculate_background_area(tile) > 98 else False
 
 
-def run_wrapper(tile, run_fn, model_path, eager_mode=False):
+def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
     if is_empty(tile):
         return {
             'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
@@ -257,7 +224,7 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False):
             'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
         }
     else:
-        return run_fn(tile, model_path, eager_mode)
+        return run_fn(tile, model_path, eager_mode, opt)
 
 
 def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
@@ -307,7 +274,7 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
 
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
-              color_dapi=False, color_marker=False):
+              color_dapi=False, color_marker=False, opt=None):
 
     rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
 
@@ -323,7 +290,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
     for i in range(cols):
         for j in range(rows):
             tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
-            res = run_fn(tile, model_path, eager_mode)
+            res = run_fn(tile, model_path, eager_mode, opt)
 
             stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
             stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
@@ -371,7 +338,7 @@ def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_siz
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
-                     color_dapi=False, color_marker=False):
+                     color_dapi=False, color_marker=False, opt=None):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -391,7 +358,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         model_path=model_dir,
         eager_mode=eager_mode,
         color_dapi=color_dapi,
-        color_marker=color_marker
+        color_marker=color_marker,
+        opt=opt
     )
 
     post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)

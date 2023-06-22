@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi
+from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi, create_model
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi
@@ -97,6 +97,7 @@ def cli():
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--targets-no', default=5, help='number of targets')
 # model parameters
+@click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
 @click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
 @click.option('--ngf', default=64, help='# of gen filters in the last conv layer')
@@ -112,7 +113,6 @@ def cli():
 @click.option('--init-type', default='normal',
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
-@click.option('--padding-type', default='reflect', help='network padding type.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
@@ -182,12 +182,12 @@ def cli():
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
 @click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
-          n_layers_d, norm, init_type, init_gain, padding_type, no_dropout, direction, serial_batches, num_threads,
+          n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding):
+          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding, model):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -225,13 +225,13 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
         flag_deterministic = set_seed(seed)
 
     if flag_deterministic:
-        padding_type = 'zero'
+        d_params['padding'] = 'zero'
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
 
-    opt = Options(d_params)
+    opt = Options(d_params=d_params)
     print_options(opt)
     
     dataset = create_dataset(opt)
@@ -239,7 +239,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     click.echo('The number of training images = %d' % len(dataset))
 
     # create a model given model and other options
-    model = DeepLIIFModel(opt)
+    model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
 
@@ -524,6 +524,10 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
     ensure_exists(output_dir)
 
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
+    files = os.listdir(model_dir)
+    assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'),mode='test')
+    print_options(opt)
 
     with click.progressbar(
             image_files,
@@ -537,7 +541,7 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker)
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt)
 
                 for name, i in images.items():
                     i.save(os.path.join(
@@ -662,17 +666,51 @@ def visualize(pickle_dir):
         time.sleep(10)
 
 
-class Options:
-    def __init__(self, d_params):
-        for k,v in d_params.items():
-            setattr(self,k,v)
+def read_model_params(file_addr):
+    with open(file_addr) as f:
+        lines = f.readlines()
+    param_dict = {}
+    for line in lines:
+        if ':' in line:
+            key = line.split(':')[0].strip()
+            val = line.split(':')[1].split('[')[0].strip()
+            param_dict[key] = val
+    print(param_dict)
+    return param_dict
 
-        self.isTrain = True
-        self.netG = 'resnet_9blocks'
-        self.netD = 'n_layers'
-        self.n_layers_D = 4
-        self.lambda_L1 = 100
-        self.lambda_feat = 100
+class Options:
+    def __init__(self, d_params=None, path_file=None, mode='train'):
+        assert d_params is not None or path_file is not None, "either d_params or path_file should be provided"
+        assert d_params is None or path_file is None, "only one source can be provided, either being d_params or path_file"
+        assert mode in ['train','test'], 'mode should be one of ["train", "test"]'
+        
+        if path_file:
+            d_params = read_model_params(path_file)
+     
+        for k,v in d_params.items():
+            try:
+                if k not in ['phase']: # e.g., k = 'phase', v = 'train', eval(v) is a function rather than a string
+                    setattr(self,k,eval(v)) # to parse int/float/tuple etc. from string
+                else:
+                    setattr(self,k,v)
+            except:
+                setattr(self,k,v)
+
+        if mode == 'train':
+            self.isTrain = True
+            self.netG = 'resnet_9blocks'
+            self.netD = 'n_layers'
+            self.n_layers_D = 4
+            self.lambda_L1 = 100
+            self.lambda_feat = 100
+        else:
+            self.input_nc = 3
+            self.output_nc = 3
+            self.ngf = 64
+            self.norm = 'batch'
+            self.use_dropout = True
+            self.padding_type = 'zero'
+            self.use_dropout = False if self.no_dropout == 'True' else True
 
 
 if __name__ == '__main__':
