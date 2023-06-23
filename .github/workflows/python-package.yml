@@ -26,7 +26,9 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Install dependencies (hardcoded)
+      run: python -m pip install numpy
+    - name: Install dependencies from requirements.txt and/or setup.py
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
