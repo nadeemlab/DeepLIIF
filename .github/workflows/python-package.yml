@@ -34,7 +34,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python setup.py build
         python setup.py install
-        python -m pip uninstall numba
+        python -m pip uninstall numba -y
         python -m pip install numba
         python -c "import deepliif; print('deepliif imported')"
     - name: Lint with flake8
