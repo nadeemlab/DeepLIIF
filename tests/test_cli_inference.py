@@ -85,10 +85,11 @@ def test_cli_inference_consistency(tmp_path, model_dir_final):
         return score/count
            
     
-        for i, suffix in enumerate(l_suffix):
-            print(f'Calculating {suffix}...')
-            ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
-            assert ssim_score == 1
+    for i, suffix in enumerate(l_suffix):
+        print(f'Calculating {suffix}...')
+        ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
+        print(ssim_score)
+        assert ssim_score == 1
   
 
     
