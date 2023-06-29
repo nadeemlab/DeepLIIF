@@ -695,6 +695,10 @@ class Options:
                     setattr(self,k,v)
             except:
                 setattr(self,k,v)
+        
+        # to account for old settings where gpu_ids value is an integer, not a tuple
+        if isinstance(self.gpu_ids,int):
+            self.gpu_ids = (self.gpu_ids,)
 
         if mode == 'train':
             self.isTrain = True
@@ -704,13 +708,15 @@ class Options:
             self.lambda_L1 = 100
             self.lambda_feat = 100
         else:
+            self.phase = 'test'
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
             self.norm = 'batch'
             self.use_dropout = True
             self.padding_type = 'zero'
-            self.use_dropout = False if self.no_dropout == 'True' else True
+            self.padding = 'zero'
+            self.use_dropout = False #if self.no_dropout == 'True' else True
 
 
 if __name__ == '__main__':
