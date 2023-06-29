@@ -107,10 +107,6 @@ def load_eager_models(model_dir, devices, opt):
     nets = {}
     for n in ['G1', 'G2', 'G3', 'G4','G51', 'G52', 'G53', 'G54', 'G55']:
         net = getattr(model,'net'+n)
-        net.load_state_dict(torch.load(
-            os.path.join(model_dir, f'latest_net_{n}.pth'),
-            map_location=devices[n]
-        ))
         nets[n] = disable_batchnorm_tracking_stats(net)
         nets[n].eval()
 
