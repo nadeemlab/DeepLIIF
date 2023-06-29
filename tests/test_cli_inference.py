@@ -4,6 +4,7 @@ from skimage.metrics import structural_similarity as ssim
 from PIL import Image
 import cv2
 import os
+import numpy as np
 
 def test_cli_inference(tmp_path, model_dir_final):
     dir_model = model_dir_final
