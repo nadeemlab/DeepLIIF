@@ -46,22 +46,3 @@ def model_dir_final(model_type,model_dir):
         print(os.listdir(tmp_path))
         return tmp_path
         
-
-#
-#def pytest_sessionstart(session, name):
-#    print('session start,',name)
-#    urls_model = [
-#        "https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip"
-#    ]
-#    td = TemporaryDirectory()
-#    tmp_path = Path(td.name)
-#
-#    for i, url_model in enumerate(urls_model):
-#        urllib.request.urlretrieve(url_model, tmp_path)
-#
-#    session.__MODEL_CACHE = tmp_path
-#
-#
-#def pytest_sessionfinish(session, exitstatus):
-#    # remove the cached images
-#    session.__MODEL_CACHE.cleanup()
