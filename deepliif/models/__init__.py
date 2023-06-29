@@ -31,7 +31,7 @@ import numpy as np
 from dask import delayed, compute
 
 from deepliif.util import *
-from deepliif.util.util import tensor_to_pil
+from deepliif.util.util import tensor_to_pil, check_multi_scale
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
     overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
@@ -102,6 +102,7 @@ def load_eager_models(model_dir, devices, opt):
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
+    model.eval()
 
     nets = {}
     for n in ['G1', 'G2', 'G3', 'G4','G51', 'G52', 'G53', 'G54', 'G55']:
