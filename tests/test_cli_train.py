@@ -5,7 +5,7 @@ def test_cli_train(tmp_path):
     dir_input = 'Datasets/Sample_Dataset' # cli.py train looks for subfolder "train" under dataroot
     dir_save = tmp_path
     
-    fns_input = [f for f in os.listdir(dir_input + '/train') if os.path.isfile(os.path.join(dir_input + ''/train, f)) and f.endswith('png')]
+    fns_input = [f for f in os.listdir(dir_input + '/train') if os.path.isfile(os.path.join(dir_input + '/train', f)) and f.endswith('png')]
     num_input = len(fns_input)
     assert num_input > 0
     
