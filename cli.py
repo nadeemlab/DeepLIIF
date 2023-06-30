@@ -2,6 +2,7 @@ import os
 import json
 import time
 import random
+from pathlib import Path
 
 import click
 import cv2
@@ -526,7 +527,7 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
     image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
     files = os.listdir(model_dir)
     assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
-    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'),mode='test')
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     print_options(opt)
 
     with click.progressbar(
@@ -701,7 +702,7 @@ class Options:
             self.gpu_ids = (self.gpu_ids,)
 
         if mode == 'train':
-            self.isTrain = True
+            self.is_train = True
             self.netG = 'resnet_9blocks'
             self.netD = 'n_layers'
             self.n_layers_D = 4
@@ -709,6 +710,7 @@ class Options:
             self.lambda_feat = 100
         else:
             self.phase = 'test'
+            self.is_train = False
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
@@ -717,6 +719,15 @@ class Options:
             self.padding_type = 'zero'
             self.padding = 'zero'
             self.use_dropout = False #if self.no_dropout == 'True' else True
+            
+            # reset checkpoints_dir and name based on the model directory
+            # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
+            model_dir = Path(path_file).parent
+            self.checkpoints_dir = str(model_dir.parent)
+            self.name = str(model_dir.name)
+            
+            self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
+            
 
 
 if __name__ == '__main__':
