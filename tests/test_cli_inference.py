@@ -36,8 +36,8 @@ def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
         score += ssim(img_a,img_b, data_range=img_a.max() - img_b.min(), multichannel=True, channel_axis=2)
         count +=1
 
-        if count % verbose_freq == 0 or count == len(fns):
-            print(f"{count}/{len(fns)}, running mean SSIM {score / count}")
+        #if count % verbose_freq == 0 or count == len(fns):
+        #    print(f"{count}/{len(fns)}, running mean SSIM {score / count}")
     return score/count
 
 
@@ -111,6 +111,7 @@ def test_cli_inference_consistency(tmp_path, model_dir_final):
         print(suffix, ssim_score)
         assert (1 - ssim_score) < TOLERANCE
 
+
 def test_cli_inference_eager_consistency(tmp_path, model_dir_final):
     dir_model = model_dir_final
     dir_input = 'Datasets/Sample_Dataset/test_cli'
@@ -122,6 +123,42 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final):
     
     for dir_output in dirs_output:
         res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+        assert res.returncode == 0
+        
+        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+        num_output = len(fns_output)
+        assert num_output == num_input * 7
+    
+    fns = [f for f in os.listdir(dirs_output[0]) if os.path.isfile(os.path.join(dirs_output[0], f)) and f.endswith('png')]
+    l_suffix = list(set([fn[:-4].split('_')[-1] for fn in fns]))
+    print('suffix:',l_suffix)       
+
+    files = os.listdir(dirs_output[0])
+    files = [x for x in files if x.endswith('.png')]
+    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in files])) # remove suffix (e.g., fake_B_1.png), then take unique values
+    print('num of input files (derived from output):',len(fns))
+    print('input img name:',fns)
+    
+    print(f'Calculating SSIM...')
+    for i, suffix in enumerate(l_suffix):
+        ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
+        print(suffix, ssim_score)
+        assert (1 - ssim_score) < TOLERANCE
+
+
+def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final):
+    dir_model = model_dir_final
+    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dirs_output = [tmp_path / 'test_eager', tmp_path / 'test_serialized']
+    
+    fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+    num_input = len(fns_input)
+    assert num_input > 0
+    for dir_output in dirs_output:
+        if 'eager' in str(dir_output):
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+        else:
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
