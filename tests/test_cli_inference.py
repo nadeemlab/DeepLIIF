@@ -1,3 +1,4 @@
+import pytest
 import subprocess
 import os
 from skimage.metrics import structural_similarity as ssim
@@ -41,19 +42,44 @@ def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
     return score/count
 
 
+URLS_MODEL = {'latest':"https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip"}
+
+@pytest.fixture(scope="session")
+def model_dir_final(model_type,model_dir):
+        
+    if model_dir:
+        fns = [f for f in os.listdir(model_dir) if os.path.isfile(os.path.join(model_dir, f))]
+        assert len(fns) > 0
+        return model_dir
+    else:
+        assert model_type in URLS_MODEL.keys()
+        url_model = URLS_MODEL[model_type]
+        td = TemporaryDirectory()
+        tmp_path = Path(td.name)
+        
+        target_path = tmp_path / url_model.split('/')[-1]
+    
+        urllib.request.urlretrieve(url_model, target_path)
+        
+        
+        with zipfile.ZipFile(target_path, 'r') as f:
+            f.extractall(tmp_path)
+        
+        print(os.listdir(tmp_path))
+        return tmp_path
 
 
 #### 1. test if functions can run ####
-def test_cli_inference(tmp_path, model_dir_final):
+def test_cli_inference(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     dir_output = tmp_path
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
     num_input = len(fns_input)
     assert num_input > 0
     
-    res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+    res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
     assert res.returncode == 0
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -61,16 +87,16 @@ def test_cli_inference(tmp_path, model_dir_final):
     assert num_output == num_input * 7
 
 
-def test_cli_inference_eager(tmp_path, model_dir_final):
+def test_cli_inference_eager(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     dir_output = tmp_path
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
     num_input = len(fns_input)
     assert num_input > 0
     
-    res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+    res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
     assert res.returncode == 0
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -79,9 +105,9 @@ def test_cli_inference_eager(tmp_path, model_dir_final):
 
 
 from deepliif.models import inference
-def test_cli_inference_bare(tmp_path, model_dir_final):
+def test_cli_inference_bare(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     tile_size = 512
     overlap_size = 0
     
@@ -97,9 +123,9 @@ def test_cli_inference_bare(tmp_path, model_dir_final):
 
 
 #### 2. test if inference results are consistent ####
-def test_cli_inference_consistency(tmp_path, model_dir_final):
+def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
@@ -107,7 +133,7 @@ def test_cli_inference_consistency(tmp_path, model_dir_final):
     assert num_input > 0    
     
     for dir_output in dirs_output:
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+        res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -131,9 +157,9 @@ def test_cli_inference_consistency(tmp_path, model_dir_final):
         assert (1 - ssim_score) < TOLERANCE
 
 
-def test_cli_inference_eager_consistency(tmp_path, model_dir_final):
+def test_cli_inference_eager_consistency(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
@@ -141,7 +167,7 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final):
     assert num_input > 0
     
     for dir_output in dirs_output:
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+        res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -165,9 +191,9 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final):
         assert (1 - ssim_score) < TOLERANCE
 
 
-def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final):
+def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
-    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test_eager', tmp_path / 'test_serialized']
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
@@ -175,9 +201,9 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final):
     assert num_input > 0
     for dir_output in dirs_output:
         if 'eager' in str(dir_output):
-            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+            res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
         else:
-            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+            res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
