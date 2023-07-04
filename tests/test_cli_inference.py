@@ -43,7 +43,7 @@ def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
 
 
 
-
+#### 1. test if functions can run ####
 def test_cli_inference(tmp_path, model_dir_final):
     dir_model = model_dir_final
     dir_input = 'Datasets/Sample_Dataset/test_cli'
@@ -78,6 +78,25 @@ def test_cli_inference_eager(tmp_path, model_dir_final):
     assert num_output == num_input * 7
 
 
+from deepliif.models import inference
+def test_cli_inference_bare(tmp_path, model_dir_final):
+    dir_model = model_dir_final
+    dir_input = 'Datasets/Sample_Dataset/test_cli'
+    tile_size = 512
+    overlap_size = 0
+    
+    fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+    num_input = len(fns_input)
+    assert num_input > 0
+    
+    fn_input = fns_input[0] # take only 1 image
+    
+    img = Image.open(os.path.join(dir_input, fn_input))
+    res = inference(img, tile_size, overlap_size, dir_model, use_torchserve=False, eager_mode=False,
+              color_dapi=False, color_marker=False, opt=None)
+
+
+#### 2. test if inference results are consistent ####
 def test_cli_inference_consistency(tmp_path, model_dir_final):
     dir_model = model_dir_final
     dir_input = 'Datasets/Sample_Dataset/test_cli'
@@ -85,7 +104,7 @@ def test_cli_inference_consistency(tmp_path, model_dir_final):
     
     fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
     num_input = len(fns_input)
-    assert num_input > 0
+    assert num_input > 0    
     
     for dir_output in dirs_output:
         res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
