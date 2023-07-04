@@ -35,6 +35,7 @@ from deepliif.util.util import tensor_to_pil, check_multi_scale
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
     overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
+from deepliif.options import Options
 
 from .base_model import BaseModel
 
@@ -270,8 +271,16 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
     return images
 
 
+@lru_cache
+def get_opt(model_dir):
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    return opt
+
+
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
               color_dapi=False, color_marker=False, opt=None):
+    if not opt:
+        opt = get_opt(model_path)
 
     rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
 

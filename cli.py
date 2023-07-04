@@ -2,7 +2,6 @@ import os
 import json
 import time
 import random
-from pathlib import Path
 
 import click
 import cv2
@@ -15,6 +14,7 @@ from deepliif.models import inference, postprocess, compute_overlap, init_nets, 
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi
+from deepliif.options import Options
 
 import torch.distributed as dist
 
@@ -679,67 +679,7 @@ def visualize(pickle_dir):
         time.sleep(10)
 
 
-def read_model_params(file_addr):
-    with open(file_addr) as f:
-        lines = f.readlines()
-    param_dict = {}
-    for line in lines:
-        if ':' in line:
-            key = line.split(':')[0].strip()
-            val = line.split(':')[1].split('[')[0].strip()
-            param_dict[key] = val
-    print(param_dict)
-    return param_dict
 
-class Options:
-    def __init__(self, d_params=None, path_file=None, mode='train'):
-        assert d_params is not None or path_file is not None, "either d_params or path_file should be provided"
-        assert d_params is None or path_file is None, "only one source can be provided, either being d_params or path_file"
-        assert mode in ['train','test'], 'mode should be one of ["train", "test"]'
-        
-        if path_file:
-            d_params = read_model_params(path_file)
-     
-        for k,v in d_params.items():
-            try:
-                if k not in ['phase']: # e.g., k = 'phase', v = 'train', eval(v) is a function rather than a string
-                    setattr(self,k,eval(v)) # to parse int/float/tuple etc. from string
-                else:
-                    setattr(self,k,v)
-            except:
-                setattr(self,k,v)
-        
-        # to account for old settings where gpu_ids value is an integer, not a tuple
-        if isinstance(self.gpu_ids,int):
-            self.gpu_ids = (self.gpu_ids,)
-
-        if mode == 'train':
-            self.is_train = True
-            self.netG = 'resnet_9blocks'
-            self.netD = 'n_layers'
-            self.n_layers_D = 4
-            self.lambda_L1 = 100
-            self.lambda_feat = 100
-        else:
-            self.phase = 'test'
-            self.is_train = False
-            self.input_nc = 3
-            self.output_nc = 3
-            self.ngf = 64
-            self.norm = 'batch'
-            self.use_dropout = True
-            self.padding_type = 'zero'
-            self.padding = 'zero'
-            self.use_dropout = False #if self.no_dropout == 'True' else True
-            
-            # reset checkpoints_dir and name based on the model directory
-            # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
-            model_dir = Path(path_file).parent
-            self.checkpoints_dir = str(model_dir.parent)
-            self.name = str(model_dir.name)
-            
-            self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
-            
 
 
 if __name__ == '__main__':
