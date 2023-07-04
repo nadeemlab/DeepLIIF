@@ -469,15 +469,18 @@ def trainlaunch(**kwargs):
 @cli.command()
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
+@click.option('--tile-size', type=int, default=None, help='tile size')
 @click.option('--device', default='cpu', type=str, help='device to load model, either cpu or gpu')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
-def serialize(models_dir, output_dir, device, verbose):
+def serialize(models_dir, output_dir, tile_size, device, verbose):
     """Serialize DeepLIIF models using Torchscript
     """
+    if tile_size is None:
+        tile_size = 512
     output_dir = output_dir or models_dir
     ensure_exists(output_dir)
 
-    sample = transform(Image.new('RGB', (512, 512)))
+    sample = transform(Image.new('RGB', (tile_size, tile_size)))
     
     with click.progressbar(
             init_nets(models_dir, eager_mode=True).items(),
