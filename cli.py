@@ -540,8 +540,13 @@ def test(input_dir, output_dir, tile_size, model_dir, model, region_size, eager_
     files = os.listdir(model_dir)
     assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
-    if getattr(opt,'model') is None or getattr(opt,'model') != model:
+    
+    # fix opt from old settings
+    if hasattr(opt,'model') is None or getattr(opt,'model') != model:
         opt.model = model
+    if not hasattr(opt,'modalities_no') and hasattr(opt,'targets_no'):
+        opt.modalities_no = opt.targets_no - 1
+        del opt.targets_no
     print_options(opt)
 
     with click.progressbar(
