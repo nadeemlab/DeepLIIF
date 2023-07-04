@@ -97,7 +97,6 @@ def cli():
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, help='number of targets')
-@click.option('--targets-no', default=5, help='number of targets')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
@@ -193,7 +192,7 @@ def cli():
               help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 @click.option('--gan-mode-s', type=str, default='lsgan',
               help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
-def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
+def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
@@ -522,13 +521,14 @@ def serialize(models_dir, output_dir, device, verbose):
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+@click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
 @click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
-def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
+def test(input_dir, output_dir, tile_size, model_dir, model, region_size, eager_mode,
          color_dapi, color_marker):
     
     """Test trained models
@@ -540,6 +540,8 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
     files = os.listdir(model_dir)
     assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    if getattr(opt,'model') is None or getattr(opt,'model') != model:
+        opt.model = model
     print_options(opt)
 
     with click.progressbar(

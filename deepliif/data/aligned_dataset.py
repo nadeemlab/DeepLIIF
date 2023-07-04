@@ -25,7 +25,6 @@ class AlignedDataset(BaseDataset):
         self.input_nc = opt.output_nc if opt.direction == 'BtoA' else opt.input_nc
         self.output_nc = opt.input_nc if opt.direction == 'BtoA' else opt.output_nc
         self.no_flip = opt.no_flip
-        self.targets_no = opt.targets_no
         self.modalities_no = opt.modalities_no
         self.seg_gen = opt.seg_gen
         self.load_size = opt.load_size
@@ -50,11 +49,12 @@ class AlignedDataset(BaseDataset):
         # split AB image into A and B
         w, h = AB.size
         if self.model == 'DeepLIIF':
-            w2 = int(w / (self.targets_no + 1))
+            num_img = self.modalities_no + 1 + 1 # +1 for segmentation channel, +1 for input image
         elif self.model == 'DeepLIIFExt':
-            w2 = int(w / (self.modalities_no * 2 + 1)) if self.seg_gen else int(w / (self.modalities_no + 1))
+            num_img = self.modalities_no * 2 + 1 if self.seg_gen else self.modalities_no + 1 # +1 for segmentation channel   
         else:
             raise Exception(f'model class {self.model} does not have corresponding implementation in deepliif/data/aligned_dataset.py')
+        w2 = int(w / num_img)
         A = AB.crop((0, 0, w2, h))
 
         # apply the same transform to both A and B
@@ -65,7 +65,7 @@ class AlignedDataset(BaseDataset):
         A = A_transform(A)
         B_Array = []
         if self.model == 'DeepLIIF':
-            for i in range(1, self.targets_no + 1):
+            for i in range(1, num_img):
                 B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
                 B = B_transform(B)
                 B_Array.append(B)
