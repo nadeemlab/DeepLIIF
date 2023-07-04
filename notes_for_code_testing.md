@@ -6,19 +6,14 @@ The implemented testing uses `pytest`, consisting of the following files:
   |
   - test_args.py
   - test_cli_inference.py
+  - test_cli_train.py
   - test_model_download.py
 ```
 Constant variables that will be shared across test cases are stored as fixtures, specified in `conftest.py`.
 
-The **automatic testing** is configured with GitHub Actions, relying on the following files:
-```
-- .github/workflows/python-package.yml
-```
-
 |Test Env|Time|
 |--------|----|
-|Local|02:19|
-|GitHub|53:00+ (not finished)|
+|Local|00:11:24|
 
 Added arguments:
 - `model_type`: the type of model to use, currently only allows "latest"; at the moment this is not used if `model_dir` is specified
@@ -30,6 +25,7 @@ Added test cases:
 - test_args.py: tests the access to argument values as fixture
 - test_model_download.py: tests the access to remote model if local model directory is not provided, by checking if the final model directory for testing is valid
 - test_cli_inference.py: tests if `cli.py test` a) can run, and b) yields consistent predictions across two trials
+- test_cli_train.py: tests if `cli.py train` can run on a) cpu, b) single gpu, and c) multiple gpus (DP)
 
 ## To Run Testing...
 ### ... Locally
@@ -39,11 +35,7 @@ pytest -v -s --model_type latest --model_dir <your local model dir>
 ```
 This will use the model files you provided to run all the test cases.
 
-### ... Automatically on GitHub
-The key command controlling the automatic testing is in the last section of file `.github/workflows/python-package.yml`:
+The default temporary directory is `/tmp`. Use option `--basetemp` for a different temporary directory like the following:
 ```
-    - name: Test with pytest
-      run: |
-        pytest -v -s
+pytest -v -s --basetemp=../tmp/ --model_type latest --model_dir <your local model dir>
 ```
-No `model_dir` is specified & the default value for `model_type` is `latest`. This will trigger the downloading and preparation of the latest model from Zenodo, before the test cases are executed.
