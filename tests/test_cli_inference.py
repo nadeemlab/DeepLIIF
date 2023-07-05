@@ -68,6 +68,9 @@ def model_dir_final(model_type,model_dir):
         print(os.listdir(tmp_path))
         return tmp_path
 
+def test_model_download(model_dir_final):
+    print('final model dir:',model_dir_final)
+    print(os.listdir(model_dir_final))
 
 #### 1. test if functions can run ####
 def test_cli_inference(tmp_path, model_dir_final, model_info):
