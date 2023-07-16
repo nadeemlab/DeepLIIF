@@ -42,32 +42,6 @@ def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
     return score/count
 
 
-URLS_MODEL = {'latest':"https://zenodo.org/record/4751737/files/DeepLIIF_Latest_Model.zip"}
-
-@pytest.fixture(scope="session")
-def model_dir_final(model_type,model_dir):
-        
-    if model_dir:
-        fns = [f for f in os.listdir(model_dir) if os.path.isfile(os.path.join(model_dir, f))]
-        assert len(fns) > 0
-        return model_dir
-    else:
-        assert model_type in URLS_MODEL.keys()
-        url_model = URLS_MODEL[model_type]
-        td = TemporaryDirectory()
-        tmp_path = Path(td.name)
-        
-        target_path = tmp_path / url_model.split('/')[-1]
-    
-        urllib.request.urlretrieve(url_model, target_path)
-        
-        
-        with zipfile.ZipFile(target_path, 'r') as f:
-            f.extractall(tmp_path)
-        
-        print(os.listdir(tmp_path))
-        return tmp_path
-
 def test_model_download(model_dir_final):
     print('final model dir:',model_dir_final)
     print(os.listdir(model_dir_final))
