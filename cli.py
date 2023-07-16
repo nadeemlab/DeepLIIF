@@ -479,11 +479,16 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
         tile_size = 512
     output_dir = output_dir or models_dir
     ensure_exists(output_dir)
-
+    
+    # copy train_opt.txt to the target location
+    import shutil
+    if models_dir != output_dir:
+        shutil.copy(f'{models_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
+    
     sample = transform(Image.new('RGB', (tile_size, tile_size)))
     
     with click.progressbar(
-            init_nets(models_dir, eager_mode=True).items(),
+            init_nets(models_dir, eager_mode=True, phase='test').items(),
             label='Tracing nets',
             item_show_func=lambda n: n[0] if n else n
     ) as bar:

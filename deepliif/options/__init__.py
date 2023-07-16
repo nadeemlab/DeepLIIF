@@ -1,6 +1,8 @@
 """This package options includes option modules: training options, test options, and basic options (used in both training and test)."""
 
 from pathlib import Path
+import os
+from ..util.util import mkdirs
 
 def read_model_params(file_addr):
     with open(file_addr) as f:
@@ -32,9 +34,20 @@ class Options:
             except:
                 setattr(self,k,v)
         
-        # to account for old settings where gpu_ids value is an integer, not a tuple
-        if isinstance(self.gpu_ids,int):
-            self.gpu_ids = (self.gpu_ids,)
+        if mode != 'train':
+            # to account for old settings where gpu_ids value is an integer, not a tuple
+            if isinstance(self.gpu_ids,int):
+                self.gpu_ids = (self.gpu_ids,)
+            
+            # to account for old settings before modalities_no was introduced
+            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
+                self.modalities_no = self.targets_no - 1
+                del self.targets_no
+            
+            # to account for old settings when DeepLIIFExt was using model name DeepLIIF
+            if self.model == 'DeepLIIF' and hasattr(self,'seg_gen'):
+                self.model = 'DeepLIIFExt'
+            
 
         if mode == 'train':
             self.is_train = True
@@ -51,8 +64,8 @@ class Options:
             self.ngf = 64
             self.norm = 'batch'
             self.use_dropout = True
-            self.padding_type = 'zero'
-            self.padding = 'zero'
+            #self.padding_type = 'zero' # some models use reflect etc. which adds additional randomness 
+            #self.padding = 'zero'
             self.use_dropout = False #if self.no_dropout == 'True' else True
             
             # reset checkpoints_dir and name based on the model directory
@@ -63,3 +76,24 @@ class Options:
             
             self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
             
+def print_options(opt):
+    """Print and save options
+
+    It will print both current options and default values(if different).
+    It will save options into a text file / [checkpoints_dir] / opt.txt
+    """
+    message = ''
+    message += '----------------- Options ---------------\n'
+    for k, v in sorted(vars(opt).items()):
+        comment = ''
+        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
+    message += '----------------- End -------------------'
+    print(message)
+
+    # save to the disk
+    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+    mkdirs(expr_dir)
+    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write(message)
+        opt_file.write('\n')

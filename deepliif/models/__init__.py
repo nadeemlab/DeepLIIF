@@ -35,7 +35,7 @@ from deepliif.util.util import tensor_to_pil, check_multi_scale
 from deepliif.data import transform
 from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
     overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
-from deepliif.options import Options
+from deepliif.options import Options, print_options
 
 from .base_model import BaseModel
 
@@ -43,6 +43,15 @@ from .base_model import BaseModel
 from .DeepLIIF_model import DeepLIIFModel
 from .DeepLIIFExt_model import DeepLIIFExtModel
 
+
+@lru_cache
+def get_opt(model_dir, mode='test'):
+    """
+    mode: test or train, currently only functions used for inference utilize get_opt so it
+          defaults to test
+    """
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+    return opt
 
 def find_model_using_name(model_name):
     """Import the module "models/[model_name]_model.py".
@@ -103,30 +112,54 @@ def load_eager_models(model_dir, devices, opt):
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
-    model.eval()
 
     nets = {}
-    for n in ['G1', 'G2', 'G3', 'G4','G51', 'G52', 'G53', 'G54', 'G55']:
-        net = getattr(model,'net'+n)
-        nets[n] = disable_batchnorm_tracking_stats(net)
-        nets[n].eval()
-
+    for name in model.model_names:
+        if isinstance(name, str):
+            save_filename = '%s_net_%s.pth' % (opt.epoch, name)
+            save_path = os.path.join(model.save_dir, save_filename)
+            if '_' in name:
+                net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+            else:
+                net = getattr(model, 'net' + name)
+    
+            if opt.phase != 'train':
+                net.eval()
+                net = disable_batchnorm_tracking_stats(net)
+            
+            nets[name] = net
+            
     return nets
 
 
 @lru_cache
-def init_nets(model_dir, eager_mode=False, opt=None):
+def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     """
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
-    """
-    net_groups = [
-        ('G1', 'G52'),
-        ('G2', 'G53'),
-        ('G3', 'G54'),
-        ('G4', 'G55'),
-        ('G51',)
-    ]
+    
+    opt_args: to overwrite opt arguments in train_opt.txt, typically used in inference stage
+              for example, opt_args={'phase':'test'}
+    """ 
+    if opt is None:
+        opt = get_opt(model_dir, mode=phase)
+        print_options(opt)
+    
+    if opt.model == 'DeepLIIF':
+        net_groups = [
+            ('G1', 'G52'),
+            ('G2', 'G53'),
+            ('G3', 'G54'),
+            ('G4', 'G55'),
+            ('G51',)
+        ]
+    elif opt.model == 'DeepLIIFExt':
+        if opt.seg_gen:
+            net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
+        else:
+            net_groups = [(f'G_{i+1}',) for i in opt.modalities_no]
+    else:
+        raise Exception(f'init_nets() not implemented for model {opt.model}')
 
     number_of_gpus = torch.cuda.device_count()
     # number_of_gpus = 0
@@ -188,23 +221,42 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     def forward(input, model):
         with torch.no_grad():
             return model(input.to(next(model.parameters()).device))
+    
+    if opt.model == 'DeepLIIF':
+        seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+        
+        lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+        gens = compute(lazy_gens)[0]
+        
+        lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+        lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+        segs = compute(lazy_segs)[0]
+    
+        seg_weights = [0.25, 0.25, 0.25, 0, 0.25]
+        seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
+    
+        res = {k: tensor_to_pil(v) for k, v in gens.items()}
+        res['G5'] = tensor_to_pil(seg)
+    
+        return res
+    elif opt.model == 'DeepLIIFExt':
+        seg_map = {'G_' + str(i): 'GS_' + str(i) for i in range(1, opt.modalities_no + 1)}
+        
+        lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+        gens = compute(lazy_gens)[0]
+        
+        res = {k: tensor_to_pil(v) for k, v in gens.items()}
+    
+        if opt.seg_gen:
+            lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+            segs = compute(lazy_segs)[0]
+            res.update({k: tensor_to_pil(v) for k, v in segs.items()})
+    
+        return res
+    else:
+        raise Exception(f'run_dask() not implemented for {opt.model}')
 
-    seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
-
-    lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
-    gens = compute(lazy_gens)[0]
-
-    lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-    lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
-    segs = compute(lazy_segs)[0]
-
-    seg_weights = [0.25, 0.25, 0.25, 0, 0.25]
-    seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
-
-    res = {k: tensor_to_pil(v) for k, v in gens.items()}
-    res['G5'] = tensor_to_pil(seg)
-
-    return res
+    
 
 
 def is_empty(tile):
@@ -213,16 +265,26 @@ def is_empty(tile):
 
 
 def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
-    if is_empty(tile):
-        return {
-            'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
-            'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-            'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-            'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-            'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
-        }
+    if opt.model == 'DeepLIIF':
+        if is_empty(tile):
+            return {
+                'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
+                'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
+            }
+        else:
+            return run_fn(tile, model_path, eager_mode, opt)
+    elif opt.model == 'DeepLIIFExt':
+        if is_empty(tile):
+            res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
+            res.update({'GS_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)})
+            return res
+        else:
+            return run_fn(tile, model_path, eager_mode, opt)
     else:
-        return run_fn(tile, model_path, eager_mode, opt)
+        raise Exception(f'run_wrapper() not implemented for model {opt.model}')
 
 
 def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
@@ -271,76 +333,128 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
     return images
 
 
-@lru_cache
-def get_opt(model_dir):
-    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
-    return opt
-
-
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
               color_dapi=False, color_marker=False, opt=None):
     if not opt:
         opt = get_opt(model_path)
+        print_options(opt)
+    
+    if opt.model == 'DeepLIIF':
 
-    rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
+        rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
+    
+        run_fn = run_torchserve if use_torchserve else run_dask
+    
+        images = {}
+        images['Hema'] = create_image_for_stitching(tile_size, rows, cols)
+        images['DAPI'] = create_image_for_stitching(tile_size, rows, cols)
+        images['Lap2'] = create_image_for_stitching(tile_size, rows, cols)
+        images['Marker'] = create_image_for_stitching(tile_size, rows, cols)
+        images['Seg'] = create_image_for_stitching(tile_size, rows, cols)
+    
+        for i in range(cols):
+            for j in range(rows):
+                tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
+                res = run_fn(tile, model_path, eager_mode, opt)
+    
+                stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
+                stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
+                stitch_tile(images['Lap2'], res['G3'], tile_size, overlap_size, i, j)
+                stitch_tile(images['Marker'], res['G4'], tile_size, overlap_size, i, j)
+                stitch_tile(images['Seg'], res['G5'], tile_size, overlap_size, i, j)
+    
+        images['Hema'] = images['Hema'].resize(img.size)
+        images['DAPI'] = images['DAPI'].resize(img.size)
+        images['Lap2'] = images['Lap2'].resize(img.size)
+        images['Marker'] = images['Marker'].resize(img.size)
+        images['Seg'] = images['Seg'].resize(img.size)
+    
+        if color_dapi:
+            matrix = (       0,        0,        0, 0,
+                      299/1000, 587/1000, 114/1000, 0,
+                      299/1000, 587/1000, 114/1000, 0)
+            images['DAPI'] = images['DAPI'].convert('RGB', matrix)
+    
+        if color_marker:
+            matrix = (299/1000, 587/1000, 114/1000, 0,
+                      299/1000, 587/1000, 114/1000, 0,
+                             0,        0,        0, 0)
+            images['Marker'] = images['Marker'].convert('RGB', matrix)
+    
+        return images
+        
+    elif opt.model == 'DeepLIIFExt':
+        #param_dict = read_train_options(model_path)
+        #modalities_no = int(param_dict['modalities_no']) if param_dict else 4
+        #seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
+    
+        tiles = list(generate_tiles(img, tile_size, overlap_size))
+    
+        run_fn = run_torchserve if use_torchserve else run_dask
+        res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, eager_mode, opt)) for t in tiles]
+    
+        def get_net_tiles(n):
+            return [Tile(t.i, t.j, t.img[n]) for t in res]
+    
+        images = {}
+    
+        for i in range(1, opt.modalities_no + 1):
+            images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize(img.size)
+    
+        if opt.seg_gen:
+            for i in range(1, opt.modalities_no + 1):
+                images['Seg' + str(i)] = stitch(get_net_tiles('GS_' + str(i)), tile_size, overlap_size).resize(img.size)
+    
+        return images
+    
+    else:
+        raise Exception(f'inference() not implemented for model {opt.model}')
 
-    run_fn = run_torchserve if use_torchserve else run_dask
 
-    images = {}
-    images['Hema'] = create_image_for_stitching(tile_size, rows, cols)
-    images['DAPI'] = create_image_for_stitching(tile_size, rows, cols)
-    images['Lap2'] = create_image_for_stitching(tile_size, rows, cols)
-    images['Marker'] = create_image_for_stitching(tile_size, rows, cols)
-    images['Seg'] = create_image_for_stitching(tile_size, rows, cols)
+def postprocess(img, images, thresh=80, noise_objects_size=20, small_object_size=50, opt=None):
+    if opt.model == 'DeepLIIF':
+        seg_img = images['Seg']
+        mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
+                                                    thresh, noise_objects_size, small_object_size)
+        images = {}
+        images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
+        images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
+    
+        all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
+        scoring = {
+            'num_total': all_cells_no,
+            'num_pos': positive_cells_no,
+            'num_neg': negative_cells_no,
+            'percent_pos': IHC_score
+        }
+        
+        return images, scoring
+        
+    elif opt.model == 'DeepLIIFExt':
+        processed_images = {}
+        scoring = {}
+        for img_name in list(images.keys()):
+            if 'Seg' in img_name:
+                seg_img = images[img_name]
+                mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
+                                                            thresh, noise_objects_size, small_object_size)
+    
+                processed_images[img_name + '_Overlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
+                processed_images[img_name + '_Refined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
+    
+                all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
+                scoring[img_name] = {
+                    'num_total': all_cells_no,
+                    'num_pos': positive_cells_no,
+                    'num_neg': negative_cells_no,
+                    'percent_pos': IHC_score
+                }
+        return processed_images, scoring
+    
+    else:
+        raise Exception(f'postprocess() not implemented for model {opt.model}')
 
-    for i in range(cols):
-        for j in range(rows):
-            tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
-            res = run_fn(tile, model_path, eager_mode, opt)
-
-            stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
-            stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
-            stitch_tile(images['Lap2'], res['G3'], tile_size, overlap_size, i, j)
-            stitch_tile(images['Marker'], res['G4'], tile_size, overlap_size, i, j)
-            stitch_tile(images['Seg'], res['G5'], tile_size, overlap_size, i, j)
-
-    images['Hema'] = images['Hema'].resize(img.size)
-    images['DAPI'] = images['DAPI'].resize(img.size)
-    images['Lap2'] = images['Lap2'].resize(img.size)
-    images['Marker'] = images['Marker'].resize(img.size)
-    images['Seg'] = images['Seg'].resize(img.size)
-
-    if color_dapi:
-        matrix = (       0,        0,        0, 0,
-                  299/1000, 587/1000, 114/1000, 0,
-                  299/1000, 587/1000, 114/1000, 0)
-        images['DAPI'] = images['DAPI'].convert('RGB', matrix)
-
-    if color_marker:
-        matrix = (299/1000, 587/1000, 114/1000, 0,
-                  299/1000, 587/1000, 114/1000, 0,
-                         0,        0,        0, 0)
-        images['Marker'] = images['Marker'].convert('RGB', matrix)
-
-    return images
-
-
-def postprocess(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
-    mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
-                                                thresh, noise_objects_size, small_object_size)
-    images = {}
-    images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
-    images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
-
-    all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
-    scoring = {
-        'num_total': all_cells_no,
-        'num_pos': positive_cells_no,
-        'num_neg': negative_cells_no,
-        'percent_pos': IHC_score
-    }
-
-    return images, scoring
+    
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
@@ -352,6 +466,10 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     :param model_dir: The directory containing serialized model files.
     :return: The inferred modalities and the segmentation mask.
     """
+    if opt is None:
+        opt = get_opt(model_dir)
+        print_options(opt)
+    
     if not tile_size:
         tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
                                       img.convert('L'))
@@ -367,10 +485,13 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         color_marker=color_marker,
         opt=opt
     )
-
-    post_images, scoring = postprocess(img, images['Seg'], small_object_size=20)
-    images = {**images, **post_images}
-    return images, scoring
+    
+    if opt.seg_gen:
+        post_images, scoring = postprocess(img, images, small_object_size=20, opt=opt)
+        images = {**images, **post_images}
+        return images, scoring
+    else:
+        return images, None
 
 
 def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000):
