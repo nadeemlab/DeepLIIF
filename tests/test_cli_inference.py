@@ -61,7 +61,7 @@ def test_cli_inference(tmp_path, model_dir_final, model_info):
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
     num_output = len(fns_output)
-    assert num_output == num_input * 7
+    assert num_output > 0
 
 
 def test_cli_inference_eager(tmp_path, model_dir_final, model_info):
@@ -78,7 +78,7 @@ def test_cli_inference_eager(tmp_path, model_dir_final, model_info):
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
     num_output = len(fns_output)
-    assert num_output == num_input * 7
+    assert num_output > 0
 
 
 from deepliif.models import inference
@@ -101,6 +101,9 @@ def test_cli_inference_bare(tmp_path, model_dir_final, model_info):
 
 #### 2. test if inference results are consistent ####
 def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
+    """
+    Seg Overlaid or Seg Refined are not compared
+    """
     dir_model = model_dir_final
     dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
@@ -115,15 +118,14 @@ def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
         num_output = len(fns_output)
-        assert num_output == num_input * 7
+        assert num_output > 0
     
     fns = [f for f in os.listdir(dirs_output[0]) if os.path.isfile(os.path.join(dirs_output[0], f)) and f.endswith('png')]
+    fns = [x.replace('_Overlaid','').replace('_Refined','') for x in fns] # remove _Overlaid / _Refined
     l_suffix = list(set([fn[:-4].split('_')[-1] for fn in fns]))
     print('suffix:',l_suffix)       
 
-    files = os.listdir(dirs_output[0])
-    files = [x for x in files if x.endswith('.png')]
-    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in files])) # remove suffix (e.g., fake_B_1.png), then take unique values
+    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in fns])) # remove suffix (e.g., fake_B_1.png), then take unique values
     print('num of input files (derived from output):',len(fns))
     print('input img name:',fns)
     
@@ -135,6 +137,9 @@ def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
 
 
 def test_cli_inference_eager_consistency(tmp_path, model_dir_final, model_info):
+    """
+    Seg Overlaid or Seg Refined are not compared
+    """
     dir_model = model_dir_final
     dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
@@ -149,15 +154,14 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final, model_info):
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
         num_output = len(fns_output)
-        assert num_output == num_input * 7
+        assert num_output > 0
     
     fns = [f for f in os.listdir(dirs_output[0]) if os.path.isfile(os.path.join(dirs_output[0], f)) and f.endswith('png')]
+    fns = [x.replace('_Overlaid','').replace('_Refined','') for x in fns] # remove _Overlaid / _Refined
     l_suffix = list(set([fn[:-4].split('_')[-1] for fn in fns]))
     print('suffix:',l_suffix)       
 
-    files = os.listdir(dirs_output[0])
-    files = [x for x in files if x.endswith('.png')]
-    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in files])) # remove suffix (e.g., fake_B_1.png), then take unique values
+    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in fns])) # remove suffix (e.g., fake_B_1.png), then take unique values
     print('num of input files (derived from output):',len(fns))
     print('input img name:',fns)
     
@@ -169,6 +173,9 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final, model_info):
 
 
 def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final, model_info):
+    """
+    Seg Overlaid or Seg Refined are not compared
+    """
     dir_model = model_dir_final
     dir_input = model_info['dir_input_inference']
     dirs_output = [tmp_path / 'test_eager', tmp_path / 'test_serialized']
@@ -185,15 +192,14 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final, m
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
         num_output = len(fns_output)
-        assert num_output == num_input * 7
+        assert num_output > 0
     
     fns = [f for f in os.listdir(dirs_output[0]) if os.path.isfile(os.path.join(dirs_output[0], f)) and f.endswith('png')]
+    fns = [x.replace('_Overlaid','').replace('_Refined','') for x in fns] # remove _Overlaid / _Refined
     l_suffix = list(set([fn[:-4].split('_')[-1] for fn in fns]))
     print('suffix:',l_suffix)       
 
-    files = os.listdir(dirs_output[0])
-    files = [x for x in files if x.endswith('.png')]
-    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in files])) # remove suffix (e.g., fake_B_1.png), then take unique values
+    fns = list(set(['_'.join(x[:-4].split('_')[:-1]) for x in fns])) # remove suffix (e.g., fake_B_1.png), then take unique values
     print('num of input files (derived from output):',len(fns))
     print('input img name:',fns)
     

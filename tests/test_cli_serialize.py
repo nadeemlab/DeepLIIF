@@ -1,6 +1,6 @@
 import subprocess
 
-def test_cli_inference(tmp_path, model_dir_final, model_info):
+def test_cli_serialize(tmp_path, model_dir_final, model_info):
     dir_model = model_dir_final
     dir_output = tmp_path
     
