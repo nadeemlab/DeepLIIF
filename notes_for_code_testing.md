@@ -16,6 +16,7 @@ The **automatic testing** with GitHub Actions is not enabled due to the need of 
 Added arguments:
 - `model_type`: the type of model to use, currently allows "latest" or "ext"
 - `model_dir`: the directory to your local model files if you have, using which can avoid the time downloading the models from Zenodo (10min+)
+
 Note that **in order to specify `model_dir`, you have to specify `model_type`**. This seems to be some issue in `pytest` custom arguments.
 
 |Model Type|Example Execution Time|
