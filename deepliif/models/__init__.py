@@ -107,7 +107,7 @@ def load_torchscript_model(model_pt_path, device):
 
 
 
-def load_eager_models(model_dir, devices, opt):
+def load_eager_models(opt):
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
