@@ -323,7 +323,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
     for i in range(cols):
         for j in range(rows):
             tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
-            res = run_fn(tile, model_path, eager_mode)
+            res = run_wrapper(tile, run_fn, model_path, eager_mode)
 
             stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
             stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
