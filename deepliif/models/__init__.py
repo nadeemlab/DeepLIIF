@@ -171,7 +171,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
     if eager_mode:
-        return load_eager_models(model_dir, devices, opt)
+        return load_eager_models(opt)
 
     return {
         n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
@@ -485,7 +485,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         opt=opt
     )
     
-    if opt.seg_gen:
+    if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
         post_images, scoring = postprocess(img, images, small_object_size=20, opt=opt)
         images = {**images, **post_images}
         return images, scoring
