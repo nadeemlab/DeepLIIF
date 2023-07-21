@@ -340,7 +340,6 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         print_options(opt)
     
     if opt.model == 'DeepLIIF':
-
         rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
     
         run_fn = run_torchserve if use_torchserve else run_dask
@@ -355,7 +354,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         for i in range(cols):
             for j in range(rows):
                 tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
-                res = run_fn(tile, model_path, eager_mode, opt)
+                res = run_wrapper(tile, run_fn, model_path, eager_mode, opt)
     
                 stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
                 stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
