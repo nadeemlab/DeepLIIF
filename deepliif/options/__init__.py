@@ -44,9 +44,6 @@ class Options:
                 self.modalities_no = self.targets_no - 1
                 del self.targets_no
             
-            # to account for old settings when DeepLIIFExt was using model name DeepLIIF
-            if self.model == 'DeepLIIF' and hasattr(self,'seg_gen'):
-                self.model = 'DeepLIIFExt'
             
 
         if mode == 'train':

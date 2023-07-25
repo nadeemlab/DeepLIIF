@@ -157,7 +157,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         if opt.seg_gen:
             net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
         else:
-            net_groups = [(f'G_{i+1}',) for i in opt.modalities_no]
+            net_groups = [(f'G_{i+1}',) for i in range(opt.modalities_no)]
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
