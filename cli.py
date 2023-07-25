@@ -529,14 +529,13 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
-@click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
 @click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
-def test(input_dir, output_dir, tile_size, model_dir, model, region_size, eager_mode,
+def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
          color_dapi, color_marker):
     
     """Test trained models
@@ -550,8 +549,6 @@ def test(input_dir, output_dir, tile_size, model_dir, model, region_size, eager_
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     
     # fix opt from old settings
-    if hasattr(opt,'model') is None or getattr(opt,'model') != model:
-        opt.model = model
     if not hasattr(opt,'modalities_no') and hasattr(opt,'targets_no'):
         opt.modalities_no = opt.targets_no - 1
         del opt.targets_no

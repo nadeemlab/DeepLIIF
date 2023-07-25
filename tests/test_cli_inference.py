@@ -56,7 +56,7 @@ def test_cli_inference(tmp_path, model_dir_final, model_info):
     num_input = len(fns_input)
     assert num_input > 0
     
-    res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+    res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
     assert res.returncode == 0
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -73,7 +73,7 @@ def test_cli_inference_eager(tmp_path, model_dir_final, model_info):
     num_input = len(fns_input)
     assert num_input > 0
     
-    res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+    res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
     assert res.returncode == 0
     
     fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -113,7 +113,7 @@ def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
     assert num_input > 0    
     
     for dir_output in dirs_output:
-        res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -149,7 +149,7 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir_final, model_info):
     assert num_input > 0
     
     for dir_output in dirs_output:
-        res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
@@ -185,9 +185,9 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir_final, m
     assert num_input > 0
     for dir_output in dirs_output:
         if 'eager' in str(dir_output):
-            res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode',shell=True)
         else:
-            res = subprocess.run(f'python cli.py test --model {model_info["model"]} --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
