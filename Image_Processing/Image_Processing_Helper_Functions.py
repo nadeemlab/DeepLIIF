@@ -485,7 +485,7 @@ def create_dataset_from_ome_multi_channel_image(ome_dir, output_addr, tile_size=
                                                                                       region=(i, j, min(region_size, size_x - i), min(region_size, size_y - j)))
 
                 create_dataset_from_WSI_regions(images_dict, output_addr,
-                                                ome.split('_')[0], tile_size=tile_sicdze, start_i=i, start_j=j)
+                                                ome.split('_')[0], tile_size=tile_size, start_i=i, start_j=j)
 
     javabridge.kill_vm()
 
