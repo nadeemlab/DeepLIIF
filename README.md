@@ -342,7 +342,7 @@ co-registration, whole-cell multiplex segmentation via [ImPartial](https://githu
 DeepLIIF model and release back to the community with full credit to the contributors.
 
 - [x] **Memorial Sloan Kettering Cancer Center** [AI-ready immunohistochemistry and multiplex immunofluorescence dataset](https://zenodo.org/record/4751737#.YKRTS0NKhH4) for breast, lung, and bladder cancers (**Nature Machine Intelligence'22**)
-- [x] **Moffitt Cancer Center** AI-ready multiplex immunofluorescence and multiplex immunohistochemistry dataset for head-and-neck squamous cell carcinoma (**MICCAI'23**)   
+- [x] **Moffitt Cancer Center** [AI-ready multiplex immunofluorescence and multiplex immunohistochemistry dataset](https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=70226184) for head-and-neck squamous cell carcinoma (**MICCAI'23**)   
 
 ## Support
 Please use the [Image.sc Forum](https://forum.image.sc/tag/deepliif) for discussion and questions related to DeepLIIF.
