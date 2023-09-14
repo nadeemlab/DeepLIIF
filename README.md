@@ -388,10 +388,10 @@ If you find our work useful in your research or if you use parts of this code or
 }
 
 @article{nadeem2023ki67validationMTC,
-author = {Nadeem, Saad and Hanna, Matthew G and Viswanathan, Kartik and Marino, Joseph and Ahadi, Mahsa and Alzumaili, Bayan and Bani, Mohamed-Amine and Chiarucci, Federico and Chou, Angela and De Leo, Antonio and Fuchs, Talia L and Lubin, Daniel J and Luxford, Catherine and Magliocca, Kelly and Martinez, Germán and Shi, Qiuying and Sidhu, Stan and Al Ghuzlan, Abir and Gill, Anthony J and Tallini, Giovanni and Ghossein, Ronald and Xu, Bin},
-title = {Ki67 proliferation index in medullary thyroid carcinoma: a comparative study of multiple counting methods and validation of image analysis and deep learning platforms},
-journal = {Histopathology},
-year = {2023},
-doi = {https://doi.org/10.1111/his.15048}
+  author = {Nadeem, Saad and Hanna, Matthew G and Viswanathan, Kartik and Marino, Joseph and Ahadi, Mahsa and Alzumaili, Bayan and Bani, Mohamed-Amine and Chiarucci, Federico and Chou, Angela and De Leo, Antonio and Fuchs, Talia L and Lubin, Daniel J and Luxford, Catherine and Magliocca, Kelly and Martinez, Germán and Shi, Qiuying and Sidhu, Stan and Al Ghuzlan, Abir and Gill, Anthony J and Tallini, Giovanni and Ghossein, Ronald and Xu, Bin},
+  title = {Ki67 proliferation index in medullary thyroid carcinoma: a comparative study of multiple counting methods and validation of image analysis and deep learning platforms},
+  journal = {Histopathology},
+  year = {2023},
+  doi = {https://doi.org/10.1111/his.15048}
 }
 ```
