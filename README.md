@@ -208,8 +208,7 @@ on how to deploy the model with Torchserve and for an example of how to run the 
 We provide a Dockerfile that can be used to run the DeepLIIF models inside a container.
 First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
 After installing the Docker, you need to follow these steps:
-* Download the pretrained model and place them in DeepLIIF/checkpoints/DeepLIIF_Latest_Model.
-* Change XXX of the **WORKDIR** line in the **DockerFile** to the directory containing the DeepLIIF project. 
+* Download the pretrained model [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4) and place them in DeepLIIF/model-server/DeepLIIF_Latest_Model.
 * To create a docker image from the docker file:
 ```
 docker build -t cuda/deepliif .
@@ -218,7 +217,7 @@ The image is then used as a base. You can copy and use it to run an application.
 environment in which to run, referred to as a container.
 * To create and run a container:
 ```
- docker run -it -v `pwd`:`pwd` -w `pwd` cuda/deepliif deepliif test --input-dir Sample_Large_Tissues
+ docker run -it -v `pwd`:`pwd` -w `pwd` cuda/deepliif deepliif test --input-dir Sample_Large_Tissues --tile-size 512
 ```
 When you run a container from the image, the `deepliif` CLI will be available.
 You can easily run any CLI command in the activated environment and copy the results from the docker container to the host.
