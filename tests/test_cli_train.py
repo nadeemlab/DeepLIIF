@@ -13,8 +13,8 @@ def test_cli_train(tmp_path, model_info):
     fns_input = [f for f in os.listdir(dir_input + '/train') if os.path.isfile(os.path.join(dir_input + '/train', f)) and f.endswith('png')]
     num_input = len(fns_input)
     assert num_input > 0
-    
-    res = subprocess.run(f'python cli.py train --model {model_info["model"]} --dataroot {dir_input} --name test_local --batch-size 1 --num-threads 0 --checkpoints-dir {dir_save} --remote True --n-epochs 1 --n-epochs-decay 1',shell=True)
+
+    res = subprocess.run(f'python cli.py train --model {model_info["model"]} --dataroot {dir_input} --name test_local --batch-size 1 --num-threads 0 --checkpoints-dir {dir_save} --remote True --n-epochs 1 --n-epochs-decay 1 --print-freq 1 --display-freq 1 --update-html-freq 1 --save-latest-freq 1 --save-epoch-freq 1',shell=True)
     assert res.returncode == 0
     
 

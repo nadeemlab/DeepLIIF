@@ -130,7 +130,13 @@ class BaseModel(ABC):
         visual_ret = OrderedDict()
         for name in self.visual_names:
             if isinstance(name, str):
-                visual_ret[name] = getattr(self, name)
+                if not hasattr(self, name):
+                    if len(name.split('_')) == 2:
+                        visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
+                    else:
+                        visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
+                else:
+                    visual_ret[name] = getattr(self, name)
         return visual_ret
 
     def get_current_losses(self):
@@ -138,7 +144,16 @@ class BaseModel(ABC):
         errors_ret = OrderedDict()
         for name in self.loss_names:
             if isinstance(name, str):
-                errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
+                if not hasattr(self, 'loss_'+name): # appears in DeepLIIFExt
+                    if len(name.split('_')) == 2:
+                        errors_ret[name] = float(getattr(self, 'loss_' + name.split('_')[0])[int(
+                            name.split('_')[-1]) - 1])  # float(...) works for both scalar tensor and float number
+                    else:
+                        errors_ret[name] = float(getattr(self, 'loss_' + name.split('_')[0] + '_' + name.split('_')[1])[int(
+                            name.split('_')[-1]) - 1])  # float(...) works for both scalar tensor and float number
+                else: # single numeric value
+                    errors_ret[name] = float(getattr(self, 'loss_' + name)) 
+                    
         return errors_ret
 
     def save_networks(self, epoch, save_from_one_process=False):
