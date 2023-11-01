@@ -4,6 +4,8 @@ from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
 from ..util import disable_batchnorm_tracking_stats
+from deepliif.util import *
+import itertools
 
 
 class BaseModel(ABC):
@@ -246,17 +248,37 @@ class BaseModel(ABC):
                     net = getattr(self, 'net' + name)
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
+                
+                self.set_requires_grad(net,self.opt.is_train)
+                # check if gradients are disabled
+                names_layer_requires_grad = []
+                for name, param in net.named_parameters():
+                    if param.requires_grad:
+                        names_layer_requires_grad.append(name)
+                
+                print('requires grad:',names_layer_requires_grad)
                 print('loading the model from %s' % load_path)
                 # if you are using PyTorch newer than 0.4 (e.g., built from
                 # GitHub source), you can remove str() on self.device
-                state_dict = torch.load(load_path, map_location=str(self.device))
+                
+                if self.opt.is_train:
+                    device = self.device
+                else:
+                    device = torch.device('cpu') # load in cpu first; later in __inite__.py::init_nets we will move it to the specified device
+                    
+                print(device)
+                net.to(device)
+                state_dict = torch.load(load_path, map_location=str(device))
+                
                 if hasattr(state_dict, '_metadata'):
                     del state_dict._metadata
 
+                
                 # patch InstanceNorm checkpoints prior to 0.4
-                #for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
-                #    self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
+                for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
+                    self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
                 net.load_state_dict(state_dict)
+                
 
     def print_networks(self, verbose):
         """Print the total number of parameters in the network and (if verbose) network architecture

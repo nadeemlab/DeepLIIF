@@ -6,6 +6,7 @@ from PIL import Image
 import cv2
 import os
 import numpy as np
+import torch
 
 
 TOLERANCE = 0.0001
@@ -98,8 +99,48 @@ def test_cli_inference_bare(tmp_path, model_dir_final, model_info):
     res = inference(img, tile_size, overlap_size, dir_model, use_torchserve=False, eager_mode=False,
               color_dapi=False, color_marker=False, opt=None)
 
+#### 2. test inference with selected gpus
+def test_cli_inference_selected_gpu(tmp_path, model_dir_final, model_info):
+    if torch.cuda.device_count() > 0:
+        dir_model = model_dir_final
+        dir_input = model_info['dir_input_inference']
+        dir_output = tmp_path
+        
+        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+        num_input = len(fns_input)
+        assert num_input > 0
+        
+        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --gpu-ids 1',shell=True)
+        assert res.returncode == 0
+        
+        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+        num_output = len(fns_output)
+        assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
-#### 2. test if inference results are consistent ####
+
+def test_cli_inference_eager_selected_gpu(tmp_path, model_dir_final, model_info):
+    if torch.cuda.device_count() > 0:
+        dir_model = model_dir_final
+        dir_input = model_info['dir_input_inference']
+        dir_output = tmp_path
+        
+        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+        num_input = len(fns_input)
+        assert num_input > 0
+        
+        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode --gpu-ids 1',shell=True)
+        assert res.returncode == 0
+        
+        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+        num_output = len(fns_output)
+        assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
+    
+
+#### 3. test if inference results are consistent ####
 def test_cli_inference_consistency(tmp_path, model_dir_final, model_info):
     """
     Seg Overlaid or Seg Refined are not compared

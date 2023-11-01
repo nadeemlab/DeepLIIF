@@ -20,6 +20,11 @@ class DeepLIIFModel(BaseModel):
         # loss weights in calculating the final loss
         self.loss_G_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
         self.loss_D_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+        
+        if not opt.is_train:
+            self.gpu_ids = [] # avoid the models being loaded as DP
+        else:
+            self.gpu_ids = opt.gpu_ids
 
         self.loss_names = []
         self.visual_names = ['real_A']
