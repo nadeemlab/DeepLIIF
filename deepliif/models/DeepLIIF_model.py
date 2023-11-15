@@ -12,6 +12,7 @@ class DeepLIIFModel(BaseModel):
         Parameters:
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/init")
         BaseModel.__init__(self, opt)
 
         # weights of the modalities in generating segmentation mask
@@ -51,6 +52,7 @@ class DeepLIIFModel(BaseModel):
                 self.model_names.extend(['G5' + str(i)])
 
         # define networks (both generator and discriminator)
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/init define_G")
         self.netG1 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding)
         self.netG2 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
@@ -70,9 +72,11 @@ class DeepLIIFModel(BaseModel):
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
         self.netG55 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'unet_512', opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+        torch.cuda.nvtx.range_pop()
 
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
+            torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/init define_D")
             self.netD1 = networks.define_D(opt.input_nc+opt.output_nc , opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
             self.netD2 = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
@@ -92,14 +96,18 @@ class DeepLIIFModel(BaseModel):
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
             self.netD55 = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+            torch.cuda.nvtx.range_pop()
 
         if self.is_train:
             # define loss functions
+            torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/init define loss")
             self.criterionGAN_BCE = networks.GANLoss('vanilla').to(self.device)
             self.criterionGAN_lsgan = networks.GANLoss('lsgan').to(self.device)
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
+            torch.cuda.nvtx.range_pop()
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
+            torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/init define optimizers")
             params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
             self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
@@ -110,6 +118,8 @@ class DeepLIIFModel(BaseModel):
             self.optimizers.append(self.optimizer_D)
 
             self.criterionVGG = networks.VGGLoss().to(self.device)
+            torch.cuda.nvtx.range_pop()
+    torch.cuda.nvtx.range_pop()
 
     def set_input(self, input):
         """
@@ -130,21 +140,42 @@ class DeepLIIFModel(BaseModel):
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward")
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G1")
         self.fake_B_1 = self.netG1(self.real_A)   # Hematoxylin image generator
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G2")
         self.fake_B_2 = self.netG2(self.real_A)   # mpIF DAPI image generator
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G3")
         self.fake_B_3 = self.netG3(self.real_A)   # mpIF Lap2 image generator
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G4")
         self.fake_B_4 = self.netG4(self.real_A)   # mpIF Ki67 image generator
-
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G51")
         self.fake_B_5_1 = self.netG51(self.real_A)      # Segmentation mask generator from IHC input image
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G52")
         self.fake_B_5_2 = self.netG52(self.fake_B_1)    # Segmentation mask generator from Hematoxylin input image
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G53")
         self.fake_B_5_3 = self.netG53(self.fake_B_2)    # Segmentation mask generator from mpIF DAPI input image
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G54")
         self.fake_B_5_4 = self.netG54(self.fake_B_3)    # Segmentation mask generator from mpIF Lap2 input image
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward G55")
         self.fake_B_5_5 = self.netG55(self.fake_B_4)    # Segmentation mask generator from mpIF Lap2 input image
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/DeepLIIF/forward agg")
         self.fake_B_5 = torch.stack([torch.mul(self.fake_B_5_1, self.seg_weights[0]),
                                      torch.mul(self.fake_B_5_2, self.seg_weights[1]),
                                      torch.mul(self.fake_B_5_3, self.seg_weights[2]),
                                      torch.mul(self.fake_B_5_4, self.seg_weights[3]),
                                      torch.mul(self.fake_B_5_5, self.seg_weights[4])]).sum(dim=0)
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_pop()
 
     def backward_D(self):
         """Calculate GAN loss for the discriminators"""

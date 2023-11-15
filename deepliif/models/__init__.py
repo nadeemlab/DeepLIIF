@@ -42,6 +42,7 @@ from .base_model import BaseModel
 # import for init purpose, not used in this script
 from .DeepLIIF_model import DeepLIIFModel
 from .DeepLIIFExt_model import DeepLIIFExtModel
+from .networks import get_norm_layer, ResnetGenerator, UnetGenerator
 
 
 @lru_cache
@@ -106,13 +107,17 @@ def load_torchscript_model(model_pt_path, device):
     return net
 
 
-
+"""
 def load_eager_models(opt, devices):
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models")
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models model.setup")
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
+    torch.cuda.nvtx.range_pop()
     
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models get net and move to device")
     nets = {}
     for name in model.model_names:
         if isinstance(name, str):
@@ -128,7 +133,76 @@ def load_eager_models(opt, devices):
             nets[name] = net
             nets[name].to(devices[name])
             print(name, next(net.parameters()).device)
+    torch.cuda.nvtx.range_pop()
+    torch.cuda.nvtx.range_pop()
             
+    return nets
+"""
+  
+def read_model_params(file_addr):
+    with open(file_addr) as f:
+        lines = f.readlines()
+    param_dict = {}
+    for line in lines:
+        if ':' in line:
+            key = line.split(':')[0].strip()
+            val = line.split(':')[1].split('[')[0].strip()
+            param_dict[key] = val
+    print(param_dict)
+    return param_dict
+
+
+def load_eager_models(opt, devices):
+    print(devices)
+    model_dir = '../checkpoints/DeepLIIF_Latest_Model'
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models")
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models setup")
+    input_nc = 3
+    output_nc = 3
+    ngf = 64
+    norm = 'batch'
+    use_dropout = True
+    padding_type = 'zero'
+
+    files = os.listdir(model_dir)
+    for f in files:
+        if 'train_opt.txt' in f:
+            param_dict = read_model_params(os.path.join(model_dir, f))
+            input_nc = int(param_dict['input_nc'])
+            output_nc = int(param_dict['output_nc'])
+            ngf = int(param_dict['ngf'])
+            norm = param_dict['norm']
+            use_dropout = False if param_dict['no_dropout'] == 'True' else True
+            padding_type = param_dict['padding']
+
+    norm_layer = get_norm_layer(norm_type=norm)
+    torch.cuda.nvtx.range_pop()
+    
+    torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models load nets")
+    nets = {}
+    for n in ['G1', 'G2', 'G3', 'G4']:
+        torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models load net {n}")
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
+        net.load_state_dict(torch.load(
+            os.path.join(model_dir, f'latest_net_{n}.pth'),
+            map_location=devices[n]
+        ))
+        nets[n] = disable_batchnorm_tracking_stats(net)
+        nets[n].eval()
+        torch.cuda.nvtx.range_pop()
+
+    for n in ['G51', 'G52', 'G53', 'G54', 'G55']:
+        torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models load net {n}")
+        net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net.load_state_dict(torch.load(
+            os.path.join(model_dir, f'latest_net_{n}.pth'),
+            map_location=devices[n]
+        ))
+        nets[n] = disable_batchnorm_tracking_stats(net)
+        nets[n].eval()
+        torch.cuda.nvtx.range_pop()
+    torch.cuda.nvtx.range_pop()
+    torch.cuda.nvtx.range_pop()
     return nets
 
 
@@ -141,6 +215,8 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     opt_args: to overwrite opt arguments in train_opt.txt, typically used in inference stage
               for example, opt_args={'phase':'test'}
     """ 
+    torch.cuda.nvtx.range_push(f"deepliif/models/init_nets")
+    torch.cuda.nvtx.range_push(f"deepliif/models/init_nets setup")
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
         print_options(opt)
@@ -160,10 +236,12 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
             net_groups = [(f'G_{i+1}',) for i in range(opt.modalities_no)]
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
-
+    torch.cuda.nvtx.range_pop()
+    
+    torch.cuda.nvtx.range_push(f"deepliif/models/init_nets infer devices")
     number_of_gpus_all = torch.cuda.device_count()
     number_of_gpus = len(opt.gpu_ids)
-    
+    print(number_of_gpus)
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
@@ -172,14 +250,20 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         # devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
-        
+    torch.cuda.nvtx.range_pop()
+    
+    torch.cuda.nvtx.range_push(f"deepliif/models/init_nets load models")
     if eager_mode:
-        return load_eager_models(opt, devices)
-
-    return {
+        res = load_eager_models(opt, devices)
+        torch.cuda.nvtx.range_pop()
+        return res
+    
+    res = {
         n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
         for n, d in devices.items()
     }
+    torch.cuda.nvtx.range_pop()
+    return res
 
 
 def compute_overlap(img_size, tile_size):
@@ -215,11 +299,16 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
 
 
 def run_dask(img, model_path, eager_mode=False, opt=None):
+    torch.cuda.nvtx.range_push(f"deepliif/models/run_dask")
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
+    torch.cuda.nvtx.range_push(f"deepliif/models/run_dask init_nets")
     nets = init_nets(model_dir, eager_mode, opt)
+    torch.cuda.nvtx.range_pop()
     print(nets.keys())
-
+    
+    torch.cuda.nvtx.range_push(f"deepliif/models/run_dask transform")
     ts = transform(img.resize((512, 512)))
+    torch.cuda.nvtx.range_pop()
 
     @delayed
     def forward(input, model):
@@ -229,19 +318,31 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     if opt.model == 'DeepLIIF':
         seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
         
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask create lazy_gens")
         lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask compute lazy_gens")
         gens = compute(lazy_gens)[0]
+        torch.cuda.nvtx.range_pop()
         
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask create lazy_segs")
         lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
         lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask compute lazy_segs")
         segs = compute(lazy_segs)[0]
-    
+        torch.cuda.nvtx.range_pop()
+        
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask aggregate seg images")
         seg_weights = [0.25, 0.25, 0.25, 0, 0.25]
         seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
-    
+        torch.cuda.nvtx.range_pop()
+        
+        torch.cuda.nvtx.range_push(f"deepliif/models/run_dask tensor_to_pil")
         res = {k: tensor_to_pil(v) for k, v in gens.items()}
         res['G5'] = tensor_to_pil(seg)
-    
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_pop()
         return res
     elif opt.model == 'DeepLIIFExt':
         seg_map = {'G_' + str(i): 'GS_' + str(i) for i in range(1, opt.modalities_no + 1)}
@@ -339,33 +440,47 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
               color_dapi=False, color_marker=False, opt=None):
+    torch.cuda.nvtx.range_push(f"deepliif/models/inference")
+    torch.cuda.nvtx.range_push(f"deepliif/models/inference setup")
     if not opt:
         opt = get_opt(model_path)
         print_options(opt)
+    torch.cuda.nvtx.range_pop()
     
     if opt.model == 'DeepLIIF':
-        rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
-    
+        torch.cuda.nvtx.range_push(f"deepliif/models/inference format_image_for_tiling & determine run_fn")
+        rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)        
         run_fn = run_torchserve if use_torchserve else run_dask
+        torch.cuda.nvtx.range_pop()
     
+        torch.cuda.nvtx.range_push(f"deepliif/models/inference create_image_for_stitching")
         images = {}
         images['Hema'] = create_image_for_stitching(tile_size, rows, cols)
         images['DAPI'] = create_image_for_stitching(tile_size, rows, cols)
         images['Lap2'] = create_image_for_stitching(tile_size, rows, cols)
         images['Marker'] = create_image_for_stitching(tile_size, rows, cols)
         images['Seg'] = create_image_for_stitching(tile_size, rows, cols)
-    
+        torch.cuda.nvtx.range_pop()
+        
+        torch.cuda.nvtx.range_push(f"deepliif/models/inference get tile and run dask")
         for i in range(cols):
             for j in range(rows):
+                torch.cuda.nvtx.range_push(f"deepliif/models/inference tile {(j,i)}")
+                torch.cuda.nvtx.range_push(f"deepliif/models/inference tile {(j,i)} extract_tile")
                 tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
+                torch.cuda.nvtx.range_pop()
+                torch.cuda.nvtx.range_push(f"deepliif/models/inference tile {(j,i)} run_wrapper")
                 res = run_wrapper(tile, run_fn, model_path, eager_mode, opt)
+                torch.cuda.nvtx.range_pop()
     
                 stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
                 stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
                 stitch_tile(images['Lap2'], res['G3'], tile_size, overlap_size, i, j)
                 stitch_tile(images['Marker'], res['G4'], tile_size, overlap_size, i, j)
                 stitch_tile(images['Seg'], res['G5'], tile_size, overlap_size, i, j)
-    
+                torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_push(f"deepliif/models/inference post process")
         images['Hema'] = images['Hema'].resize(img.size)
         images['DAPI'] = images['DAPI'].resize(img.size)
         images['Lap2'] = images['Lap2'].resize(img.size)
@@ -383,7 +498,8 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
                       299/1000, 587/1000, 114/1000, 0,
                              0,        0,        0, 0)
             images['Marker'] = images['Marker'].convert('RGB', matrix)
-    
+        torch.cuda.nvtx.range_pop()
+        torch.cuda.nvtx.range_pop()
         return images
         
     elif opt.model == 'DeepLIIFExt':
@@ -469,6 +585,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     :param model_dir: The directory containing serialized model files.
     :return: The inferred modalities and the segmentation mask.
     """
+    torch.cuda.nvtx.range_push(f"deepliif/models/infer_modalities")
+    torch.cuda.nvtx.range_push(f"deepliif/models/infer_modalities setup")
     if opt is None:
         opt = get_opt(model_dir)
         print_options(opt)
@@ -477,7 +595,9 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
                                       img.convert('L'))
     tile_size = int(tile_size)
-
+    torch.cuda.nvtx.range_pop()
+    
+    torch.cuda.nvtx.range_push(f"deepliif/models/infer_modalities inference")
     images = inference(
         img,
         tile_size=tile_size,
@@ -488,12 +608,15 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         color_marker=color_marker,
         opt=opt
     )
+    torch.cuda.nvtx.range_pop()
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
         post_images, scoring = postprocess(img, images, small_object_size=20, opt=opt)
         images = {**images, **post_images}
+        torch.cuda.nvtx.range_pop()
         return images, scoring
     else:
+        torch.cuda.nvtx.range_pop()
         return images, None
 
 
