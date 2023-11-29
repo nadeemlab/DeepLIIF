@@ -107,7 +107,7 @@ def load_torchscript_model(model_pt_path, device):
     return net
 
 
-"""
+
 def load_eager_models(opt, devices):
     torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models")
     torch.cuda.nvtx.range_push(f"deepliif/models/load_eager_models model.setup")
@@ -137,8 +137,8 @@ def load_eager_models(opt, devices):
     torch.cuda.nvtx.range_pop()
             
     return nets
-"""
-  
+
+"""  
 def read_model_params(file_addr):
     with open(file_addr) as f:
         lines = f.readlines()
@@ -204,7 +204,7 @@ def load_eager_models(opt, devices):
     torch.cuda.nvtx.range_pop()
     torch.cuda.nvtx.range_pop()
     return nets
-
+"""
 
 @lru_cache
 def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
@@ -303,6 +303,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     torch.cuda.nvtx.range_push(f"deepliif/models/run_dask init_nets")
     nets = init_nets(model_dir, eager_mode, opt)
+    torch.backends.cudnn.benchmark = False
     torch.cuda.nvtx.range_pop()
     print(nets.keys())
     
