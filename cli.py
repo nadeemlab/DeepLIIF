@@ -553,6 +553,7 @@ def test(input_dir, output_dir, tile_size, model_dir, gpu_ids, region_size, eage
     files = os.listdir(model_dir)
     assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    opt.use_dp = False
     
     number_of_gpus_all = torch.cuda.device_count()
     if number_of_gpus_all < len(gpu_ids) and -1 not in gpu_ids:
@@ -574,6 +575,7 @@ def test(input_dir, output_dir, tile_size, model_dir, gpu_ids, region_size, eage
     print_options(opt)
     torch.cuda.nvtx.range_pop()
     torch.cuda.nvtx.range_push("click progressbar")
+    
     with click.progressbar(
             image_files,
             label=f'Processing {len(image_files)} images',

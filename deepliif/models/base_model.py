@@ -261,7 +261,7 @@ class BaseModel(ABC):
                 # if you are using PyTorch newer than 0.4 (e.g., built from
                 # GitHub source), you can remove str() on self.device
                 
-                if self.opt.is_train:
+                if self.opt.is_train or self.opt.use_dp:
                     device = self.device
                 else:
                     device = torch.device('cpu') # load in cpu first; later in __inite__.py::init_nets we will move it to the specified device
