@@ -38,13 +38,10 @@ import torch
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
-    print(opt.model)
-    
     
     # retrieve options used in training setting, similar to cli.py test
     model_dir = os.path.join(opt.checkpoints_dir, opt.name)
     opt_orig = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
-    print(opt_orig._get_kwargs)
     
     # overwrite/supply unseen options using the values from training stage
     for k,v in opt_orig._get_kwargs().items():
