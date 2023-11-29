@@ -685,7 +685,7 @@ def visualize(pickle_dir, display_env):
     params_opt = pickle.load(open(path_init,'rb'))
     params_opt.remote = False
     if display_env is not None:
-      params_opt.display_env = display_env
+        params_opt.display_env = display_env
     visualizer = Visualizer(params_opt)   # create a visualizer that display/save images and plots
 
     paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),
