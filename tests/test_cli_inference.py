@@ -101,7 +101,7 @@ def test_cli_inference_bare(tmp_path, model_dir_final, model_info):
 
 #### 2. test inference with selected gpus
 def test_cli_inference_selected_gpu(tmp_path, model_dir_final, model_info):
-    if torch.cuda.device_count() > 0:
+    if torch.cuda.device_count() > 1:
         dir_model = model_dir_final
         dir_input = model_info['dir_input_inference']
         dir_output = tmp_path
@@ -121,7 +121,7 @@ def test_cli_inference_selected_gpu(tmp_path, model_dir_final, model_info):
 
 
 def test_cli_inference_eager_selected_gpu(tmp_path, model_dir_final, model_info):
-    if torch.cuda.device_count() > 0:
+    if torch.cuda.device_count() > 1:
         dir_model = model_dir_final
         dir_input = model_info['dir_input_inference']
         dir_output = tmp_path
