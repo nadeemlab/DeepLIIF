@@ -142,6 +142,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     """ 
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
+        opt.use_dp = False
         print_options(opt)
     
     if opt.model == 'DeepLIIF':
@@ -470,6 +471,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     """
     if opt is None:
         opt = get_opt(model_dir)
+        opt.use_dp = False
         print_options(opt)
     
     if not tile_size:
