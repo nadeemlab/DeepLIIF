@@ -256,7 +256,6 @@ class BaseModel(ABC):
                     if param.requires_grad:
                         names_layer_requires_grad.append(name)
                 
-                print('requires grad:',names_layer_requires_grad)
                 print('loading the model from %s' % load_path)
                 # if you are using PyTorch newer than 0.4 (e.g., built from
                 # GitHub source), you can remove str() on self.device
@@ -266,7 +265,6 @@ class BaseModel(ABC):
                 else:
                     device = torch.device('cpu') # load in cpu first; later in __inite__.py::init_nets we will move it to the specified device
                     
-                print(device)
                 net.to(device)
                 state_dict = torch.load(load_path, map_location=str(device))
                 
