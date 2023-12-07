@@ -50,7 +50,13 @@ def get_opt(model_dir, mode='test'):
     mode: test or train, currently only functions used for inference utilize get_opt so it
           defaults to test
     """
-    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+    if mode == 'train':
+        opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+    elif mode == 'test':
+        try:
+            opt = Options(path_file=os.path.join(model_dir,'test_opt.txt'), mode=mode)
+        except:
+            opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
     return opt
 
 def find_model_using_name(model_name):
