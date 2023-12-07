@@ -242,7 +242,8 @@ def test_cli_inference_consistency(tmp_path, model_dir, model_info):
     dirs_model = model_dir
     dirs_input = model_info['dir_input_inference']
     for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
+        print('serialized x 2',dir_model, dir_input)
+        dirs_output = [tmp_path / f'{dir_model.split("/")[-1]}_test1', tmp_path / f'{dir_model.split("/")[-1]}_test2']
         
         fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
         num_input = len(fns_input)
@@ -279,7 +280,8 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir, model_info):
     dirs_model = model_dir
     dirs_input = model_info['dir_input_inference']
     for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
+        print('eager x 2',dir_model, dir_input)
+        dirs_output = [tmp_path / f'{dir_model.split("/")[-1]}_test3', tmp_path / f'{dir_model.split("/")[-1]}_test4']
         
         fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
         num_input = len(fns_input)
@@ -316,6 +318,7 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir, model_i
     dirs_model = model_dir
     dirs_input = model_info['dir_input_inference']
     for dir_model, dir_input in zip(dirs_model, dirs_input):
+        print('serialized vs eager',dir_model, dir_input)
         dirs_output = [tmp_path / 'test_eager', tmp_path / 'test_serialized']
         
         fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
