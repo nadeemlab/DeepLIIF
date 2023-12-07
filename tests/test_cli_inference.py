@@ -8,7 +8,7 @@ import os
 import numpy as np
 import torch
 
-
+available_gpus = torch.cuda.device_count()
 TOLERANCE = 0.0001
 
 def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
@@ -69,38 +69,44 @@ def test_cli_inference(tmp_path, model_dir, model_info):
 
 
 def test_cli_inference_gpu_single(tmp_path, model_dir, model_info):
-    dirs_model = model_dir
-    dirs_input = model_info['dir_input_inference']
-    tile_size = model_info['tile_size']
-    for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dir_output = tmp_path
-        
-        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
-        num_input = len(fns_input)
-        assert num_input > 0
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --tile-size {tile_size} --gpu-ids 1',shell=True)
-        assert res.returncode == 0
-        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
-        num_output = len(fns_output)
-        assert num_output > 0
+    if available_gpus > 0:
+        dirs_model = model_dir
+        dirs_input = model_info['dir_input_inference']
+        tile_size = model_info['tile_size']
+        for dir_model, dir_input in zip(dirs_model, dirs_input):
+            dir_output = tmp_path
+            
+            fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+            num_input = len(fns_input)
+            assert num_input > 0
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --tile-size {tile_size} --gpu-ids 0',shell=True)
+            assert res.returncode == 0
+            fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+            num_output = len(fns_output)
+            assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
 
 def test_cli_inference_gpu_multi(tmp_path, model_dir, model_info):
-    dirs_model = model_dir
-    dirs_input = model_info['dir_input_inference']
-    for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dir_output = tmp_path
-        
-        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
-        num_input = len(fns_input)
-        assert num_input > 0
-        
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --gpu-ids 3 --gpu-ids 2 --gpu-ids 1 --gpu-ids 0',shell=True)
-        assert res.returncode == 0
-        
-        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
-        num_output = len(fns_output)
-        assert num_output > 0
+    if available_gpus > 1:
+        dirs_model = model_dir
+        dirs_input = model_info['dir_input_inference']
+        for dir_model, dir_input in zip(dirs_model, dirs_input):
+            dir_output = tmp_path
+            
+            fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+            num_input = len(fns_input)
+            assert num_input > 0
+            
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --gpu-ids 1 --gpu-ids 0',shell=True)
+            assert res.returncode == 0
+            
+            fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+            num_output = len(fns_output)
+            assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
 
 def test_cli_inference_eager(tmp_path, model_dir, model_info):
@@ -122,39 +128,45 @@ def test_cli_inference_eager(tmp_path, model_dir, model_info):
 
 
 def test_cli_inference_eager_gpu_single(tmp_path, model_dir, model_info):
-    dirs_model = model_dir
-    dirs_input = model_info['dir_input_inference']
-    for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dir_output = tmp_path
-        
-        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
-        num_input = len(fns_input)
-        assert num_input > 0
-        
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode --gpu-ids 1',shell=True)
-        assert res.returncode == 0
-        
-        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
-        num_output = len(fns_output)
-        assert num_output > 0
+    if available_gpus > 0:
+        dirs_model = model_dir
+        dirs_input = model_info['dir_input_inference']
+        for dir_model, dir_input in zip(dirs_model, dirs_input):
+            dir_output = tmp_path
+            
+            fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+            num_input = len(fns_input)
+            assert num_input > 0
+            
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode --gpu-ids 0',shell=True)
+            assert res.returncode == 0
+            
+            fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+            num_output = len(fns_output)
+            assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
 
 def test_cli_inference_eager_gpu_multi(tmp_path, model_dir, model_info):
-    dirs_model = model_dir
-    dirs_input = model_info['dir_input_inference']
-    for dir_model, dir_input in zip(dirs_model, dirs_input):
-        dir_output = tmp_path
-        
-        fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
-        num_input = len(fns_input)
-        assert num_input > 0
-        
-        res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode --gpu-ids 2 --gpu-ids 1',shell=True)
-        assert res.returncode == 0
-        
-        fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
-        num_output = len(fns_output)
-        assert num_output > 0
+    if available_gpus > 1:
+        dirs_model = model_dir
+        dirs_input = model_info['dir_input_inference']
+        for dir_model, dir_input in zip(dirs_model, dirs_input):
+            dir_output = tmp_path
+            
+            fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
+            num_input = len(fns_input)
+            assert num_input > 0
+            
+            res = subprocess.run(f'python cli.py test --model-dir {dir_model} --input-dir {dir_input} --output-dir {dir_output} --eager-mode --gpu-ids 0 --gpu-ids 1',shell=True)
+            assert res.returncode == 0
+            
+            fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
+            num_output = len(fns_output)
+            assert num_output > 0
+    else:
+        pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
 
 from deepliif.models import inference
@@ -178,7 +190,7 @@ def test_cli_inference_bare(tmp_path, model_dir, model_info):
 
 #### 2. test inference with selected gpus
 def test_cli_inference_selected_gpu(tmp_path, model_dir, model_info):
-    if torch.cuda.device_count() > 1:
+    if available_gpus > 1:
         dirs_model = model_dir
         dirs_input = model_info['dir_input_inference']
         for dir_model, dir_input in zip(dirs_model, dirs_input):
@@ -199,7 +211,7 @@ def test_cli_inference_selected_gpu(tmp_path, model_dir, model_info):
 
 
 def test_cli_inference_eager_selected_gpu(tmp_path, model_dir, model_info):
-    if torch.cuda.device_count() > 1:
+    if available_gpus > 1:
         dirs_model = model_dir
         dirs_input = model_info['dir_input_inference']
         for dir_model, dir_input in zip(dirs_model, dirs_input):
@@ -335,6 +347,3 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir, model_i
             print(suffix, ssim_score)
             assert (1 - ssim_score) < TOLERANCE
       
-
-    
-    
