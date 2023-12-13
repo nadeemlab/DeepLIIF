@@ -4,9 +4,9 @@ import os
 from skimage.metrics import structural_similarity as ssim
 from PIL import Image
 import cv2
-import os
 import numpy as np
 import torch
+import shutil
 
 available_gpus = torch.cuda.device_count()
 TOLERANCE = 0.0001
@@ -43,9 +43,17 @@ def calculate_ssim(dir_a,dir_b,fns,suffix_a,suffix_b,verbose_freq=50):
     return score/count
 
 
-#def test_model_download(model_dir):
-#    print('final model dir:',model_dir)
-#    print(os.listdir(model_dir))
+# https://stackoverflow.com/questions/185936/how-to-delete-the-contents-of-a-folder
+def remove_contents_in_folder(folder):
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 #### 1. test if functions can run ####
 def test_cli_inference(tmp_path, model_dir, model_info):
@@ -64,7 +72,8 @@ def test_cli_inference(tmp_path, model_dir, model_info):
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
         num_output = len(fns_output)
         assert num_output > 0
-        break
+        
+        remove_contents_in_folder(tmp_path)
 
 
 
@@ -84,6 +93,8 @@ def test_cli_inference_gpu_single(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
@@ -105,6 +116,8 @@ def test_cli_inference_gpu_multi(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
@@ -125,6 +138,8 @@ def test_cli_inference_eager(tmp_path, model_dir, model_info):
         fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
         num_output = len(fns_output)
         assert num_output > 0
+        
+        remove_contents_in_folder(tmp_path)
 
 
 def test_cli_inference_eager_gpu_single(tmp_path, model_dir, model_info):
@@ -144,6 +159,8 @@ def test_cli_inference_eager_gpu_single(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
@@ -165,6 +182,8 @@ def test_cli_inference_eager_gpu_multi(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
@@ -186,6 +205,7 @@ def test_cli_inference_bare(tmp_path, model_dir, model_info):
         img = Image.open(os.path.join(dir_input, fn_input))
         res = inference(img, tile_size, overlap_size, dir_model, use_torchserve=False, eager_mode=False,
                   color_dapi=False, color_marker=False, opt=None)
+        
 
 
 #### 2. test inference with selected gpus
@@ -206,6 +226,8 @@ def test_cli_inference_selected_gpu(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
@@ -215,9 +237,6 @@ def test_cli_inference_eager_selected_gpu(tmp_path, model_dir, model_info):
         dirs_model = model_dir
         dirs_input = model_info['dir_input_inference']
         for dir_model, dir_input in zip(dirs_model, dirs_input):
-            dir_output = tmp_path
-            dir_model = model_dir
-            dir_input = model_info['dir_input_inference']
             dir_output = tmp_path
     
             fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
@@ -230,6 +249,8 @@ def test_cli_inference_eager_selected_gpu(tmp_path, model_dir, model_info):
             fns_output = [f for f in os.listdir(dir_output) if os.path.isfile(os.path.join(dir_output, f)) and f.endswith('png')]
             num_output = len(fns_output)
             assert num_output > 0
+            
+            remove_contents_in_folder(tmp_path)
     else:
         pytest.skip(f'Detected {available_gpus} (< 2) available GPUs. Skip.')
 
@@ -243,7 +264,7 @@ def test_cli_inference_consistency(tmp_path, model_dir, model_info):
     dirs_input = model_info['dir_input_inference']
     for dir_model, dir_input in zip(dirs_model, dirs_input):
         print('serialized x 2',dir_model, dir_input)
-        dirs_output = [tmp_path / f'{dir_model.split("/")[-1]}_test1', tmp_path / f'{dir_model.split("/")[-1]}_test2']
+        dirs_output = [tmp_path / 'test1', tmp_path / 'test2']
         
         fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
         num_input = len(fns_input)
@@ -271,6 +292,8 @@ def test_cli_inference_consistency(tmp_path, model_dir, model_info):
             ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
             print(suffix, ssim_score)
             assert (1 - ssim_score) < TOLERANCE
+        
+        remove_contents_in_folder(tmp_path)
 
 
 def test_cli_inference_eager_consistency(tmp_path, model_dir, model_info):
@@ -281,7 +304,7 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir, model_info):
     dirs_input = model_info['dir_input_inference']
     for dir_model, dir_input in zip(dirs_model, dirs_input):
         print('eager x 2',dir_model, dir_input)
-        dirs_output = [tmp_path / f'{dir_model.split("/")[-1]}_test3', tmp_path / f'{dir_model.split("/")[-1]}_test4']
+        dirs_output = [tmp_path / 'test1', tmp_path / f'test2']
         
         fns_input = [f for f in os.listdir(dir_input) if os.path.isfile(os.path.join(dir_input, f)) and f.endswith('png')]
         num_input = len(fns_input)
@@ -309,6 +332,8 @@ def test_cli_inference_eager_consistency(tmp_path, model_dir, model_info):
             ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
             print(suffix, ssim_score)
             assert (1 - ssim_score) < TOLERANCE
+        
+        remove_contents_in_folder(tmp_path)
 
 
 def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir, model_info):
@@ -349,4 +374,6 @@ def test_cli_inference_eager_serialized_consistency(tmp_path, model_dir, model_i
             ssim_score = calculate_ssim(dirs_output[0], dirs_output[1], fns, '_'+suffix, '_'+suffix)
             print(suffix, ssim_score)
             assert (1 - ssim_score) < TOLERANCE
+        
+        remove_contents_in_folder(tmp_path)
       
