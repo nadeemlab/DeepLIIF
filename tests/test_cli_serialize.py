@@ -1,4 +1,5 @@
 import subprocess
+from util import *
 
 def test_cli_serialize(tmp_path, model_dir, model_info):
     dirs_model = model_dir
@@ -8,3 +9,5 @@ def test_cli_serialize(tmp_path, model_dir, model_info):
     
         res = subprocess.run(f'python cli.py serialize --models-dir {dir_model} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
+        
+        remove_contents_in_folder(tmp_path)
