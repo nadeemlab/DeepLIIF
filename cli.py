@@ -211,6 +211,18 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG'], f'model class {model} is not implemented'
+    if model == 'DeepLIIF':
+        seg_no = 1
+    elif model == 'DeepLIIFExt':
+        if seg_gen:
+            seg_no = modalities_no
+        else:
+            seg_no = 0
+    else: # SDG
+        seg_no = 0
+        seg_gen = False
+    
     d_params = locals()
 
     if gpu_ids and gpu_ids[0] == -1:
@@ -239,6 +251,20 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     if flag_deterministic:
         d_params['padding'] = 'zero'
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
+
+    # infer number of input images
+    dir_data_train = dataroot + '/train'
+    fns = os.listdir(dir_data_train)
+    fns = [x for x in fns if x.endswith('.png')]
+    img = Image.open(f"{dir_data_train}/{fns[0]}")
+    
+    num_img = img.size[0] / img.size[1]
+    assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
+    num_img = int(num_img)
+    
+    input_no = num_img - modalities_no - seg_no
+    assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
+    d_params['input_no'] = input_no
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
@@ -470,7 +496,7 @@ def trainlaunch(**kwargs):
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', type=int, default=None, help='tile size')
-@click.option('--device', default='cpu', type=str, help='device to load model, either cpu or gpu')
+@click.option('--device', default='cpu', type=str, help='device to load model for the similarity test, either cpu or gpu')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
 def serialize(models_dir, output_dir, tile_size, device, verbose):
     """Serialize DeepLIIF models using Torchscript
