@@ -223,7 +223,6 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
 def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
-    torch.backends.cudnn.benchmark = False
     
     ts = transform(img.resize((512, 512)))
 
