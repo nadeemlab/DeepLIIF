@@ -72,6 +72,11 @@ class Options:
             self.name = str(model_dir.name)
             
             self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
+    
+    def _get_kwargs(self):
+        common_attr = ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__']
+        l_args = [x for x in dir(self) if x not in common_attr]
+        return {k:getattr(self,k) for k in l_args}
             
 def print_options(opt):
     """Print and save options
@@ -88,9 +93,10 @@ def print_options(opt):
     print(message)
 
     # save to the disk
-    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-    mkdirs(expr_dir)
-    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
-    with open(file_name, 'wt') as opt_file:
-        opt_file.write(message)
+    if opt.phase == 'train':
+        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+        mkdirs(expr_dir)
+        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+        with open(file_name, 'wt') as opt_file:
+            opt_file.write(message)
         opt_file.write('\n')

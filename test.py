@@ -29,33 +29,32 @@ See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-a
 import os
 import time
 from deepliif.options.test_options import TestOptions
+from deepliif.options import read_model_params, Options
 from deepliif.data import create_dataset
-from deepliif.models import create_model, read_model_params
+from deepliif.models import create_model
 from deepliif.util.visualizer import save_images
 from deepliif.util import html
-
+import torch
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
     
-    # retrieve options used in training setting, similar to 
-    # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/__init__.py#L115
-    # model_dir in init_nets() is equivalent to save_dir in basemodel init
-    # https://github.com/nadeemlab/DeepLIIF/blob/cc4deffca64b8865415ba665290d7971b821b1bd/deepliif/models/base_model.py#L36
+    # retrieve options used in training setting, similar to cli.py test
     model_dir = os.path.join(opt.checkpoints_dir, opt.name)
-    files = os.listdir(model_dir)
-    for f in files:
-        if 'train_opt.txt' in f:
-            param_dict = read_model_params(os.path.join(model_dir, f))
-            opt.input_nc = int(param_dict['input_nc'])
-            opt.output_nc = int(param_dict['output_nc'])
-            opt.ngf = int(param_dict['ngf'])
-            opt.norm = param_dict['norm']
-            # opt.use_dropout = False if param_dict['no_dropout'] == 'True' else True # in DeepLIIFModel(), the option used is opt.no_dropout not opt.use_dropout
-            # opt.padding_type = param_dict['padding'] # in DeepLIIFModel(), the option used is opt.padding not opt.padding_type
-            opt.padding = param_dict['padding'] 
+    opt_orig = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     
-    # hard-code some parameters for test
+    # overwrite/supply unseen options using the values from training stage
+    for k,v in opt_orig._get_kwargs().items():
+        if not hasattr(opt,k):
+            setattr(opt,k,v)
+    
+    if not hasattr(opt_orig,'seg_gen'): # old settings for DeepLIIF models
+        opt.seg_gen = True
+    else:
+        opt.seg_gen = opt_orig.seg_gen
+    
+    # hard-code some parameters for test.py
+    opt.use_dp = True # whether to initialize model in DataParallel setting (all models to one gpu, then pytorch controls the usage of specified set of GPUs for inference)
     opt.num_threads = 0   # test code only supports num_threads = 1
     opt.batch_size = 1    # test code only supports batch_size = 1
     opt.serial_batches = True  # disable data shuffling; comment this line if results on randomly chosen images are needed.
@@ -64,6 +63,7 @@ if __name__ == '__main__':
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
+    torch.backends.cudnn.benchmark = False
     # create a website
     web_dir = os.path.join(opt.results_dir, opt.name, '{}_{}'.format(opt.phase, opt.epoch))  # define the website directory
     if opt.load_iter > 0:  # load_iter is 0 by default

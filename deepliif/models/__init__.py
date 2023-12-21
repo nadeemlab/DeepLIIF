@@ -50,7 +50,13 @@ def get_opt(model_dir, mode='test'):
     mode: test or train, currently only functions used for inference utilize get_opt so it
           defaults to test
     """
-    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+    if mode == 'train':
+        opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+    elif mode == 'test':
+        try:
+            opt = Options(path_file=os.path.join(model_dir,'test_opt.txt'), mode=mode)
+        except:
+            opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
     return opt
 
 def find_model_using_name(model_name):
@@ -107,7 +113,7 @@ def load_torchscript_model(model_pt_path, device):
 
 
 
-def load_eager_models(opt):
+def load_eager_models(opt, devices):
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
@@ -116,8 +122,6 @@ def load_eager_models(opt):
     nets = {}
     for name in model.model_names:
         if isinstance(name, str):
-            save_filename = '%s_net_%s.pth' % (opt.epoch, name)
-            save_path = os.path.join(model.save_dir, save_filename)
             if '_' in name:
                 net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
             else:
@@ -128,6 +132,7 @@ def load_eager_models(opt):
                 net = disable_batchnorm_tracking_stats(net)
             
             nets[name] = net
+            nets[name].to(devices[name])
             
     return nets
 
@@ -143,6 +148,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     """ 
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
+        opt.use_dp = False
         print_options(opt)
     
     if opt.model == 'DeepLIIF':
@@ -161,17 +167,20 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
-    number_of_gpus = torch.cuda.device_count()
-    # number_of_gpus = 0
-    if number_of_gpus:
+    number_of_gpus_all = torch.cuda.device_count()
+    number_of_gpus = len(opt.gpu_ids)
+    print(number_of_gpus)
+    if number_of_gpus > 0:
+        mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
         # chunks = chunks[1:]
-        devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
+        devices = {n: torch.device(f'cuda:{mapping_gpu_ids[i]}') for i, g in enumerate(chunks) for n in g}
+        # devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
     if eager_mode:
-        return load_eager_models(opt)
+        return load_eager_models(opt, devices)
 
     return {
         n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
@@ -214,7 +223,7 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
 def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
-
+    
     ts = transform(img.resize((512, 512)))
 
     @delayed
@@ -467,6 +476,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     """
     if opt is None:
         opt = get_opt(model_dir)
+        opt.use_dp = False
         print_options(opt)
     
     if not tile_size:

@@ -96,7 +96,7 @@ def cli():
               help='name of the experiment. It decides where to store samples and models')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
-@click.option('--modalities-no', default=4, help='number of targets')
+@click.option('--modalities-no', default=4, type=int, help='number of targets')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
@@ -507,8 +507,8 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
     
     # test: whether the original and the serialized model produces highly similar predictions
     print('testing similarity between prediction from original vs serialized models...')
-    models_original = init_nets(models_dir,eager_mode=True)
-    models_serialized = init_nets(output_dir,eager_mode=False)
+    models_original = init_nets(models_dir,eager_mode=True,phase='test')
+    models_serialized = init_nets(output_dir,eager_mode=False,phase='test')
     if device == 'gpu':
         sample = sample.cuda()
     else:
@@ -529,13 +529,14 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', default=None, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+@click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
                                                    'So the WSI image is read region by region. '
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
 @click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
-def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
+def test(input_dir, output_dir, tile_size, model_dir, gpu_ids, region_size, eager_mode,
          color_dapi, color_marker):
     
     """Test trained models
@@ -547,6 +548,20 @@ def test(input_dir, output_dir, tile_size, model_dir, region_size, eager_mode,
     files = os.listdir(model_dir)
     assert 'train_opt.txt' in files, f'file train_opt.txt is missing from model directory {model_dir}'
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    opt.use_dp = False
+    
+    number_of_gpus_all = torch.cuda.device_count()
+    if number_of_gpus_all < len(gpu_ids) and -1 not in gpu_ids:
+        number_of_gpus = 0
+        gpu_ids = [-1]
+        print(f'Specified to use GPU {opt.gpu_ids} for inference, but there are only {number_of_gpus_all} GPU devices. Switched to CPU inference.')
+
+    if len(gpu_ids) > 0 and gpu_ids[0] == -1:
+        gpu_ids = []
+    elif len(gpu_ids) == 0:
+        gpu_ids = list(range(number_of_gpus_all))
+    
+    opt.gpu_ids = gpu_ids # overwrite gpu_ids; for test command, default gpu_ids at first is [] which will be translated to a list of all gpus
     
     # fix opt from old settings
     if not hasattr(opt,'modalities_no') and hasattr(opt,'targets_no'):
@@ -659,7 +674,8 @@ class CPU_Unpickler(pickle.Unpickler):
 
 @cli.command()
 @click.option('--pickle-dir', required=True, help='directory where the pickled snapshots are stored')
-def visualize(pickle_dir):
+@click.option('--display-env', default = None, help='window name; overwrite the display-env opt from the saved pickle file')
+def visualize(pickle_dir, display_env):
 
     path_init = os.path.join(pickle_dir,'opt.pickle')
     print(f'waiting for initialization signal from {path_init}')
@@ -668,6 +684,8 @@ def visualize(pickle_dir):
 
     params_opt = pickle.load(open(path_init,'rb'))
     params_opt.remote = False
+    if display_env is not None:
+        params_opt.display_env = display_env
     visualizer = Visualizer(params_opt)   # create a visualizer that display/save images and plots
 
     paths_plot = {'display_current_results':os.path.join(pickle_dir,'display_current_results.pickle'),

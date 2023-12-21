@@ -32,6 +32,13 @@ class DeepLIIFExtModel(BaseModel):
 
         self.loss_D_weights = [1 / self.mod_gen_no] * self.mod_gen_no
         self.loss_DS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
+        
+        # self.gpu_ids is a possibly modifed one for model initialization
+        # self.opt.gpu_ids is the original one received in the command
+        if not opt.is_train:
+            self.gpu_ids = [] # avoid the models being loaded as DP
+        else:
+            self.gpu_ids = opt.gpu_ids
 
         self.loss_names = []
         self.visual_names = ['real_A']
@@ -69,19 +76,19 @@ class DeepLIIFExtModel(BaseModel):
         self.netGS = [None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
             self.netG[i] = networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
+                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding)
             print('***************************************')
             print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
+                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding)
             print('***************************************')
         for i in range(self.mod_gen_no):
             if self.opt.seg_gen:
                 # if i == 0:
                 #     self.netGS[i] = networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_gs, self.opt.norm,
-                #                                       not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids)
+                #                                       not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids)
                 # else:
                 self.netGS[i] = networks.define_G(self.opt.input_nc * 3, self.opt.output_nc, self.opt.ngf, self.opt.net_gs, self.opt.norm,
-                                                  not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids)
+                                                  not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids)
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.netD = [None for _ in range(self.mod_gen_no)]
@@ -89,17 +96,17 @@ class DeepLIIFExtModel(BaseModel):
             for i in range(self.mod_gen_no):
                 self.netD[i] = networks.define_D(self.opt.input_nc + self.opt.output_nc, self.opt.ndf, self.opt.net_d,
                                                  self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                                                 self.opt.gpu_ids)
+                                                 self.gpu_ids)
             for i in range(self.mod_gen_no):
                 if self.opt.seg_gen:
                     # if i == 0:
                     #     self.netDS[i] = networks.define_D(self.opt.input_nc + self.opt.output_nc, self.opt.ndf, self.opt.net_ds,
                     #                                       self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                    #                                       self.opt.gpu_ids)
+                    #                                       self.gpu_ids)
                     # else:
                     self.netDS[i] = networks.define_D(self.opt.input_nc * 3 + self.opt.output_nc, self.opt.ndf, self.opt.net_ds,
                                                       self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                                                      self.opt.gpu_ids)
+                                                      self.gpu_ids)
 
 
         if self.is_train:
