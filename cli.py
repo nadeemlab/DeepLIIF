@@ -75,12 +75,13 @@ def print_options(opt):
     print(message)
 
     # save to the disk
-    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-    mkdirs(expr_dir)
-    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
-    with open(file_name, 'wt') as opt_file:
-        opt_file.write(message)
-        opt_file.write('\n')
+    if opt.phase == 'train':
+        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+        mkdirs(expr_dir)
+        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+        with open(file_name, 'wt') as opt_file:
+            opt_file.write(message)
+            opt_file.write('\n')
         
         
 @click.group()

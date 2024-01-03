@@ -204,7 +204,10 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
     opt: same as eager_mode
     """
     buffer = BytesIO()
-    torch.save(transform(img.resize((512, 512))), buffer)
+    if opt.model == 'DeepLIIFExt':
+        torch.save(transform(img.resize((1024, 1024))), buffer)
+    else:
+        torch.save(transform(img.resize((512, 512))), buffer)
 
     torchserve_host = os.getenv('TORCHSERVE_HOST', 'http://localhost')
     res = requests.post(
@@ -223,9 +226,11 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
 def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
-    torch.backends.cudnn.benchmark = False
     
-    ts = transform(img.resize((512, 512)))
+    if opt.model == 'DeepLIIFExt':
+        ts = transform(img.resize((1024, 1024)))
+    else:
+        ts = transform(img.resize((512, 512)))
 
     @delayed
     def forward(input, model):

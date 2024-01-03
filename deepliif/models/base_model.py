@@ -37,8 +37,9 @@ class BaseModel(ABC):
         self.is_train = opt.is_train
         self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')  # get device name: CPU or GPU
         self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir
-        if opt.preprocess != 'scale_width':  # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
+        if opt.phase == 'train' and opt.preprocess != 'scale_width': # with [scale_width], input images might have different sizes, which hurts the performance of cudnn.benchmark.
             torch.backends.cudnn.benchmark = True
+        # especially for inference, cudnn benchmark can cause excessive usage of GPU memory for the first image in the sequence in order to find the best conv alg which is not necessary.
         self.loss_names = []
         self.model_names = []
         self.visual_names = []
