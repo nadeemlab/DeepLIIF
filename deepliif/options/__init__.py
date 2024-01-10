@@ -72,6 +72,25 @@ class Options:
             self.name = str(model_dir.name)
             
             self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
+            
+            # to account for old settings: same as in cli.py train
+            if not hasattr(self,'seg_no'):
+              if self.model == 'DeepLIIF':
+                  self.seg_no = 1
+              elif self.model == 'DeepLIIFExt':
+                  if self.seg_gen:
+                      self.seg_no = self.modalities_no
+                  else:
+                      self.seg_no = 0
+              else: # SDG
+                  self.seg_no = 0
+                  self.seg_gen = False
+            
+            # to account for old settings: prior to SDG, our models only have 1 input image
+            if not hasattr(self,'input_no'):
+                self.input_no = 1
+
+            
     
     def _get_kwargs(self):
         common_attr = ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__']

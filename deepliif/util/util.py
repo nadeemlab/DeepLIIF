@@ -48,7 +48,23 @@ def save_image(image_numpy, image_path, aspect_ratio=1.0):
         image_numpy (numpy array) -- input numpy array
         image_path (str)          -- the path of the image
     """
-
+    x, y, nc = image_numpy.shape
+    
+    if nc > 3:
+        if nc % 3 == 0:
+            nc_img = 3
+            no_img = nc // nc_img
+            
+        elif nc % 2 == 0:
+            nc_img = 2
+            no_img = nc // nc_img
+        else:
+            nc_img = 1
+            no_img = nc // nc_img
+        print(f'image (numpy) has {nc}>3 channels, inferred to have {no_img} images each with {nc_img} channel(s)')
+        l_image_numpy = np.dsplit(image_numpy,[nc_img*i for i in range(1,no_img)])
+        image_numpy = np.concatenate(l_image_numpy, axis=1) # stack horizontally
+        
     image_pil = Image.fromarray(image_numpy)
     h, w, _ = image_numpy.shape
 

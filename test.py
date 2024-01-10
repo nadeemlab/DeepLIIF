@@ -29,37 +29,50 @@ See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-a
 import os
 import time
 from deepliif.options.test_options import TestOptions
-from deepliif.options import read_model_params, Options
+from deepliif.options import read_model_params, Options, print_options
 from deepliif.data import create_dataset
 from deepliif.models import create_model
 from deepliif.util.visualizer import save_images
 from deepliif.util import html
 import torch
-
-if __name__ == '__main__':
-    opt = TestOptions().parse()  # get test options
+import click
     
+@click.command()
+#@click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
+#@click.option('--output-dir', help='saves results here.')
+#@click.option('--tile-size', default=None, help='tile size')
+#@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+@click.option('--dataroot', required=True, help='reads images from here; expected to have a subfolder')
+@click.option('--results_dir', required=True, help='saves results here.')
+@click.option('--name', default='.', help='name of the experiment, used as a subfolder under results_dir')
+@click.option('--checkpoints_dir', required=True, help='load models from here.')
+@click.option('--num_test', default=10000, help='only run test for num_test images')
+def test(dataroot, results_dir, name, checkpoints_dir,num_test):
     # retrieve options used in training setting, similar to cli.py test
-    model_dir = os.path.join(opt.checkpoints_dir, opt.name)
-    opt_orig = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    model_dir = os.path.join(checkpoints_dir, name)
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     
-    # overwrite/supply unseen options using the values from training stage
-    for k,v in opt_orig._get_kwargs().items():
-        if not hasattr(opt,k):
-            setattr(opt,k,v)
-    
-    if not hasattr(opt_orig,'seg_gen'): # old settings for DeepLIIF models
+    # overwrite/supply unseen options using the values from the options provided in the command
+    setattr(opt,'checkpoints_dir',checkpoints_dir)
+    setattr(opt,'dataroot',dataroot)
+    setattr(opt,'name',name)
+    setattr(opt,'results_dir',results_dir)
+    setattr(opt,'num_test',num_test)
+        
+    if not hasattr(opt,'seg_gen'): # old settings for DeepLIIF models
         opt.seg_gen = True
-    else:
-        opt.seg_gen = opt_orig.seg_gen
+    
     
     # hard-code some parameters for test.py
+    opt.aspect_ratio = 1.0 # from previous default setting
+    opt.display_winsize = 512 # from previous default setting
     opt.use_dp = True # whether to initialize model in DataParallel setting (all models to one gpu, then pytorch controls the usage of specified set of GPUs for inference)
     opt.num_threads = 0   # test code only supports num_threads = 1
     opt.batch_size = 1    # test code only supports batch_size = 1
     opt.serial_batches = True  # disable data shuffling; comment this line if results on randomly chosen images are needed.
     opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
     opt.display_id = -1   # no visdom display; the test code saves the results to a HTML file.
+    print_options(opt)
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
@@ -95,3 +108,9 @@ if __name__ == '__main__':
     (t_hour, t_min) = divmod(t_min, 60)
     print('Time passed: {}hour:{}min:{}sec'.format(t_hour, t_min, t_sec))
     webpage.save()  # save the HTML
+
+
+
+if __name__ == '__main__':
+    test()
+    
