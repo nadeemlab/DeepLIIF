@@ -82,9 +82,11 @@ class Options:
                       self.seg_no = self.modalities_no
                   else:
                       self.seg_no = 0
-              else: # SDG
+              elif self.model == 'SDG':
                   self.seg_no = 0
                   self.seg_gen = False
+              else:
+                  raise Exception(f'seg_gen cannot be automatically determined for {opt.model}')
             
             # to account for old settings: prior to SDG, our models only have 1 input image
             if not hasattr(self,'input_no'):

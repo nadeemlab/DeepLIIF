@@ -235,12 +235,14 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         ts = transform(img.resize((1024, 1024)))
     elif opt.model == 'DeepLIIF':
         ts = transform(img.resize((512, 512)))
-    else: # SDG, in this case img is a list of img
+    elif opt.model == 'SDG': # in this case img is a list of img
         if opt.input_no > 1:
             l_ts = [transform(img_i.resize((512,512))) for img_i in img]
             ts = torch.cat(l_ts, dim=1)
         else:
             ts = transform(img.resize((512, 512)))
+    else:
+        raise Exception(f'run_dask() not fully implemented for {opt.model}')
     
 
     @delayed
@@ -280,7 +282,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     
         return res
     else:
-        raise Exception(f'run_dask() not implemented for {opt.model}')
+        raise Exception(f'run_dask() not fully implemented for {opt.model}')
 
     
 
@@ -374,28 +376,25 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         run_fn = run_torchserve if use_torchserve else run_dask
     
         images = {}
-        images['Hema'] = create_image_for_stitching(tile_size, rows, cols)
-        images['DAPI'] = create_image_for_stitching(tile_size, rows, cols)
-        images['Lap2'] = create_image_for_stitching(tile_size, rows, cols)
-        images['Marker'] = create_image_for_stitching(tile_size, rows, cols)
-        images['Seg'] = create_image_for_stitching(tile_size, rows, cols)
+        d_modality2net = {'Hema':'G1',
+                          'DAPI':'G2',
+                          'Lap2':'G3',
+                          'Marker':'G4',
+                          'Seg':'G5'}
+        
+        for k in d_modality2net.keys():
+            images[k] = create_image_for_stitching(tile_size, rows, cols)
     
         for i in range(cols):
             for j in range(rows):
                 tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
                 res = run_wrapper(tile, run_fn, model_path, eager_mode, opt)
-    
-                stitch_tile(images['Hema'], res['G1'], tile_size, overlap_size, i, j)
-                stitch_tile(images['DAPI'], res['G2'], tile_size, overlap_size, i, j)
-                stitch_tile(images['Lap2'], res['G3'], tile_size, overlap_size, i, j)
-                stitch_tile(images['Marker'], res['G4'], tile_size, overlap_size, i, j)
-                stitch_tile(images['Seg'], res['G5'], tile_size, overlap_size, i, j)
-    
-        images['Hema'] = images['Hema'].resize(img.size)
-        images['DAPI'] = images['DAPI'].resize(img.size)
-        images['Lap2'] = images['Lap2'].resize(img.size)
-        images['Marker'] = images['Marker'].resize(img.size)
-        images['Seg'] = images['Seg'].resize(img.size)
+                
+                for modality_name, net_name in d_modality2net.items():
+                    stitch_tile(images[modality_name], res[net_name], tile_size, overlap_size, i, j)
+        
+        for modality_name, output_img in images.items():
+            images[modality_name] = output_img.resize(img.size)
     
         if color_dapi:
             matrix = (       0,        0,        0, 0,
@@ -417,23 +416,31 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         #seg_gen = (param_dict['seg_gen'] == 'True') if param_dict else True
         
         
-        tiles = list(generate_tiles(img, tile_size, overlap_size))
-    
+        rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
         run_fn = run_torchserve if use_torchserve else run_dask
-        res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, eager_mode, opt)) for t in tiles]
     
         def get_net_tiles(n):
             return [Tile(t.i, t.j, t.img[n]) for t in res]
     
         images = {}
-    
-        for i in range(1, opt.modalities_no + 1):
-            images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize(img.size)
-    
+        d_modality2net = {f'mod{i}':f'G_{i}' for i in range(1, opt.modalities_no + 1)}
         if opt.seg_gen:
-            for i in range(1, opt.modalities_no + 1):
-                images['Seg' + str(i)] = stitch(get_net_tiles('GS_' + str(i)), tile_size, overlap_size).resize(img.size)
+            d_modality2net.update({f'Seg{i}':f'GS_{i}' for i in range(1, opt.modalities_no + 1)})
+        
+        for k in d_modality2net.keys():
+            images[k] = create_image_for_stitching(tile_size, rows, cols)
     
+        for i in range(cols):
+            for j in range(rows):
+                tile = extract_tile(rescaled, tile_size, overlap_size, i, j)
+                res = run_wrapper(tile, run_fn, model_path, eager_mode, opt)
+                
+                for modality_name, net_name in d_modality2net.items():
+                    stitch_tile(images[modality_name], res[net_name], tile_size, overlap_size, i, j)
+        
+        for modality_name, output_img in images.items():
+            images[modality_name] = output_img.resize(img.size)
+            
         return images
         
     elif opt.model == 'SDG':
@@ -447,35 +454,30 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         w, h = img.size
         w2 = int(w / opt.input_no)
         
-        l_img = []
-        d_tiles = {}
-        
+        l_img = []        
         for i in range(opt.input_no):
             img_i = img.crop((w2 * i, 0, w2 * (i+1), h))
-            l_img.append(img_i)
-            d_tiles[i] = list(generate_tiles(img_i, tile_size, overlap_size))
-            
-        l_tile_pairs = []
-        l_tile_location = []        
-        num_tiles = len(d_tiles[0])
-        for i in range(num_tiles): # the number of tile pairs
-            tile_pair = []
-            for j in range(opt.input_no): # these are also the keys in d_tiles
-                tile_pair.append(d_tiles[j][i].img)
-            l_tile_pairs.append(tile_pair)
-            l_tile_location.append((d_tiles[j][i].i, d_tiles[j][i].j))
+            rescaled_img_i, rows, cols = format_image_for_tiling(img_i, tile_size, overlap_size)
+            l_img.append(rescaled_img_i)
         
         run_fn = run_torchserve if use_torchserve else run_dask
-        res = [Tile(tile_location[0], tile_location[1], run_wrapper(tile_pair, run_fn, model_path, eager_mode, opt)) for tile_location, tile_pair in zip(l_tile_location, l_tile_pairs)]
         
-        def get_net_tiles(n):
-            return [Tile(t.i, t.j, t.img[n]) for t in res]
-            
         images = {}
-    
-        for i in range(1, opt.modalities_no + 1):
-            images['mod' + str(i)] = stitch(get_net_tiles('G_' + str(i)), tile_size, overlap_size).resize((w2,w2))
-            
+        d_modality2net = {f'mod{i}':f'G_{i}' for i in range(1, opt.modalities_no + 1)}
+        for k in d_modality2net.keys():
+            images[k] = create_image_for_stitching(tile_size, rows, cols)
+        
+        for i in range(cols):
+            for j in range(rows):
+                tile_pair = [extract_tile(rescaled, tile_size, overlap_size, i, j) for rescaled in l_img]
+                res = run_wrapper(tile_pair, run_fn, model_path, eager_mode, opt)
+                
+                for modality_name, net_name in d_modality2net.items():
+                    stitch_tile(images[modality_name], res[net_name], tile_size, overlap_size, i, j)
+        
+        for modality_name, output_img in images.items():
+            images[modality_name] = output_img.resize((w2,w2))
+        
         return images
     
     else:
