@@ -497,9 +497,10 @@ def trainlaunch(**kwargs):
 @click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
 @click.option('--tile-size', type=int, default=None, help='tile size')
+@click.option('--input-no', type=int, default=1, help='num of modalities in input')
 @click.option('--device', default='cpu', type=str, help='device to load model for the similarity test, either cpu or gpu')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
-def serialize(models_dir, output_dir, tile_size, device, verbose):
+def serialize(models_dir, output_dir, tile_size, input_no, device, verbose):
     """Serialize DeepLIIF models using Torchscript
     """
     if tile_size is None:
@@ -513,6 +514,7 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
         shutil.copy(f'{models_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
     
     sample = transform(Image.new('RGB', (tile_size, tile_size)))
+    sample = torch.cat([sample]*input_no, 1)
     
     with click.progressbar(
             init_nets(models_dir, eager_mode=True, phase='test').items(),
