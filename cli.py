@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel, infer_modalities, infer_results_for_wsi, create_model
+from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi

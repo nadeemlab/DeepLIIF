@@ -33,8 +33,7 @@ from dask import delayed, compute
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil, check_multi_scale
 from deepliif.data import transform
-from deepliif.postprocessing import adjust_marker, adjust_dapi, compute_IHC_scoring, \
-    overlay_final_segmentation_mask, create_final_segmentation_mask_with_boundaries, create_basic_segmentation_mask
+from deepliif.postprocessing import compute_results
 from deepliif.options import Options, print_options
 
 from .base_model import BaseModel
@@ -474,50 +473,35 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         raise Exception(f'inference() not implemented for model {opt.model}')
 
 
-def postprocess(img, images, thresh=80, noise_objects_size=20, small_object_size=50, opt=None):
+def postprocess(orig, images, tile_size, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None, opt=None):
     if opt.model == 'DeepLIIF':
-        seg_img = images['Seg']
-        mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
-                                                    thresh, noise_objects_size, small_object_size)
-        images = {}
-        images['SegOverlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
-        images['SegRefined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
-    
-        all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
-        scoring = {
-            'num_total': all_cells_no,
-            'num_pos': positive_cells_no,
-            'num_neg': negative_cells_no,
-            'percent_pos': IHC_score
-        }
-        
-        return images, scoring
-        
+        resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
+        overlay, refined, scoring = compute_results(np.array(orig), np.array(images['Seg']),
+                                                    np.array(images['Marker'].convert('L')), resolution,
+                                                    seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
+        processed_images = {}
+        processed_images['SegOverlaid'] = Image.fromarray(overlay)
+        processed_images['SegRefined'] = Image.fromarray(refined)
+        return processed_images, scoring
+
     elif opt.model == 'DeepLIIFExt':
+        resolution = '40x' if tile_size > 768 else ('20x' if tile_size > 384 else '10x')
         processed_images = {}
         scoring = {}
         for img_name in list(images.keys()):
             if 'Seg' in img_name:
                 seg_img = images[img_name]
-                mask_image = create_basic_segmentation_mask(np.array(img), np.array(seg_img),
-                                                            thresh, noise_objects_size, small_object_size)
+                overlay, refined, score = compute_results(np.array(orig), np.array(images[img_name]),
+                                                          None, resolution,
+                                                          seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
     
-                processed_images[img_name + '_Overlaid'] = Image.fromarray(overlay_final_segmentation_mask(np.array(img), mask_image))
-                processed_images[img_name + '_Refined'] = Image.fromarray(create_final_segmentation_mask_with_boundaries(np.array(mask_image)))
-    
-                all_cells_no, positive_cells_no, negative_cells_no, IHC_score = compute_IHC_scoring(mask_image)
-                scoring[img_name] = {
-                    'num_total': all_cells_no,
-                    'num_pos': positive_cells_no,
-                    'num_neg': negative_cells_no,
-                    'percent_pos': IHC_score
-                }
+                processed_images[img_name + '_Overlaid'] = Image.fromarray(overlay)
+                processed_images[img_name + '_Refined'] = Image.fromarray(refined)
+                scoring[img_name] = score
         return processed_images, scoring
-    
+
     else:
         raise Exception(f'postprocess() not implemented for model {opt.model}')
-
-    
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
@@ -555,7 +539,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     )
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
-        post_images, scoring = postprocess(img, images, small_object_size=20, opt=opt)
+        post_images, scoring = postprocess(img, images, tile_size, opt=opt)
         images = {**images, **post_images}
         return images, scoring
     else:

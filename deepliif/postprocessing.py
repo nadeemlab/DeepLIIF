@@ -59,235 +59,6 @@ def remove_cell_noise(mask1, mask2):
     return mask1, mask2
 
 
-@jit(nopython=True)
-def compute_cell_mapping(new_mapping, image_size, small_object_size=20):
-    marked = [[False for _ in range(image_size[1])] for _ in range(image_size[0])]
-    for i in range(image_size[0]):
-        for j in range(image_size[1]):
-            if marked[i][j] is False and (new_mapping[i, j, 0] > 0 or new_mapping[i, j, 2] > 0):
-                cluster_red_no, cluster_blue_no = 0, 0
-                pixels = [(i, j)]
-                cluster = [(i, j)]
-                marked[i][j] = True
-                while len(pixels) > 0:
-                    pixel = pixels.pop()
-                    if new_mapping[pixel[0], pixel[1], 0] > 0:
-                        cluster_red_no += 1
-                    if new_mapping[pixel[0], pixel[1], 2] > 0:
-                        cluster_blue_no += 1
-                    for neigh_i in range(-1, 2):
-                        for neigh_j in range(-1, 2):
-                            neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
-                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and \
-                                    marked[neigh_pixel[0]][neigh_pixel[1]] is False and (
-                                    new_mapping[neigh_pixel[0], neigh_pixel[1], 0] > 0 or new_mapping[
-                                neigh_pixel[0], neigh_pixel[1], 2] > 0):
-                                cluster.append(neigh_pixel)
-                                pixels.append(neigh_pixel)
-                                marked[neigh_pixel[0]][neigh_pixel[1]] = True
-                cluster_value = None
-                if cluster_red_no < cluster_blue_no:
-                    cluster_value = (0, 0, 255)
-                else:
-                    cluster_value = (255, 0, 0)
-                if len(cluster) < small_object_size:
-                    cluster_value = (0, 0, 0)
-                if cluster_value is not None:
-                    for node in cluster:
-                        new_mapping[node[0], node[1]] = cluster_value
-    return new_mapping
-
-
-@jit(nopython=True)
-def remove_noises(channel, image_size, small_object_size=20):
-    marked = [[False for _ in range(image_size[1])] for _ in range(image_size[0])]
-    for i in range(image_size[0]):
-        for j in range(image_size[1]):
-            if marked[i][j] is False and channel[i, j] > 0:
-                pixels = [(i, j)]
-                cluster = [(i, j)]
-                marked[i][j] = True
-                while len(pixels) > 0:
-                    pixel = pixels.pop()
-                    for neigh_i in range(-1, 2):
-                        for neigh_j in range(-1, 2):
-                            neigh_pixel = (pixel[0] + neigh_i, pixel[1] + neigh_j)
-                            if 0 <= neigh_pixel[0] < image_size[0] and 0 <= neigh_pixel[1] < image_size[1] and \
-                                    marked[neigh_pixel[0]][neigh_pixel[1]] is False and channel[
-                                neigh_pixel[0], neigh_pixel[1]] > 0:
-                                cluster.append(neigh_pixel)
-                                pixels.append(neigh_pixel)
-                                marked[neigh_pixel[0]][neigh_pixel[1]] = True
-
-                cluster_value = None
-                if len(cluster) < small_object_size:
-                    cluster_value = 0
-                if cluster_value is not None:
-                    for node in cluster:
-                        channel[node[0], node[1]] = cluster_value
-    return channel
-
-
-def remove_noises_fill_empty_holes(label_img, size=200):
-    inverse_img = 255 - label_img
-    inverse_img_removed = remove_noises(inverse_img, inverse_img.shape, small_object_size=size)
-    label_img[inverse_img_removed == 0] = 255
-    return label_img
-
-
-def apply_original_image_intensity(gray, channel, orig_image_intensity_effect=0.1):
-    red_image_value = np.zeros((gray.shape[0], gray.shape[1]))
-    red_image_value[channel > 10] = gray[channel > 10] * orig_image_intensity_effect
-    red_image_value += channel
-    red_image_value[red_image_value > 255] = 255
-    return red_image_value.astype(np.uint8)
-
-
-def apply_original_image_intensity2(gray, channel, channel2, orig_image_intensity_effect=0.1):
-    red_image_value = np.zeros((gray.shape[0], gray.shape[1]))
-    red_image_value[channel > 10] = gray[channel > 10] * orig_image_intensity_effect
-    red_image_value[channel2 > 10] = gray[channel2 > 10] * orig_image_intensity_effect
-    red_image_value += channel
-    red_image_value[red_image_value > 255] = 255
-    return red_image_value.astype(np.uint8)
-
-
-def positive_negative_masks(img, mask, marker_image, marker_effect=0.4, thresh=100, noise_objects_size=20):
-    positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-    negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-
-    red = mask[:, :, 0]
-    blue = mask[:, :, 2]
-    boundary = mask[:, :, 1]
-
-    # Adding the original image intensity to increase the probability of low-contrast cells
-    # with lower probability in the segmentation mask
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    red = apply_original_image_intensity(gray, red, 0.3)
-    blue = apply_original_image_intensity(gray, blue, 0.3)
-
-    # Adding marker_image annotations to red probability mask
-    # to increase the probability of positive cells in the segmentation mask
-    # gray = cv2.cvtColor(marker_image, cv2.COLOR_RGB2GRAY)
-    # # red = apply_original_image_intensity(gray, red, marker_effect)
-    # red = apply_original_image_intensity2(gray, red, blue, marker_effect)
-
-    # Filtering boundary pixels
-    boundary[boundary < 80] = 0
-
-    positive_mask[red > thresh] = 255
-    positive_mask[boundary > 0] = 0
-    positive_mask[blue > red] = 0
-
-    negative_mask[blue > thresh] = 255
-    negative_mask[boundary > 0] = 0
-    negative_mask[red >= blue] = 0
-
-    cell_mapping = np.zeros_like(mask)
-    cell_mapping[:, :, 0] = positive_mask
-    cell_mapping[:, :, 2] = negative_mask
-
-    compute_cell_mapping(cell_mapping, mask.shape, small_object_size=50)
-    cell_mapping[cell_mapping > 0] = 255
-
-    positive_mask = cell_mapping[:, :, 0]
-    negative_mask = cell_mapping[:, :, 2]
-
-    def inner(img):
-        img = remove_small_objects_from_image(img, noise_objects_size)
-        img = ndi.binary_fill_holes(img).astype(np.uint8)
-        return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
-
-    # return inner(positive_mask), inner(negative_mask)
-    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(
-        negative_mask, noise_objects_size)
-
-
-def positive_negative_masks_basic(img, mask, thresh=100, noise_objects_size=50, small_object_size=50):
-    positive_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-    negative_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
-
-    red = mask[:, :, 0]
-    blue = mask[:, :, 2]
-    boundary = mask[:, :, 1]
-
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-
-    red = apply_original_image_intensity(gray, red)
-    blue = apply_original_image_intensity(gray, blue)
-
-    boundary[boundary < 80] = 0
-
-    positive_mask[red > thresh] = 255
-    positive_mask[boundary > 0] = 0
-    positive_mask[blue > red] = 0
-
-    negative_mask[blue > thresh] = 255
-    negative_mask[boundary > 0] = 0
-    negative_mask[red >= blue] = 0
-
-    cell_mapping = np.zeros_like(mask)
-    cell_mapping[:, :, 0] = positive_mask
-    cell_mapping[:, :, 2] = negative_mask
-
-    compute_cell_mapping(cell_mapping, mask.shape, small_object_size)
-    cell_mapping[cell_mapping > 0] = 255
-
-    positive_mask = cell_mapping[:, :, 0]
-    negative_mask = cell_mapping[:, :, 2]
-
-    def inner(img):
-        img = remove_small_objects_from_image(img, noise_objects_size)
-        img = ndi.binary_fill_holes(img).astype(np.uint8)
-        return cv2.morphologyEx(img, cv2.MORPH_DILATE, kernel=np.ones((2, 2)))
-
-    # return inner(positive_mask), inner(negative_mask)
-    return remove_noises_fill_empty_holes(positive_mask, noise_objects_size), remove_noises_fill_empty_holes(
-        negative_mask, noise_objects_size)
-
-
-def create_final_segmentation_mask_with_boundaries(mask_image):
-    refined_mask = mask_image.copy()
-
-    edges = feature.canny(refined_mask[:, :, 0], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
-    cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
-
-    edges = feature.canny(refined_mask[:, :, 2], sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
-    cv2.drawContours(refined_mask, contours, -1, (0, 255, 0), 2)
-
-    return refined_mask
-
-
-def overlay_final_segmentation_mask(img, mask_image):
-    positive_mask, negative_mask = mask_image[:, :, 0], mask_image[:, :, 2]
-
-    overlaid_mask = img.copy()
-
-    edges = feature.canny(positive_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
-    cv2.drawContours(overlaid_mask, contours, -1, (255, 0, 0), 2)
-
-    edges = feature.canny(negative_mask, sigma=3).astype(np.uint8)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2:] # a more recent cv2 version has 3 returned values
-    cv2.drawContours(overlaid_mask, contours, -1, (0, 0, 255), 2)
-
-    return overlaid_mask
-
-
-def create_final_segmentation_mask(img, seg_img, marker_image, marker_effect=0.4, thresh=80, noise_objects_size=20):
-    positive_mask, negative_mask = positive_negative_masks(img, seg_img, marker_image, marker_effect, thresh,
-                                                           noise_objects_size)
-
-    mask = np.zeros_like(img)
-
-    mask[positive_mask > 0] = (255, 0, 0)
-    mask[negative_mask > 0] = (0, 0, 255)
-
-    return mask
-
-
 def create_basic_segmentation_mask(img, seg_img, thresh=80, noise_objects_size=20, small_object_size=50):
     positive_mask, negative_mask = positive_negative_masks_basic(img, seg_img, thresh, noise_objects_size, small_object_size)
 
@@ -371,24 +142,292 @@ def adjust_marker(inferred_tile, orig_tile):
     return Image.fromarray(processed_tile)
 
 
-def compute_IHC_scoring(mask_image):
-    """ Computes the number of cells and the IHC score for the given segmentation mask
+# Values for uint8 masks
+MASK_UNKNOWN = 50
+MASK_POSITIVE = 200
+MASK_NEGATIVE = 150
+MASK_BACKGROUND = 0
+MASK_CELL = 255
+MASK_CELL_POSITIVE = 201
+MASK_CELL_NEGATIVE = 151
+MASK_BOUNDARY_POSITIVE = 202
+MASK_BOUNDARY_NEGATIVE = 152
 
-    Parameters:
-        mask_image (numpy array) -- segmentation mask image of red and blue cells
 
-    Returns:
-        all_cells_no (integer) -- number of all cells
-        positive_cells_no (integer) -- number of positive cells
-        negative_cells_no (integer) -- number of negative cells
-        IHC_score (integer) -- IHC score (percentage of positive cells to all cells)
+@jit(nopython=True)
+def in_bounds(array, index):
+    return index[0] >= 0 and index[0] < array.shape[0] and index[1] >= 0 and index[1] < array.shape[1]
 
+
+def create_posneg_mask(seg, thresh):
+    """Create a mask of positive and negative pixels."""
+
+    cell = np.logical_and(np.add(seg[:,:,0], seg[:,:,2], dtype=np.uint16) > thresh, seg[:,:,1] <= 80)
+    pos = np.logical_and(cell, seg[:,:,0] >= seg[:,:,2])
+    neg = np.logical_xor(cell, pos)
+
+    mask = np.full(seg.shape[0:2], MASK_UNKNOWN, dtype=np.uint8)
+    mask[pos] = MASK_POSITIVE
+    mask[neg] = MASK_NEGATIVE
+
+    return mask
+
+
+@jit(nopython=True)
+def mark_background(mask):
+    """Mask all background pixels by 4-connected region growing unknown boundary pixels."""
+
+    seeds = []
+    for i in range(mask.shape[0]):
+        if mask[i, 0] == MASK_UNKNOWN:
+            seeds.append((i, 0))
+        if mask[i, mask.shape[1]-1] == MASK_UNKNOWN:
+            seeds.append((i, mask.shape[1]-1))
+    for j in range(mask.shape[1]):
+        if mask[0, j] == MASK_UNKNOWN:
+            seeds.append((0, j))
+        if mask[mask.shape[0]-1, j] == MASK_UNKNOWN:
+            seeds.append((mask.shape[0]-1, j))
+
+    neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    while len(seeds) > 0:
+        seed = seeds.pop()
+        if mask[seed] == MASK_UNKNOWN:
+            mask[seed] = MASK_BACKGROUND
+            for n in neighbors:
+                idx = (seed[0] + n[0], seed[1] + n[1])
+                if in_bounds(mask, idx) and mask[idx] == MASK_UNKNOWN:
+                    seeds.append(idx)
+
+
+@jit(nopython=True)
+def compute_cell_classification(mask, marker, size_thresh, marker_thresh, size_thresh_upper = None):
     """
-    label_image_red = skimage.measure.label(mask_image[:, :, 0], background=0)
-    label_image_blue = skimage.measure.label(mask_image[:, :, 2], background=0)
-    positive_cells_no = (len(np.unique(label_image_red)) - 1)
-    negative_cells_no = (len(np.unique(label_image_blue)) - 1)
-    all_cells_no = positive_cells_no + negative_cells_no
-    IHC_score = round(positive_cells_no / all_cells_no * 100, 1) if all_cells_no > 0 else 0
+    Compute the mapping of the mask to positive and negative cell classification.
 
-    return all_cells_no, positive_cells_no, negative_cells_no, IHC_score
+    Parameters
+    ==========
+    mask: 2D uint8 numpy array with pixels labeled as positive, negative, background, or unknown.
+          After the function executes, the pixels will be labeled as background or cell/boundary pos/neg.
+    marker: 2D uint8 numpy array with the restained marker values
+    size_thresh: Lower size threshold in pixels. Only include cells larger than this count.
+    size_thresh_upper: Upper size threshold in pixels, or None. Only include cells smaller than this count.
+    marker_thresh: Classify cell as positive if any marker value within the cell is above this threshold.
+
+    Returns
+    =======
+    Dictionary with the following values:
+        num_total (integer) -- total number of cells in the image
+        num_pos (integer) -- number of positive cells in the image
+        num_neg (integer) -- number of negative calles in the image
+        percent_pos (floating point) -- percentage of positive cells to all cells (IHC score)
+    """
+
+    neighbors = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+    border_neighbors = [(0, -1), (-1, 0), (1, 0), (0, 1)]
+    positive_cell_count, negative_cell_count = 0, 0
+
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == MASK_POSITIVE or mask[y, x] == MASK_NEGATIVE:
+                seeds = [(y, x)]
+                cell_coords = []
+                count = 1
+                count_posneg = 1 if mask[y, x] != MASK_UNKNOWN else 0
+                count_positive = 1 if mask[y, x] == MASK_POSITIVE else 0
+                max_marker = marker[y, x] if marker is not None else 0
+                mask[y, x] = MASK_CELL
+                cell_coords.append((y, x))
+
+                while len(seeds) > 0:
+                    seed = seeds.pop()
+                    for n in neighbors:
+                        idx = (seed[0] + n[0], seed[1] + n[1])
+                        if in_bounds(mask, idx) and (mask[idx] == MASK_POSITIVE or mask[idx] == MASK_NEGATIVE or mask[idx] == MASK_UNKNOWN):
+                            seeds.append(idx)
+                            if mask[idx] == MASK_POSITIVE:
+                                count_positive += 1
+                            if mask[idx] != MASK_UNKNOWN:
+                                count_posneg += 1
+                            if marker is not None and marker[idx] > max_marker:
+                                max_marker = marker[idx]
+                            mask[idx] = MASK_CELL
+                            cell_coords.append(idx)
+                            count += 1
+
+                if count > size_thresh and (size_thresh_upper is None or count < size_thresh_upper):
+                    if (count_positive/count_posneg) >= 0.5 or max_marker > marker_thresh:
+                        fill_value = MASK_CELL_POSITIVE
+                        border_value = MASK_BOUNDARY_POSITIVE
+                        positive_cell_count += 1
+                    else:
+                        fill_value = MASK_CELL_NEGATIVE
+                        border_value = MASK_BOUNDARY_NEGATIVE
+                        negative_cell_count += 1
+                else:
+                    fill_value = MASK_BACKGROUND
+                    border_value = MASK_BACKGROUND
+
+                for coord in cell_coords:
+                    is_boundary = False
+                    for n in border_neighbors:
+                        idx = (coord[0] + n[0], coord[1] + n[1])
+                        if in_bounds(mask, idx) and mask[idx] == MASK_BACKGROUND:
+                            is_boundary = True
+                            break
+                    if is_boundary:
+                        mask[coord] = border_value
+                    else:
+                        mask[coord] = fill_value
+
+    counts = {
+        'num_total': positive_cell_count + negative_cell_count,
+        'num_pos': positive_cell_count,
+        'num_neg': negative_cell_count,
+    }
+    return counts
+
+
+@jit(nopython=True)
+def enlarge_cell_boundaries(mask):
+    neighbors = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == MASK_BOUNDARY_POSITIVE or mask[y, x] == MASK_BOUNDARY_NEGATIVE:
+                value = MASK_POSITIVE if mask[y, x] == MASK_BOUNDARY_POSITIVE else MASK_NEGATIVE
+                for n in neighbors:
+                    idx = (y + n[0], x + n[1])
+                    if in_bounds(mask, idx) and mask[idx] != MASK_BOUNDARY_POSITIVE and mask[idx] != MASK_BOUNDARY_NEGATIVE:
+                        mask[idx] = value
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == MASK_POSITIVE:
+                mask[y, x] = MASK_BOUNDARY_POSITIVE
+            elif mask[y, x] == MASK_NEGATIVE:
+                mask[y, x] = MASK_BOUNDARY_NEGATIVE
+
+
+@jit(nopython=True)
+def compute_cell_sizes(mask):
+    neighbors = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+    sizes = []
+
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == MASK_POSITIVE or mask[y, x] == MASK_NEGATIVE:
+                seeds = [(y, x)]
+                count = 1
+                mask[y, x] = MASK_CELL_POSITIVE if mask[y, x] == MASK_POSITIVE else MASK_CELL_NEGATIVE
+
+                while len(seeds) > 0:
+                    seed = seeds.pop()
+                    for n in neighbors:
+                        idx = (seed[0] + n[0], seed[1] + n[1])
+                        if in_bounds(mask, idx) and (mask[idx] == MASK_POSITIVE or mask[idx] == MASK_NEGATIVE or mask[idx] == MASK_UNKNOWN):
+                            seeds.append(idx)
+                            if mask[idx] == MASK_POSITIVE:
+                                mask[idx] = MASK_CELL_POSITIVE
+                            elif mask[idx] == MASK_NEGATIVE:
+                                mask[idx] = MASK_CELL_NEGATIVE
+                            else:
+                                mask[idx] = MASK_CELL
+                            count += 1
+
+                sizes.append(count)
+
+    return sizes
+
+
+@jit(nopython=True)
+def create_kde(values, count, bandwidth = 1.0):
+    gaussian_denom_inv = 1 / math.sqrt(2 * math.pi);
+    max_value = max(values) + 1;
+    step = max_value / count;
+    n = values.shape[0];
+    h = bandwidth;
+    h_inv = 1 / h;
+    kde = np.zeros(count, dtype=np.float32)
+
+    for i in range(count):
+        x = i * step
+        total = 0
+        for j in range(n):
+            val = (x - values[j]) * h_inv;
+            total += math.exp(-(val*val/2)) * gaussian_denom_inv; # Gaussian
+        kde[i] = total / (n*h);
+
+    return kde, step
+
+
+def calc_default_size_thresh(mask, resolution):
+    sizes = compute_cell_sizes(mask)
+    mask[mask == MASK_CELL_POSITIVE] = MASK_POSITIVE
+    mask[mask == MASK_CELL_NEGATIVE] = MASK_NEGATIVE
+    mask[mask == MASK_CELL] = MASK_UNKNOWN
+
+    if len(sizes) > 0:
+        kde, step = create_kde(np.sqrt(sizes), 500)
+        idx = 1
+        for i in range(1, kde.shape[0]-1):
+            if kde[i] < kde[i-1] and kde[i] < kde[i+1]:
+                idx = i
+                break
+        thresh_sqrt = (idx - 1) * step
+
+        allowed_range_sqrt = (4, 7, 10) # [min, default, max] for default sqrt size thresh at 40x
+        if resolution == '20x':
+            allowed_range_sqrt = (3, 4, 6)
+        elif resolution == '10x':
+            allowed_range_sqrt = (2, 2, 3)
+
+        if thresh_sqrt < allowed_range_sqrt[0]:
+            thresh_sqrt = allowed_range_sqrt[0]
+        elif thresh_sqrt > allowed_range_sqrt[2]:
+            thresh_sqrt = allowed_range_sqrt[1]
+
+        return round(thresh_sqrt * thresh_sqrt)
+
+    else:
+        return 0
+
+
+def calc_default_marker_thresh(marker):
+    if marker is not None:
+        nonzero = marker[marker != 0]
+        marker_range = (round(np.percentile(nonzero, 0.1)), round(np.percentile(nonzero, 99.9))) if nonzero.shape[0] > 0 else (0, 0)
+        return round((marker_range[1] - marker_range[0]) * 0.9) + marker_range[0]
+    else:
+        return 0
+
+
+def compute_results(orig, seg, marker, resolution=None, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None):
+    mask = create_posneg_mask(seg, seg_thresh)
+    mark_background(mask)
+
+    if size_thresh == 'default':
+        size_thresh = calc_default_size_thresh(mask, resolution)
+    if marker_thresh == 'default':
+        marker_thresh = calc_default_marker_thresh(marker)
+
+    counts = compute_cell_classification(mask, marker, size_thresh, marker_thresh, size_thresh_upper=None)
+    enlarge_cell_boundaries(mask)
+
+    scoring = {
+        'num_total': counts['num_total'],
+        'num_pos': counts['num_pos'],
+        'num_neg': counts['num_neg'],
+        'percent_pos': round(counts['num_pos'] / counts['num_total'] * 100, 1) if counts['num_pos'] > 0 else 0
+    }
+
+    overlay = np.copy(orig)
+    overlay[mask == MASK_BOUNDARY_POSITIVE] = (255, 0, 0)
+    overlay[mask == MASK_BOUNDARY_NEGATIVE] = (0, 0, 255)
+
+    refined = np.zeros_like(seg)
+    refined[mask == MASK_CELL_POSITIVE, 0] = 255
+    refined[mask == MASK_CELL_NEGATIVE, 2] = 255
+    refined[mask == MASK_BOUNDARY_POSITIVE, 1] = 255
+    refined[mask == MASK_BOUNDARY_NEGATIVE, 1] = 255
+
+    return overlay, refined, scoring
