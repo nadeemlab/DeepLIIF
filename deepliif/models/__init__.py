@@ -208,10 +208,7 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
     opt: same as eager_mode
     """
     buffer = BytesIO()
-    if opt.model == 'DeepLIIFExt':
-        torch.save(transform(img.resize((1024, 1024))), buffer)
-    else:
-        torch.save(transform(img.resize((512, 512))), buffer)
+    torch.save(transform(img.resize((opt.scale_size, opt.scale_size))), buffer)
 
     torchserve_host = os.getenv('TORCHSERVE_HOST', 'http://localhost')
     res = requests.post(
@@ -231,18 +228,11 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
     
-    if opt.model == 'DeepLIIFExt':
-        ts = transform(img.resize((1024, 1024)))
-    elif opt.model == 'DeepLIIF':
-        ts = transform(img.resize((512, 512)))
-    elif opt.model == 'SDG': # in this case img is a list of img
-        if opt.input_no > 1:
-            l_ts = [transform(img_i.resize((512,512))) for img_i in img]
-            ts = torch.cat(l_ts, dim=1)
-        else:
-            ts = transform(img.resize((512, 512)))
+    if opt.input_no > 1:
+        l_ts = [transform(img_i.resize((opt.scale_size,opt.scale_size))) for img_i in img]
+        ts = torch.cat(l_ts, dim=1)
     else:
-        raise Exception(f'run_dask() not fully implemented for {opt.model}')
+        ts = transform(img.resize((opt.scale_size, opt.scale_size)))
     
 
     @delayed

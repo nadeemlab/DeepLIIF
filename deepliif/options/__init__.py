@@ -91,6 +91,15 @@ class Options:
             # to account for old settings: prior to SDG, our models only have 1 input image
             if not hasattr(self,'input_no'):
                 self.input_no = 1
+            
+            # to account for old settings: before adding scale_size
+            if not hasattr(self, 'scale_size'):
+                if self.model in ['DeepLIIF','SDG']:
+                    self.scale_size = 512
+                elif self.model == 'DeepLIIFExt':
+                    self.scale_size = 1024
+                else:
+                  raise Exception(f'scale_size cannot be automatically determined for {opt.model}')
 
             
     
@@ -98,26 +107,33 @@ class Options:
         common_attr = ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__']
         l_args = [x for x in dir(self) if x not in common_attr]
         return {k:getattr(self,k) for k in l_args}
-            
-def print_options(opt):
-    """Print and save options
 
-    It will print both current options and default values(if different).
-    It will save options into a text file / [checkpoints_dir] / opt.txt
-    """
+def format_options(opt):
     message = ''
     message += '----------------- Options ---------------\n'
     for k, v in sorted(vars(opt).items()):
         comment = ''
         message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
     message += '----------------- End -------------------'
-    print(message)
+    return message
+    
+def print_options(opt, save=False):
+    """Print and save options
 
+    It will print both current options and default values(if different).
+    It will save options into a text file / [checkpoints_dir] / opt.txt
+    """
+    message = format_options(opt)
+    print(message)
+    
     # save to the disk
-    if opt.phase == 'train':
-        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-        mkdirs(expr_dir)
-        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
-        with open(file_name, 'wt') as opt_file:
-            opt_file.write(message)
-        opt_file.write('\n')
+    if save:
+        save_options(opt)
+
+def save_options(opt):
+    message = format_options(opt)
+    expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+    mkdirs(expr_dir)
+    file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write(message+'\n')

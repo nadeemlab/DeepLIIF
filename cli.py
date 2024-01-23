@@ -14,7 +14,7 @@ from deepliif.models import inference, postprocess, compute_overlap, init_nets, 
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi
-from deepliif.options import Options
+from deepliif.options import Options, print_options
 
 import torch.distributed as dist
 
@@ -59,29 +59,6 @@ def set_seed(seed=0,rank=None):
 def ensure_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
-
-def print_options(opt):
-    """Print and save options
-
-    It will print both current options and default values(if different).
-    It will save options into a text file / [checkpoints_dir] / opt.txt
-    """
-    message = ''
-    message += '----------------- Options ---------------\n'
-    for k, v in sorted(vars(opt).items()):
-        comment = ''
-        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
-    message += '----------------- End -------------------'
-    print(message)
-
-    # save to the disk
-    if opt.phase == 'train':
-        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-        mkdirs(expr_dir)
-        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
-        with open(file_name, 'wt') as opt_file:
-            opt_file.write(message)
-            opt_file.write('\n')
         
         
 @click.group()
@@ -266,12 +243,13 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     input_no = num_img - modalities_no - seg_no
     assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
     d_params['input_no'] = input_no
+    d_params['scale_size'] = img.size[1]
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
 
     opt = Options(d_params=d_params)
-    print_options(opt)
+    print_options(opt, save=True)
     
     dataset = create_dataset(opt)
     # get the number of images in the dataset.
