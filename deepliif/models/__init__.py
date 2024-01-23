@@ -173,7 +173,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     number_of_gpus_all = torch.cuda.device_count()
     number_of_gpus = len(opt.gpu_ids)
-    print(number_of_gpus)
+    
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
@@ -548,11 +548,15 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
                                       img.convert('L'))
     tile_size = int(tile_size)
+    
+    # for those with multiple input modalities, find the correct size to calculate overlap_size
+    input_no = opt.input_no if hasattr(opt, 'input_no') else 1
+    img_size = (img.size[0] / input_no, img.size[1]) # (width, height)
 
     images = inference(
         img,
         tile_size=tile_size,
-        overlap_size=compute_overlap(img.size, tile_size),
+        overlap_size=compute_overlap(img_size, tile_size),
         model_path=model_dir,
         eager_mode=eager_mode,
         color_dapi=color_dapi,
