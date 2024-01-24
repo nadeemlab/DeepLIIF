@@ -13,7 +13,6 @@ def read_model_params(file_addr):
             key = line.split(':')[0].strip()
             val = line.split(':')[1].split('[')[0].strip()
             param_dict[key] = val
-    print(param_dict)
     return param_dict
 
 class Options:
@@ -32,19 +31,7 @@ class Options:
                 else:
                     setattr(self,k,v)
             except:
-                setattr(self,k,v)
-        
-        if mode != 'train':
-            # to account for old settings where gpu_ids value is an integer, not a tuple
-            if isinstance(self.gpu_ids,int):
-                self.gpu_ids = (self.gpu_ids,)
-            
-            # to account for old settings before modalities_no was introduced
-            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
-                self.modalities_no = self.targets_no - 1
-                del self.targets_no
-            
-            
+                setattr(self,k,v)            
 
         if mode == 'train':
             self.is_train = True
@@ -71,7 +58,16 @@ class Options:
             self.checkpoints_dir = str(model_dir.parent)
             self.name = str(model_dir.name)
             
-            self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
+            #self.gpu_ids = [] # gpu_ids is only used by eager mode, set to empty / cpu to be the same as the old settings; non-eager mode will use all gpus
+            
+            # to account for old settings where gpu_ids value is an integer, not a tuple
+            if isinstance(self.gpu_ids,int):
+                self.gpu_ids = (self.gpu_ids,)
+            
+            # to account for old settings before modalities_no was introduced
+            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
+                self.modalities_no = self.targets_no - 1
+                del self.targets_no
             
             # to account for old settings: same as in cli.py train
             if not hasattr(self,'seg_no'):
@@ -118,10 +114,10 @@ def format_options(opt):
     return message
     
 def print_options(opt, save=False):
-    """Print and save options
+    """Print (and save) options
 
     It will print both current options and default values(if different).
-    It will save options into a text file / [checkpoints_dir] / opt.txt
+    If save=True, it will save options into a text file / [checkpoints_dir] / opt.txt
     """
     message = format_options(opt)
     print(message)
