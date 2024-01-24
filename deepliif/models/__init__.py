@@ -56,7 +56,10 @@ def get_opt(model_dir, mode='test'):
             opt = Options(path_file=os.path.join(model_dir,'test_opt.txt'), mode=mode)
         except:
             opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+        opt.use_dp = False
+        opt.gpu_ids = list(range(torch.cuda.device_count()))
     return opt
+
 
 def find_model_using_name(model_name):
     """Import the module "models/[model_name]_model.py".
