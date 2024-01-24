@@ -472,30 +472,30 @@ def trainlaunch(**kwargs):
 
 
 @cli.command()
-@click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
+@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', type=int, default=None, help='tile size')
-@click.option('--input-no', type=int, default=1, help='num of modalities in input')
+#@click.option('--tile-size', type=int, default=None, help='tile size')
 @click.option('--device', default='cpu', type=str, help='device to load model for the similarity test, either cpu or gpu')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
-def serialize(models_dir, output_dir, tile_size, input_no, device, verbose):
+def serialize(model_dir, output_dir, device, verbose):
     """Serialize DeepLIIF models using Torchscript
     """
-    if tile_size is None:
-        tile_size = 512
-    output_dir = output_dir or models_dir
+    #if tile_size is None:
+    #    tile_size = 512
+    output_dir = output_dir or model_dir
     ensure_exists(output_dir)
     
     # copy train_opt.txt to the target location
     import shutil
-    if models_dir != output_dir:
-        shutil.copy(f'{models_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
+    if model_dir != output_dir:
+        shutil.copy(f'{model_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
     
-    sample = transform(Image.new('RGB', (tile_size, tile_size)))
-    sample = torch.cat([sample]*input_no, 1)
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    sample = transform(Image.new('RGB', (opt.scale_size, opt.scale_size)))
+    sample = torch.cat([sample]*opt.input_no, 1)
     
     with click.progressbar(
-            init_nets(models_dir, eager_mode=True, phase='test').items(),
+            init_nets(model_dir, eager_mode=True, phase='test').items(),
             label='Tracing nets',
             item_show_func=lambda n: n[0] if n else n
     ) as bar:
@@ -514,7 +514,7 @@ def serialize(models_dir, output_dir, tile_size, input_no, device, verbose):
     
     # test: whether the original and the serialized model produces highly similar predictions
     print('testing similarity between prediction from original vs serialized models...')
-    models_original = init_nets(models_dir,eager_mode=True,phase='test')
+    models_original = init_nets(model_dir,eager_mode=True,phase='test')
     models_serialized = init_nets(output_dir,eager_mode=False,phase='test')
     if device == 'gpu':
         sample = sample.cuda()

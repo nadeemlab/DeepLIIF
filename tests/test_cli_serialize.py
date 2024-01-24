@@ -10,7 +10,7 @@ def test_cli_serialize(tmp_path, model_dir, model_info):
         torch.cuda.nvtx.range_push(f"test_cli_serialize {dir_model}")
         dir_output = tmp_path
     
-        res = subprocess.run(f'python cli.py serialize --models-dir {dir_model} --output-dir {dir_output}',shell=True)
+        res = subprocess.run(f'python cli.py serialize --model-dir {dir_model} --output-dir {dir_output}',shell=True)
         assert res.returncode == 0
         
         remove_contents_in_folder(tmp_path)
