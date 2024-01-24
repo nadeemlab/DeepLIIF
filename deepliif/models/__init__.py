@@ -427,18 +427,18 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         raise Exception(f'inference() not implemented for model {opt.model}')
 
 
-def postprocess(orig, images, tile_size, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None, opt=None):
-    if opt.model == 'DeepLIIF':
+def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None):
+    if model == 'DeepLIIF':
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
         overlay, refined, scoring = compute_results(np.array(orig), np.array(images['Seg']),
-                                                    np.array(images['Marker'].convert('L')), resolution,
-                                                    seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
+                                                    np.array(images['Marker'].convert('L')) if 'Marker' in images else None,
+                                                    resolution, seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
         processed_images = {}
         processed_images['SegOverlaid'] = Image.fromarray(overlay)
         processed_images['SegRefined'] = Image.fromarray(refined)
         return processed_images, scoring
 
-    elif opt.model == 'DeepLIIFExt':
+    elif model == 'DeepLIIFExt':
         resolution = '40x' if tile_size > 768 else ('20x' if tile_size > 384 else '10x')
         processed_images = {}
         scoring = {}
@@ -455,7 +455,7 @@ def postprocess(orig, images, tile_size, seg_thresh=150, size_thresh='default', 
         return processed_images, scoring
 
     else:
-        raise Exception(f'postprocess() not implemented for model {opt.model}')
+        raise Exception(f'postprocess() not implemented for model {model}')
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
@@ -489,7 +489,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     )
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
-        post_images, scoring = postprocess(img, images, tile_size, opt=opt)
+        post_images, scoring = postprocess(img, images, tile_size, opt.model)
         images = {**images, **post_images}
         return images, scoring
     else:
