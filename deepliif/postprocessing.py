@@ -401,16 +401,16 @@ def calc_default_marker_thresh(marker):
         return 0
 
 
-def compute_results(orig, seg, marker, resolution=None, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None):
+def compute_results(orig, seg, marker, resolution=None, seg_thresh=150, size_thresh='auto', marker_thresh='auto', size_thresh_upper=None):
     mask = create_posneg_mask(seg, seg_thresh)
     mark_background(mask)
 
-    if size_thresh == 'default':
+    if size_thresh == 'auto':
         size_thresh = calc_default_size_thresh(mask, resolution)
     if marker_thresh is None:
         marker_thresh = 0
         marker = None
-    elif marker_thresh == 'default':
+    elif marker_thresh == 'auto':
         marker_thresh = calc_default_marker_thresh(marker)
 
     counts = compute_cell_classification(mask, marker, size_thresh, marker_thresh, size_thresh_upper)
