@@ -151,7 +151,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
         opt.use_dp = False
-        print_options(opt)
+        #print_options(opt)
     
     if opt.model == 'DeepLIIF':
         net_groups = [
@@ -171,7 +171,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     number_of_gpus_all = torch.cuda.device_count()
     number_of_gpus = len(opt.gpu_ids)
-    print(number_of_gpus)
+    #print(number_of_gpus)
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
@@ -354,7 +354,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
               color_dapi=False, color_marker=False, opt=None):
     if not opt:
         opt = get_opt(model_path)
-        print_options(opt)
+        #print_options(opt)
     
     if opt.model == 'DeepLIIF':
         rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
@@ -470,7 +470,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     if opt is None:
         opt = get_opt(model_dir)
         opt.use_dp = False
-        print_options(opt)
+        #print_options(opt)
     
     if not tile_size:
         tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
