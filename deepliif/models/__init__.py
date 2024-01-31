@@ -56,7 +56,10 @@ def get_opt(model_dir, mode='test'):
             opt = Options(path_file=os.path.join(model_dir,'test_opt.txt'), mode=mode)
         except:
             opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode=mode)
+        opt.use_dp = False
+        opt.gpu_ids = list(range(torch.cuda.device_count()))
     return opt
+
 
 def find_model_using_name(model_name):
     """Import the module "models/[model_name]_model.py".
@@ -152,7 +155,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
         opt.use_dp = False
-        print_options(opt)
+        #print_options(opt)
     
     if opt.model == 'DeepLIIF':
         net_groups = [
@@ -172,7 +175,8 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     number_of_gpus_all = torch.cuda.device_count()
     number_of_gpus = len(opt.gpu_ids)
-    
+    #print(number_of_gpus)
+
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
         chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
@@ -357,7 +361,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
               color_dapi=False, color_marker=False, opt=None):
     if not opt:
         opt = get_opt(model_path)
-        print_options(opt)
+        #print_options(opt)
     
     if opt.model == 'DeepLIIF':
         rescaled, rows, cols = format_image_for_tiling(img, tile_size, overlap_size)
@@ -473,18 +477,18 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         raise Exception(f'inference() not implemented for model {opt.model}')
 
 
-def postprocess(orig, images, tile_size, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None, opt=None):
-    if opt.model == 'DeepLIIF':
+def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='auto', marker_thresh='auto', size_thresh_upper=None):
+    if model == 'DeepLIIF':
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
         overlay, refined, scoring = compute_results(np.array(orig), np.array(images['Seg']),
-                                                    np.array(images['Marker'].convert('L')), resolution,
-                                                    seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
+                                                    np.array(images['Marker'].convert('L')) if 'Marker' in images else None,
+                                                    resolution, seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
         processed_images = {}
         processed_images['SegOverlaid'] = Image.fromarray(overlay)
         processed_images['SegRefined'] = Image.fromarray(refined)
         return processed_images, scoring
 
-    elif opt.model == 'DeepLIIFExt':
+    elif model == 'DeepLIIFExt':
         resolution = '40x' if tile_size > 768 else ('20x' if tile_size > 384 else '10x')
         processed_images = {}
         scoring = {}
@@ -501,7 +505,7 @@ def postprocess(orig, images, tile_size, seg_thresh=150, size_thresh='default', 
         return processed_images, scoring
 
     else:
-        raise Exception(f'postprocess() not implemented for model {opt.model}')
+        raise Exception(f'postprocess() not implemented for model {model}')
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
@@ -516,7 +520,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     if opt is None:
         opt = get_opt(model_dir)
         opt.use_dp = False
-        print_options(opt)
+        #print_options(opt)
     
     if not tile_size:
         tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
@@ -539,7 +543,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     )
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
-        post_images, scoring = postprocess(img, images, tile_size, opt=opt)
+        post_images, scoring = postprocess(img, images, tile_size, opt.model)
         images = {**images, **post_images}
         return images, scoring
     else:

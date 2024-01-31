@@ -401,23 +401,30 @@ def calc_default_marker_thresh(marker):
         return 0
 
 
-def compute_results(orig, seg, marker, resolution=None, seg_thresh=150, size_thresh='default', marker_thresh='default', size_thresh_upper=None):
+def compute_results(orig, seg, marker, resolution=None, seg_thresh=150, size_thresh='auto', marker_thresh='auto', size_thresh_upper=None):
     mask = create_posneg_mask(seg, seg_thresh)
     mark_background(mask)
 
-    if size_thresh == 'default':
+    if size_thresh == 'auto':
         size_thresh = calc_default_size_thresh(mask, resolution)
-    if marker_thresh == 'default':
+    if marker_thresh is None:
+        marker_thresh = 0
+        marker = None
+    elif marker_thresh == 'auto':
         marker_thresh = calc_default_marker_thresh(marker)
 
-    counts = compute_cell_classification(mask, marker, size_thresh, marker_thresh, size_thresh_upper=None)
+    counts = compute_cell_classification(mask, marker, size_thresh, marker_thresh, size_thresh_upper)
     enlarge_cell_boundaries(mask)
 
     scoring = {
         'num_total': counts['num_total'],
         'num_pos': counts['num_pos'],
         'num_neg': counts['num_neg'],
-        'percent_pos': round(counts['num_pos'] / counts['num_total'] * 100, 1) if counts['num_pos'] > 0 else 0
+        'percent_pos': round(counts['num_pos'] / counts['num_total'] * 100, 1) if counts['num_pos'] > 0 else 0,
+        'prob_thresh': seg_thresh,
+        'size_thresh': size_thresh,
+        'size_thresh_upper': size_thresh_upper,
+        'marker_thresh': marker_thresh if marker is not None else None,
     }
 
     overlay = np.copy(orig)
