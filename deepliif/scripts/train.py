@@ -1,4 +1,5 @@
 """
+This script is used by cli.py trainlaunch command for DDP.
 Keep this train.py up-to-date with train() in cli.py!
 They are EXACTLY THE SAME.
 """
@@ -14,17 +15,13 @@ import torch
 import numpy as np
 from PIL import Image
 
-from deepliif.data import create_dataset, AlignedDataset, transform
-from deepliif.models import inference, postprocess, compute_overlap, init_nets, DeepLIIFModel
-from deepliif.util import allowed_file, Visualizer
+from deepliif.data import create_dataset
+from deepliif.models import create_model
+from deepliif.util import Visualizer
+from deepliif.options import Options, print_options
 
 import torch.distributed as dist
-import os
-import torch
-
-import numpy as np
-import random
-import torch
+    
 
 def set_seed(seed=0,rank=None):
     """
@@ -66,8 +63,9 @@ def set_seed(seed=0,rank=None):
               help='name of the experiment. It decides where to store samples and models')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
-@click.option('--targets-no', default=5, help='number of targets')
+@click.option('--modalities-no', default=4, type=int, help='number of targets')
 # model parameters
+@click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
 @click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
 @click.option('--ngf', default=64, help='# of gen filters in the last conv layer')
@@ -83,7 +81,6 @@ def set_seed(seed=0,rank=None):
 @click.option('--init-type', default='normal',
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
-@click.option('--padding-type', default='reflect', help='network padding type.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
@@ -126,6 +123,7 @@ def set_seed(seed=0,rank=None):
               help='learning rate policy. [linear | step | plateau | cosine]')
 @click.option('--lr-decay-iters', type=int, default=50,
               help='multiply by a gamma every lr_decay_iters iterations')
+@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 # visdom and HTML visualization parameters
 @click.option('--display-freq', default=400, help='frequency of showing training results on screen')
 @click.option('--display-ncols', default=4,
@@ -146,15 +144,30 @@ def set_seed(seed=0,rank=None):
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
 @click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
 @click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--dataset-mode', type=str, default='aligned',
+              help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
+@click.option('--padding', type=str, default='zero',
+              help='chooses the type of padding used by resnet generator. [reflect | zero]')
+# DeepLIIFExt params
+@click.option('--seg-gen', type=bool, default=True, help='True (Translation and Segmentation), False (Only Translation).')
+@click.option('--net-ds', type=str, default='n_layers',
+              help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
+@click.option('--net-gs', type=str, default='unet_512',
+              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+@click.option('--gan-mode', type=str, default='vanilla',
+              help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+@click.option('--gan-mode-s', type=str, default='lsgan',
+              help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+# DDP related arguments
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
-@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
-def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output_nc, ngf, ndf, net_d, net_g,
-          n_layers_d, norm, init_type, init_gain, padding_type, no_dropout, direction, serial_batches, num_threads,
+def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
+          n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed):
+          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, 
+          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -166,19 +179,36 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG'], f'model class {model} is not implemented'
+    if model == 'DeepLIIF':
+        seg_no = 1
+    elif model == 'DeepLIIFExt':
+        if seg_gen:
+            seg_no = modalities_no
+        else:
+            seg_no = 0
+    else: # SDG
+        seg_no = 0
+        seg_gen = False
+    
+    d_params = locals()
+
+    if gpu_ids and gpu_ids[0] == -1:
+        gpu_ids = []
+        
     local_rank = os.getenv('LOCAL_RANK') # DDP single node training triggered by torchrun has LOCAL_RANK
     rank = os.getenv('RANK') # if using DDP with multiple nodes, please provide global rank in env var RANK
 
     if len(gpu_ids) > 0:
         if local_rank is not None:
             local_rank = int(local_rank)
-            torch.cuda.set_device(gpu_ids[local_rank])
-            gpu_ids=[gpu_ids[local_rank]]
+            torch.cuda.set_device(local_rank)#gpu_ids[local_rank])
+            gpu_ids = [local_rank]
         else:
             torch.cuda.set_device(gpu_ids[0])
 
     if local_rank is not None: # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
-        dist.init_process_group(backend='nccl')
+        dist.init_process_group(backend="nccl", rank=int(os.environ['RANK']), world_size=int(os.environ['WORLD_SIZE']))
         print('local rank:',local_rank)
         flag_deterministic = set_seed(seed,local_rank)
     elif rank is not None:
@@ -187,28 +217,42 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, targets_no, input_nc, output
         flag_deterministic = set_seed(seed)
 
     if flag_deterministic:
-        padding_type = 'zero'
+        d_params['padding'] = 'zero'
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
-    # create a dataset given dataset_mode and other options
-    dataset = AlignedDataset(dataroot, load_size, crop_size, input_nc, output_nc, direction, targets_no, preprocess,
-                             no_flip, phase, max_dataset_size)
+    # infer number of input images
+    dir_data_train = dataroot + '/train'
+    fns = os.listdir(dir_data_train)
+    fns = [x for x in fns if x.endswith('.png')]
+    img = Image.open(f"{dir_data_train}/{fns[0]}")
+    
+    num_img = img.size[0] / img.size[1]
+    assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
+    num_img = int(num_img)
+    
+    input_no = num_img - modalities_no - seg_no
+    assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
+    d_params['input_no'] = input_no
+    d_params['scale_size'] = img.size[1]
+    d_params['gpu_ids'] = gpu_ids
 
-    dataset = create_dataset(dataset, batch_size, serial_batches, num_threads, max_dataset_size, gpu_ids)
+    # create a dataset given dataset_mode and other options
+    # dataset = AlignedDataset(opt)
+
+    opt = Options(d_params=d_params)
+    print_options(opt, save=True)
+    
+    dataset = create_dataset(opt)
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
 
     # create a model given model and other options
-    model = DeepLIIFModel(gpu_ids, is_train, checkpoints_dir, name, preprocess, targets_no, input_nc, output_nc, ngf,
-                          net_g, norm, no_dropout, init_type, init_gain, padding_type, ndf, net_d, n_layers_d, lr, beta1, lambda_l1,
-                          lr_policy, remote_transfer_cmd)
+    model = create_model(opt)
     # regular setup: load and print networks; create schedulers
-    model.setup(lr_policy, epoch_count, n_epochs, n_epochs_decay, lr_decay_iters, continue_train, load_iter, epoch,
-                verbose)
+    model.setup(opt)
 
     # create a visualizer that display/save images and plots
-    visualizer = Visualizer(display_id, is_train, no_html, display_winsize, name, display_port, display_ncols,
-                            display_server, display_env, checkpoints_dir, remote, remote_transfer_cmd)
+    visualizer = Visualizer(opt)
     # the total number of training iterations
     total_iters = 0
 
