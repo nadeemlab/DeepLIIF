@@ -134,6 +134,7 @@ def cli():
               help='learning rate policy. [linear | step | plateau | cosine]')
 @click.option('--lr-decay-iters', type=int, default=50,
               help='multiply by a gamma every lr_decay_iters iterations')
+@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 # visdom and HTML visualization parameters
 @click.option('--display-freq', default=400, help='frequency of showing training results on screen')
 @click.option('--display-ncols', default=4,
@@ -158,8 +159,6 @@ def cli():
               help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
 @click.option('--padding', type=str, default='zero',
               help='chooses the type of padding used by resnet generator. [reflect | zero]')
-@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
-@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 # DeepLIIFExt params
 @click.option('--seg-gen', type=bool, default=True, help='True (Translation and Segmentation), False (Only Translation).')
 @click.option('--net-ds', type=str, default='n_layers',
@@ -170,14 +169,16 @@ def cli():
               help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 @click.option('--gan-mode-s', type=str, default='lsgan',
               help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+# DDP related arguments
+@click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
-          remote, local_rank, remote_transfer_cmd, seed, dataset_mode, padding, model, 
-          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s):
+          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, 
+          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -213,12 +214,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         if local_rank is not None:
             local_rank = int(local_rank)
             torch.cuda.set_device(gpu_ids[local_rank])
-            gpu_ids=[gpu_ids[local_rank]]
+            gpu_ids=[local_rank]
         else:
             torch.cuda.set_device(gpu_ids[0])
 
     if local_rank is not None: # LOCAL_RANK will be assigned a rank number if torchrun ddp is used
-        dist.init_process_group(backend='nccl')
+        dist.init_process_group(backend="nccl", rank=int(os.environ['RANK']), world_size=int(os.environ['WORLD_SIZE']))
         print('local rank:',local_rank)
         flag_deterministic = set_seed(seed,local_rank)
     elif rank is not None:
@@ -244,6 +245,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
     d_params['input_no'] = input_no
     d_params['scale_size'] = img.size[1]
+    d_params['gpu_ids'] = gpu_ids
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
@@ -336,8 +338,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
               help='name of the experiment. It decides where to store samples and models')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
-@click.option('--targets-no', default=5, help='number of targets')
+@click.option('--modalities-no', default=4, type=int, help='number of targets')
 # model parameters
+@click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
 @click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
 @click.option('--ngf', default=64, help='# of gen filters in the last conv layer')
@@ -353,7 +356,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--init-type', default='normal',
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
-@click.option('--padding-type', default='reflect', help='network padding type.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
@@ -396,6 +398,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
               help='learning rate policy. [linear | step | plateau | cosine]')
 @click.option('--lr-decay-iters', type=int, default=50,
               help='multiply by a gamma every lr_decay_iters iterations')
+@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 # visdom and HTML visualization parameters
 @click.option('--display-freq', default=400, help='frequency of showing training results on screen')
 @click.option('--display-ncols', default=4,
@@ -416,8 +419,22 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--save-by-iter', is_flag=True, help='whether saves model by iteration')
 @click.option('--remote', type=bool, default=False, help='whether isolate visdom checkpoints or not; if False, you can run a separate visdom server anywhere that consumes the checkpoints')
 @click.option('--remote-transfer-cmd', type=str, default=None, help='module and function to be used to transfer remote files to target storage location, for example mymodule.myfunction')
+@click.option('--dataset-mode', type=str, default='aligned',
+              help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
+@click.option('--padding', type=str, default='zero',
+              help='chooses the type of padding used by resnet generator. [reflect | zero]')
+# DeepLIIFExt params
+@click.option('--seg-gen', type=bool, default=True, help='True (Translation and Segmentation), False (Only Translation).')
+@click.option('--net-ds', type=str, default='n_layers',
+              help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
+@click.option('--net-gs', type=str, default='unet_512',
+              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+@click.option('--gan-mode', type=str, default='vanilla',
+              help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+@click.option('--gan-mode-s', type=str, default='lsgan',
+              help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
+# DDP related arguments
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
-@click.option('--seed', type=int, default=None, help='basic seed to be used for deterministic training, default to None (non-deterministic)')
 @click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
 def trainlaunch(**kwargs):
     """
@@ -448,6 +465,7 @@ def trainlaunch(**kwargs):
             elif args[i-1] not in l_arg_skip and arg not in l_arg_skip:
                 # if the previous element is not an option name to skip AND if the current element is not an option to remove
                 args_final.append(arg)
+    
 
     ## add quotes back to the input arg that had quotes, e.g., experiment name
     args_final = [f'"{arg}"' if ' ' in arg else arg for arg in args_final]
@@ -457,16 +475,29 @@ def trainlaunch(**kwargs):
 
     #### locate train.py
     import deepliif
-    path_train_py = deepliif.__path__[0]+'/train.py'
+    path_train_py = deepliif.__path__[0]+'/scripts/train.py'
+    
+    #### find out GPUs to use
+    gpu_ids = [args_final[i+1] for i,v in enumerate(args_final) if v=='--gpu-ids']
+    if len(gpu_ids) > 0 and gpu_ids[0] == -1:
+        gpu_ids = []
+    
+    if len(gpu_ids) > 0:
+        opt_env = f"CUDA_VISIBLE_DEVICES=\"{','.join(gpu_ids)}\""
+    else:
+        opt_env = ''
 
     #### execute train.py
     if kwargs['use_torchrun']:
         if version.parse(torch.__version__) >= version.parse('1.10.0'):
-            subprocess.run(f'torchrun {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+            cmd = f'{opt_env} torchrun {kwargs["use_torchrun"]} {path_train_py} {options}'
         else:
-            subprocess.run(f'python -m torch.distributed.launch {kwargs["use_torchrun"]} {path_train_py} {options}',shell=True)
+            cmd = f'{opt_env} python -m torch.distributed.launch {kwargs["use_torchrun"]} {path_train_py} {options}'
     else:
-        subprocess.run(f'python {path_train_py} {options}',shell=True)
+        cmd = f'{opt_env} python {path_train_py} {options}'
+    
+    print('Executing command:',cmd)
+    subprocess.run(cmd,shell=True)
 
 
 
