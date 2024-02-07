@@ -46,8 +46,9 @@ import click
 @click.option('--results_dir', required=True, help='saves results here.')
 @click.option('--name', default='.', help='name of the experiment, used as a subfolder under results_dir')
 @click.option('--checkpoints_dir', required=True, help='load models from here.')
+@click.option('--gpu_ids', type=int, multiple=True)
 @click.option('--num_test', default=10000, help='only run test for num_test images')
-def test(dataroot, results_dir, name, checkpoints_dir,num_test):
+def test(dataroot, results_dir, name, checkpoints_dir, gpu_ids, num_test):
     # retrieve options used in training setting, similar to cli.py test
     model_dir = os.path.join(checkpoints_dir, name)
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
@@ -62,6 +63,18 @@ def test(dataroot, results_dir, name, checkpoints_dir,num_test):
     if not hasattr(opt,'seg_gen'): # old settings for DeepLIIF models
         opt.seg_gen = True
     
+    number_of_gpus_all = torch.cuda.device_count()
+    if number_of_gpus_all < len(gpu_ids) and -1 not in gpu_ids:
+        number_of_gpus = 0
+        gpu_ids = [-1]
+        print(f'Specified to use GPU {opt.gpu_ids} for inference, but there are only {number_of_gpus_all} GPU devices. Switched to CPU inference.')
+
+    if len(gpu_ids) > 0 and gpu_ids[0] == -1:
+        gpu_ids = []
+    elif len(gpu_ids) == 0:
+        gpu_ids = list(range(number_of_gpus_all))
+
+    opt.gpu_ids = gpu_ids # overwrite gpu_ids; for test command, default gpu_ids at first is [] which will be translated to a list of all gpus
     
     # hard-code some parameters for test.py
     opt.aspect_ratio = 1.0 # from previous default setting
