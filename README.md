@@ -111,7 +111,7 @@ deepliif prepare-training-data --input-dir /path/to/input/images
 To train a model:
 ```
 deepliif train --dataroot /path/to/input/images 
-                --name Model_Name 
+               --name Model_Name 
 ```
 or
 ```
@@ -157,7 +157,7 @@ The installed `deepliif` uses Dask to perform inference on the input IHC images.
 Before running the `test` command, the model files must be serialized using Torchscript.
 To serialize the model files:
 ```
-deepliif serialize --models-dir /path/to/input/model/files
+deepliif serialize --model-dir /path/to/input/model/files
                    --output-dir /path/to/output/model/files
 ```
 * By default, the model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
@@ -166,15 +166,17 @@ deepliif serialize --models-dir /path/to/input/model/files
 ## Testing
 To test the model:
 ```
-deepliif test --input-dir /path/to/input/images 
-              --output-dir /path/to/output/images 
+deepliif test --input-dir /path/to/input/images
+              --output-dir /path/to/output/images
               --model-dir path/to/the/serialized/model
               --tile-size 512
 ```
 or
 ```
-python test.py --dataroot /path/to/input/images 
-               --name Model_Name  
+python test.py --dataroot /path/to/input/images
+               --results_dir /path/to/output/images
+               --checkpoints_dir /path/to/model/files
+               --name Model_Name
 ```
 * The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 * Before running test on images, the model files must be serialized as described above.
