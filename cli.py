@@ -596,11 +596,12 @@ def test(input_dir, output_dir, tile_size, model_dir, gpu_ids, region_size, eage
                         filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
                     ))
 
-                with open(os.path.join(
-                        output_dir,
-                        filename.replace('.' + filename.split('.')[-1], f'.json')
-                ), 'w') as f:
-                    json.dump(scoring, f, indent=2)
+                if scoring is not None:
+                    with open(os.path.join(
+                            output_dir,
+                            filename.replace('.' + filename.split('.')[-1], f'.json')
+                    ), 'w') as f:
+                        json.dump(scoring, f, indent=2)
 
 @cli.command()
 @click.option('--input-dir', type=str, required=True, help='Path to input images')
