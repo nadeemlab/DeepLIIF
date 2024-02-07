@@ -14,7 +14,7 @@ from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, 
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs, check_multi_scale
 # from deepliif.util import infer_results_for_wsi
-from deepliif.options import Options
+from deepliif.options import Options, print_options
 
 import torch.distributed as dist
 
@@ -59,29 +59,6 @@ def set_seed(seed=0,rank=None):
 def ensure_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
-
-def print_options(opt):
-    """Print and save options
-
-    It will print both current options and default values(if different).
-    It will save options into a text file / [checkpoints_dir] / opt.txt
-    """
-    message = ''
-    message += '----------------- Options ---------------\n'
-    for k, v in sorted(vars(opt).items()):
-        comment = ''
-        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
-    message += '----------------- End -------------------'
-    print(message)
-
-    # save to the disk
-    if opt.phase == 'train':
-        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-        mkdirs(expr_dir)
-        file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
-        with open(file_name, 'wt') as opt_file:
-            opt_file.write(message)
-            opt_file.write('\n')
         
         
 @click.group()
@@ -212,6 +189,18 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG'], f'model class {model} is not implemented'
+    if model == 'DeepLIIF':
+        seg_no = 1
+    elif model == 'DeepLIIFExt':
+        if seg_gen:
+            seg_no = modalities_no
+        else:
+            seg_no = 0
+    else: # SDG
+        seg_no = 0
+        seg_gen = False
+    
     d_params = locals()
 
     if gpu_ids and gpu_ids[0] == -1:
@@ -241,11 +230,26 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         d_params['padding'] = 'zero'
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
+    # infer number of input images
+    dir_data_train = dataroot + '/train'
+    fns = os.listdir(dir_data_train)
+    fns = [x for x in fns if x.endswith('.png')]
+    img = Image.open(f"{dir_data_train}/{fns[0]}")
+    
+    num_img = img.size[0] / img.size[1]
+    assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
+    num_img = int(num_img)
+    
+    input_no = num_img - modalities_no - seg_no
+    assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
+    d_params['input_no'] = input_no
+    d_params['scale_size'] = img.size[1]
+
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
 
     opt = Options(d_params=d_params)
-    print_options(opt)
+    print_options(opt, save=True)
     
     dataset = create_dataset(opt)
     # get the number of images in the dataset.
@@ -468,28 +472,30 @@ def trainlaunch(**kwargs):
 
 
 @cli.command()
-@click.option('--models-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
+@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', type=int, default=None, help='tile size')
-@click.option('--device', default='cpu', type=str, help='device to load model, either cpu or gpu')
+#@click.option('--tile-size', type=int, default=None, help='tile size')
+@click.option('--device', default='cpu', type=str, help='device to load model for the similarity test, either cpu or gpu')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
-def serialize(models_dir, output_dir, tile_size, device, verbose):
+def serialize(model_dir, output_dir, device, verbose):
     """Serialize DeepLIIF models using Torchscript
     """
-    if tile_size is None:
-        tile_size = 512
-    output_dir = output_dir or models_dir
+    #if tile_size is None:
+    #    tile_size = 512
+    output_dir = output_dir or model_dir
     ensure_exists(output_dir)
     
     # copy train_opt.txt to the target location
     import shutil
-    if models_dir != output_dir:
-        shutil.copy(f'{models_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
+    if model_dir != output_dir:
+        shutil.copy(f'{model_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
     
-    sample = transform(Image.new('RGB', (tile_size, tile_size)))
+    opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+    sample = transform(Image.new('RGB', (opt.scale_size, opt.scale_size)))
+    sample = torch.cat([sample]*opt.input_no, 1)
     
     with click.progressbar(
-            init_nets(models_dir, eager_mode=True, phase='test').items(),
+            init_nets(model_dir, eager_mode=True, phase='test').items(),
             label='Tracing nets',
             item_show_func=lambda n: n[0] if n else n
     ) as bar:
@@ -508,7 +514,7 @@ def serialize(models_dir, output_dir, tile_size, device, verbose):
     
     # test: whether the original and the serialized model produces highly similar predictions
     print('testing similarity between prediction from original vs serialized models...')
-    models_original = init_nets(models_dir,eager_mode=True,phase='test')
+    models_original = init_nets(model_dir,eager_mode=True,phase='test')
     models_serialized = init_nets(output_dir,eager_mode=False,phase='test')
     if device == 'gpu':
         sample = sample.cuda()
