@@ -168,7 +168,7 @@ To test the model:
 ```
 deepliif test --input-dir /path/to/input/images
               --output-dir /path/to/output/images
-              --model-dir path/to/the/serialized/model
+              --model-dir /path/to/the/serialized/model
               --tile-size 512
 ```
 or
@@ -197,7 +197,7 @@ Based on the available GPU resources, the region-size can be changed.
 ```
 deepliif test --input-dir /path/to/input/images 
               --output-dir /path/to/output/images 
-              --model-dir path/to/the/serialized/model
+              --model-dir /path/to/the/serialized/model
               --tile-size 512
               --region-size 20000
 ```
