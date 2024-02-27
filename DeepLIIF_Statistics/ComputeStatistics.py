@@ -21,7 +21,7 @@ parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('--gt_path', type=str, required=True)
 parser.add_argument('--model_path', type=str, required=True)
 parser.add_argument('--output_path', type=str, required=True)
-parser.add_argument('--model_name', type=str, required=False, default='DeepLIIF')
+parser.add_argument('--model_name', type=str, required=False, default='')
 parser.add_argument('--mode', type=str, default='Segmentation',
                     help='Mode of the statistics computation including Segmentation, ImageSynthesis, All')
 parser.add_argument('--raw_segmentation', action='store_true')
@@ -30,7 +30,8 @@ parser.add_argument('--batch_size', type=int, default=50,
                     help='Batch size to use')
 parser.add_argument('--num_workers', type=int, default=8,
                     help='Number of processes to use for data loading')
-parser.add_argument('--image_types', type=str, default='Hema,DAPI,Lap2,Marker')
+parser.add_argument('--image_types', type=str, default='Hema,DAPI,Lap2,Marker', help='These are non-seg modalities to be evaluated.')
+parser.add_argument('--seg_type', type=str, default='Seg', help='This is the seg modality to be evaluated.')
 
 
 class Statistics:
@@ -45,6 +46,7 @@ class Statistics:
         self.num_workers = args.num_workers
         self.device = args.device
         self.image_types = args.image_types.replace(' ', '').split(',')
+        self.seg_type = args.seg_type
 
         # Image Similarity Metrics
         self.inception_avg = collections.defaultdict(float)
@@ -184,8 +186,9 @@ class Statistics:
         thresh = 100
         boundary_thresh = 100
         noise_size = 50
-        print(thresh, noise_size)
-        self.segmentation_info, self.segmentation_metrics = compute_segmentation_metrics(self.gt_path, self.model_path, self.model_name, image_size=512, thresh=thresh, boundary_thresh=boundary_thresh, small_object_size=noise_size, raw_segmentation=self.raw_segmentation)
+        
+        self.segmentation_info, self.segmentation_metrics = compute_segmentation_metrics(self.gt_path, self.model_path, self.model_name, image_size=512, thresh=thresh, boundary_thresh=boundary_thresh, small_object_size=noise_size, raw_segmentation=self.raw_segmentation, suffix_seg=self.seg_type)
+        assert len(self.segmentation_info) > 0, 'No segmentation results returned; one typical cause is a wrong --seg-type and/or --image-types that cannot be found in any image filename'
         self.write_list_to_csv(self.segmentation_info, self.segmentation_info[0].keys(),
                                filename='segmentation_info_' + self.mode + '_' + self.model_name + '_' + str(thresh) + '_' + str(noise_size) + '.csv')
         for key in self.segmentation_metrics:
@@ -202,14 +205,14 @@ class Statistics:
         self.create_all_info()
 
     def write_dict_to_csv(self, info_dict, csv_columns, filename='info.csv'):
-        print('Writing in csv')
+        print('Writing in csv',os.path.join(self.output_path, filename))
         info_csv = open(os.path.join(self.output_path, filename), 'w')
         writer = csv.DictWriter(info_csv, fieldnames=csv_columns)
         writer.writeheader()
         writer.writerow(info_dict)
 
     def write_list_to_csv(self, info_dict, csv_columns, filename='info.csv'):
-        print('Writing in csv')
+        print('Writing in csv',os.path.join(self.output_path, filename))
         info_csv = open(os.path.join(self.output_path, filename), 'w')
         writer = csv.DictWriter(info_csv, fieldnames=csv_columns)
         writer.writeheader()
@@ -228,3 +231,4 @@ if __name__ == '__main__':
         stat.compute_segmentation_metrics()
     elif stat.mode == 'ImageSynthesis':
         stat.compute_image_similarity_metrics()
+    stat.create_all_info()
