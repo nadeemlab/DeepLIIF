@@ -15,6 +15,8 @@ class SDGModel(BaseModel):
         BaseModel.__init__(self, opt)
 
         self.mod_gen_no = self.opt.modalities_no
+        opt.resize_conv = 'resizeconv' in opt.checkpoints_dir or 'resizeconv' in opt.name
+            
 
         # weights of the modalities in generating segmentation mask
         self.seg_weights = [0, 0, 0]
@@ -55,7 +57,7 @@ class SDGModel(BaseModel):
         self.netG = [None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
             self.netG[i] = networks.define_G(self.opt.input_nc * self.opt.input_no, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
+                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding, resize_conv=opt.resize_conv)
             print('***************************************')
             print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
                                              not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
@@ -159,15 +161,15 @@ class SDGModel(BaseModel):
         for i in range(self.mod_gen_no):
             self.loss_G_L1.append(self.criterionSmoothL1(self.fake_B[i], self.real_B[i]) * self.opt.lambda_L1)
 
-        #self.loss_G_VGG = []
-        #for i in range(self.mod_gen_no):
-        #    self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
+        self.loss_G_VGG = []
+        for i in range(self.mod_gen_no):
+            self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
 
         # self.loss_G = (self.loss_G_GAN[0] + self.loss_G_L1[0]) * self.loss_G_weights[0]
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
-            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i]) * self.loss_G_weights[i]
-        #    self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
+            #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i]) * self.loss_G_weights[i]
+            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
         self.loss_G.backward()
 
     def optimize_parameters(self):
