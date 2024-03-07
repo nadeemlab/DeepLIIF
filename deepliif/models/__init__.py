@@ -231,7 +231,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
     
-    if opt.input_no > 1:
+    if opt.input_no > 1 or opt.model == 'SDG':
         l_ts = [transform(img_i.resize((opt.scale_size,opt.scale_size))) for img_i in img]
         ts = torch.cat(l_ts, dim=1)
     else:
