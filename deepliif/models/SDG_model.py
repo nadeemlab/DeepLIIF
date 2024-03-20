@@ -16,6 +16,9 @@ class SDGModel(BaseModel):
 
         self.mod_gen_no = self.opt.modalities_no
         opt.resize_conv = 'resizeconv' in opt.checkpoints_dir or 'resizeconv' in opt.name
+        print('opt.resize_conv', opt.resize_conv)
+        opt.tv_loss = 'tv' in opt.checkpoints_dir or 'tv' in opt.name
+        print('opt.tv_loss', opt.tv_loss)
             
 
         # weights of the modalities in generating segmentation mask
@@ -38,7 +41,7 @@ class SDGModel(BaseModel):
         self.visual_names = ['real_A']
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         for i in range(1, self.mod_gen_no + 1):
-            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'D_real_' + str(i), 'D_fake_' + str(i)])
+            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'G_VGG_'+ str(i),'G_TV_'+ str(i),'D_real_' + str(i), 'D_fake_' + str(i)])
             self.visual_names.extend(['fake_B_' + str(i), 'real_B_' + str(i)])
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
@@ -78,6 +81,7 @@ class SDGModel(BaseModel):
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
 
             self.criterionVGG = networks.VGGLoss().to(self.device)
+            self.criterionTV = networks.TotalVariationLoss().to(self.device)
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             params = []
@@ -164,12 +168,17 @@ class SDGModel(BaseModel):
         self.loss_G_VGG = []
         for i in range(self.mod_gen_no):
             self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
+        
+        self.loss_G_TV = []
+        for i in range(self.mod_gen_no):
+            self.loss_G_TV.append(self.criterionTV(self.fake_B[i]) * 0.02)
 
         # self.loss_G = (self.loss_G_GAN[0] + self.loss_G_L1[0]) * self.loss_G_weights[0]
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
             #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i]) * self.loss_G_weights[i]
-            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
+            #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
+            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i] + self.loss_G_TV[i]) * self.loss_G_weights[i]
         self.loss_G.backward()
 
     def optimize_parameters(self):

@@ -699,3 +699,15 @@ class VGGLoss(nn.Module):
         for i in range(len(x_vgg)):
             loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
         return loss
+
+
+class TotalVariationLoss(nn.Module):
+    """
+    Absolute difference for neighbouring pixels (i,j to i+1,j, then i,j to i,j+1), averaged on pixel level
+    """ 
+    def __init__(self):
+        super(TotalVariationLoss, self).__init__()
+    
+    def forward(self, x):
+        tv = torch.abs(x[:,:,1:,:]-x[:,:,:-1,:]).sum() + torch.abs(x[:,:,:,1:]-x[:,:,:,:-1]).sum()
+        return tv / torch.prod(torch.tensor(x.size()))
