@@ -40,6 +40,9 @@ segmentation.*
 
 © This code is made available for non-commercial academic purposes.
 
+![Version](https://img.shields.io/static/v1?label=latest&message=v1.1.9&color=darkgreen)
+[![Total Downloads](https://static.pepy.tech/personalized-badge/deepliif?period=total&units=international_system&left_color=grey&right_color=blue&left_text=total%20downloads)](https://pepy.tech/project/deepliif?&left_text=totalusers)
+
 ![overview_image](./images/overview.png)*Overview of DeepLIIF pipeline and sample input IHCs (different 
 brown/DAB markers -- BCL2, BCL6, CD10, CD3/CD8, Ki67) with corresponding DeepLIIF-generated hematoxylin/mpIF modalities 
 and classified (positive (red) and negative (blue) cell) segmentation masks. (a) Overview of DeepLIIF. Given an IHC 
