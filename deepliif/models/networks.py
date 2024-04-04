@@ -6,7 +6,7 @@ from torch.optim import lr_scheduler
 import os
 
 from torchvision import models
-
+from .att_unet import AttU_Net
 ###############################################################################
 # Helper Functions
 ###############################################################################
@@ -165,6 +165,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_512':
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif netG == 'unet_512_attention':
+        net = AttU_Net(img_ch=3,output_ch=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
