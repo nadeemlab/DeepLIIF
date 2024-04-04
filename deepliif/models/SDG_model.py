@@ -41,7 +41,9 @@ class SDGModel(BaseModel):
         self.visual_names = ['real_A']
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         for i in range(1, self.mod_gen_no + 1):
-            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'G_VGG_'+ str(i),'G_TV_'+ str(i),'D_real_' + str(i), 'D_fake_' + str(i)])
+            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'G_VGG_'+ str(i),
+                                    #'G_TV_'+ str(i),
+                                    'D_real_' + str(i), 'D_fake_' + str(i)])
             self.visual_names.extend(['fake_B_' + str(i), 'real_B_' + str(i)])
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
@@ -65,6 +67,8 @@ class SDGModel(BaseModel):
             print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
                                              not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
             print('***************************************')
+            if i==0:
+                print(self.netG[i])
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.netD = [None for _ in range(self.mod_gen_no)]
@@ -169,16 +173,16 @@ class SDGModel(BaseModel):
         for i in range(self.mod_gen_no):
             self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
         
-        self.loss_G_TV = []
-        for i in range(self.mod_gen_no):
-            self.loss_G_TV.append(self.criterionTV(self.fake_B[i]) * 0.02)
+        # self.loss_G_TV = []
+        # for i in range(self.mod_gen_no):
+        #     self.loss_G_TV.append(self.criterionTV(self.fake_B[i]) * 0.02)
 
         # self.loss_G = (self.loss_G_GAN[0] + self.loss_G_L1[0]) * self.loss_G_weights[0]
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
             #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i]) * self.loss_G_weights[i]
-            #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
-            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i] + self.loss_G_TV[i]) * self.loss_G_weights[i]
+            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
+            #self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i] + self.loss_G_TV[i]) * self.loss_G_weights[i]
         self.loss_G.backward()
 
     def optimize_parameters(self):
