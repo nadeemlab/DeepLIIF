@@ -253,8 +253,14 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
         segs = compute(lazy_segs)[0]
     
-        seg_weights = [0.25, 0.25, 0.25, 0, 0.25]
-        seg = torch.stack([torch.mul(n, w) for n, w in zip(segs.values(), seg_weights)]).sum(dim=0)
+        weights = {
+            'G51': 0.25, # IHC
+            'G52': 0.25, # Hema
+            'G53': 0.25, # DAPI
+            'G54': 0.00, # Lap2
+            'G55': 0.25, # Marker
+        }
+        seg = torch.stack([torch.mul(segs[k], weights[k]) for k in segs.keys()]).sum(dim=0)
     
         res = {k: tensor_to_pil(v) for k, v in gens.items()}
         res['G5'] = tensor_to_pil(seg)
