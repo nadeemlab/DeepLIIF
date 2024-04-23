@@ -164,6 +164,28 @@ def adjust_background_tile(img):
     return image
 
 
+def image_variance_gray(img):
+    px = np.asarray(img) if img.mode == 'L' else np.asarray(img.convert('L'))
+    idx = np.logical_and(px != 255, px != 0)
+    val = px[idx]
+    if val.shape[0] == 0:
+        return 0
+    var = np.var(val)
+    return var
+
+
+def image_variance_rgb(img):
+    px = np.asarray(img) if img.mode == 'RGB' else np.asarray(img.convert('RGB'))
+    nonwhite = np.any(px != [255, 255, 255], axis=-1)
+    nonblack = np.any(px != [0, 0, 0], axis=-1)
+    idx = np.logical_and(nonwhite, nonblack)
+    val = px[idx]
+    if val.shape[0] == 0:
+        return [0, 0, 0]
+    var = np.var(val, axis=0)
+    return var
+
+
 def read_bioformats_image_with_reader(path, channel=0, region=(0, 0, 0, 0)):
     """
     Using this function, you can read a specific region of a large image by giving the region bounding box (XYWH format)

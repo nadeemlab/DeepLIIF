@@ -284,12 +284,19 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         raise Exception(f'run_dask() not fully implemented for {opt.model}')
 
 
-def is_empty(tile):
+def is_empty_old(tile):
     # return True if np.mean(np.array(tile) - np.array(mean_background_val)) < 40 else False
     if isinstance(tile, list): # for pair of tiles, only mark it as empty / no need for prediction if ALL tiles are empty
         return all([True if calculate_background_area(t) > 98 else False for t in tile])
     else:
         return True if calculate_background_area(tile) > 98 else False
+
+
+def is_empty(tile):
+    if isinstance(tile, list): # for pair of tiles, only mark it as empty / no need for prediction if ALL tiles are empty
+        return all([True if np.max(image_variance_rgb(tile)) < 15 else False for t in tile])
+    else:
+        return True if np.max(image_variance_rgb(tile)) < 15 else False
 
 
 def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
