@@ -35,8 +35,8 @@ class Options:
 
         if mode == 'train':
             self.is_train = True
-            self.netG = 'resnet_9blocks'
-            self.netD = 'n_layers'
+            self.netG = self.net_g #'resnet_9blocks'
+            self.netD = self.net_d #'n_layers'
             self.n_layers_D = 4
             self.lambda_L1 = 100
             self.lambda_feat = 100
