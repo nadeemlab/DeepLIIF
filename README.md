@@ -13,6 +13,8 @@
     |
     <a href="https://onlinelibrary.wiley.com/share/author/4AEBAGEHSZE9GDP3H8MN?target=10.1111/his.15048">Histopathology'23</a>
     |
+    <a href="https://arxiv.org/abs/2405.08169">MICCAI'24</a>
+    |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
     <a href="https://nadeemlab.github.io/DeepLIIF/">Documentation</a>
@@ -537,5 +539,12 @@ If you find our work useful in your research or if you use parts of this code or
   journal = {Histopathology},
   year = {2023},
   doi = {https://doi.org/10.1111/his.15048}
+}
+
+@article{zehra2024deepliifstitch,
+author = {Zehra, Talat and Marino, Joseph and Wang, Wendy and Frantsuzov, Grigoriy and Nadeem, Saad},
+title = {Rethinking Histology Slide Digitization Workflows for Low-Resource Settings},
+journal = {International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
+year = {2024}
 }
 ```
