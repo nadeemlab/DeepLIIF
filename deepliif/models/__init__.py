@@ -369,8 +369,8 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
     return images
 
 
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
-              color_dapi=False, color_marker=False, opt=None):
+def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
+                   color_dapi=False, color_marker=False, opt=None):
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
@@ -489,6 +489,63 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
         raise Exception(f'inference() not implemented for model {opt.model}')
 
 
+def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
+              eager_mode=False, color_dapi=False, color_marker=False, opt=None):
+    if not opt:
+        opt = get_opt(model_path)
+        #print_options(opt)
+
+    run_fn = run_torchserve if use_torchserve else run_dask
+
+    if opt.model == 'SDG':
+        # SDG could have multiple input images/modalities, hence the input could be a rectangle.
+        # We split the input to get each modality image then create tiles for each set of input images.
+        w, h = int(img.width / opt.input_no), img.height
+        orig = [img.crop((w * i, 0, w * (i+1), h)) for i in range(opt.input_no)]
+    else:
+        # Otherwise expect a single input image, which is used directly.
+        orig = img
+
+    tiler = InferenceTiler(orig, tile_size, overlap_size)
+    for tile in tiler:
+        tiler.stitch(run_wrapper(tile, run_fn, model_path, eager_mode, opt))
+    results = tiler.results()
+
+    if opt.model == 'DeepLIIF':
+        images = {
+            'Hema': results['G1'],
+            'DAPI': results['G2'],
+            'Lap2': results['G3'],
+            'Marker': results['G4'],
+            'Seg': results['G5'],
+        }
+        if color_dapi:
+            matrix = (       0,        0,        0, 0,
+                      299/1000, 587/1000, 114/1000, 0,
+                      299/1000, 587/1000, 114/1000, 0)
+            images['DAPI'] = images['DAPI'].convert('RGB', matrix)
+        if color_marker:
+            matrix = (299/1000, 587/1000, 114/1000, 0,
+                      299/1000, 587/1000, 114/1000, 0,
+                             0,        0,        0, 0)
+            images['Marker'] = images['Marker'].convert('RGB', matrix)
+        return images
+
+    elif opt.model == 'DeepLIIFExt':
+        images = {f'mod{i}': results[f'G_{i}'] for i in range(1, opt.modalities_no + 1)}
+        if opt.seg_gen:
+            images.update({f'Seg{i}': results[f'GS_{i}'] for i in range(1, opt.modalities_no + 1)})
+        return images
+
+    elif opt.model == 'SDG':
+        images = {f'mod{i}': results[f'G_{i}'] for i in range(1, opt.modalities_no + 1)}
+        return images
+
+    else:
+        #raise Exception(f'inference() not implemented for model {opt.model}')
+        return results # return result images with default key names (i.e., net names)
+
+
 def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='auto', marker_thresh='auto', size_thresh_upper=None):
     if model == 'DeepLIIF':
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
@@ -546,7 +603,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
     images = inference(
         img,
         tile_size=tile_size,
-        overlap_size=compute_overlap(img_size, tile_size),
+        #overlap_size=compute_overlap(img_size, tile_size),
+        overlap_size=tile_size//16,
         model_path=model_dir,
         eager_mode=eager_mode,
         color_dapi=color_dapi,
