@@ -134,10 +134,14 @@ class BaseModel(ABC):
         for name in self.visual_names:
             if isinstance(name, str):
                 if not hasattr(self, name):
-                    if len(name.split('_')) == 2:
-                        visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
+                    if len(name.split('_')) != 2:
+                        if self.opt.model == 'DeepLIIF':
+                            img_name = name[:-1] + '_' + name[-1]
+                            visual_ret[name] = getattr(self, img_name)
+                        else:
+                            visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
                     else:
-                        visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
+                        visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
                 else:
                     visual_ret[name] = getattr(self, name)
         return visual_ret

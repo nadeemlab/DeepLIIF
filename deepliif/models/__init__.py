@@ -313,7 +313,12 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
                 'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
                 'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
+                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G51': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G52': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G53': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
             }
         else:
             return run_fn(tile, model_path, eager_mode, opt)
@@ -409,7 +414,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, ea
                 
                 for modality_name, net_name in d_modality2net.items():
                     stitch_tile(images[modality_name], res[net_name], tile_size, overlap_size, i, j)
-        
+
         for modality_name, output_img in images.items():
             images[modality_name] = output_img.resize(img.size)
     
