@@ -88,6 +88,16 @@ class BaseModel(ABC):
             self.load_networks(load_suffix)
         self.print_networks(opt.verbose)
 
+    def train(self):
+        """Make models train mode """
+        for name in self.model_names:
+            if isinstance(name, str):
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
+                net.train()
+
     def eval(self):
         """Make models eval mode during test time"""
         for name in self.model_names:
@@ -244,6 +254,7 @@ class BaseModel(ABC):
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         """
         for name in self.model_names:
+            
             if isinstance(name, str):
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)
