@@ -140,6 +140,6 @@ dependencies:
     - visdom==0.1.8.9
     - websocket-client==0.58.0
     - opencv-python
-    - numba==0.53.1
+    - numba==0.57.1
     - scikit-learn==0.24.2
     - scikit-image==0.18.3
