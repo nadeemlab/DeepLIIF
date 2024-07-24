@@ -12,7 +12,7 @@ from PIL import Image
 from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
-from deepliif.util.util import mkdirs, check_multi_scale
+from deepliif.util.util import mkdirs
 # from deepliif.util import infer_results_for_wsi
 from deepliif.options import Options, print_options
 
@@ -534,7 +534,7 @@ def serialize(model_dir, output_dir, device, verbose):
 @cli.command()
 @click.option('--input-dir', default='./Sample_Large_Tissues/', help='reads images from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--tile-size', default=None, help='tile size')
+@click.option('--tile-size', type=click.IntRange(min=1, max=None), required=True, help='tile size')
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'

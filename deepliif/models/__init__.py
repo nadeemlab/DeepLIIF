@@ -31,7 +31,7 @@ import numpy as np
 from dask import delayed, compute
 
 from deepliif.util import *
-from deepliif.util.util import tensor_to_pil, check_multi_scale
+from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import compute_results
 from deepliif.options import Options, print_options
@@ -590,11 +590,6 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         opt = get_opt(model_dir)
         opt.use_dp = False
         #print_options(opt)
-    
-    if not tile_size:
-        tile_size = check_multi_scale(Image.open('./images/target.png').convert('L'),
-                                      img.convert('L'))
-    tile_size = int(tile_size)
     
     # for those with multiple input modalities, find the correct size to calculate overlap_size
     input_no = opt.input_no if hasattr(opt, 'input_no') else 1
