@@ -90,6 +90,16 @@ Commands:
   train                  General-purpose training script for multi-task...
 ```
 
+**Note:** You might need to install a version of PyTorch that is compatible with your CUDA version. 
+Otherwise, only the CPU will be used. 
+Visit the [PyTorch website](https://pytorch.org/) for details. 
+You can confirm if your installation will run on the GPU by checking if the following returns `True`:
+
+```
+import torch
+torch.cuda.is_available()
+```
+
 ## Training Dataset
 For training, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched
 together horizontally).
@@ -187,7 +197,7 @@ python test.py --dataroot /path/to/input/images
 * Before running test on images, the model files must be serialized as described above.
 * The serialized model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
 * The test results will be saved to the specified output directory, which defaults to the input directory.
-* The default tile size is 512.
+* The tile size must be specified and is used to split the image into tiles for processing.  The tile size is based on the resolution (scan magnification) of the input image, and the recommended values are a tile size of 512 for 40x images, 256 for 20x, and 128 for 10x.  Note that the smaller the tile size, the longer inference will take.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
 **Whole Slide Image (WSI) Inference:**  
