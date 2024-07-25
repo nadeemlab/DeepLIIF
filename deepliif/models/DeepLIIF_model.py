@@ -1,6 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
+from ..util.adamw_schedulefree import AdamWScheduleFree
 
 
 class DeepLIIFModel(BaseModel):
@@ -110,10 +111,12 @@ class DeepLIIFModel(BaseModel):
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
-            self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            # self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = AdamWScheduleFree(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
             params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters()) + list(self.netD55.parameters())
-            self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            # self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_D = AdamWScheduleFree(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -331,3 +334,41 @@ class DeepLIIFModel(BaseModel):
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
         self.optimizer_G.step()             # udpate G's weights
+    
+    def calculate_losses(self):
+        """
+        Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
+        """
+        # for eval/val, schedule free optimizers need to be set to eval mode: https://github.com/facebookresearch/schedule_free/tree/main?tab=readme-ov-file#how-to-use
+        self.optimizer_D.eval()
+        self.optimizer_G.eval()
+        
+        self.forward()                   # compute fake images: G(A)
+        # update D
+        self.set_requires_grad(self.netD1, True)  # enable backprop for D1
+        self.set_requires_grad(self.netD2, True)  # enable backprop for D2
+        self.set_requires_grad(self.netD3, True)  # enable backprop for D3
+        self.set_requires_grad(self.netD4, True)  # enable backprop for D4
+        self.set_requires_grad(self.netD51, True)  # enable backprop for D51
+        self.set_requires_grad(self.netD52, True)  # enable backprop for D52
+        self.set_requires_grad(self.netD53, True)  # enable backprop for D53
+        self.set_requires_grad(self.netD54, True)  # enable backprop for D54
+        self.set_requires_grad(self.netD55, True)  # enable backprop for D54
+
+        self.backward_D()                # calculate gradients for D
+
+        # update G
+        self.set_requires_grad(self.netD1, False)  # D1 requires no gradients when optimizing G1
+        self.set_requires_grad(self.netD2, False)  # D2 requires no gradients when optimizing G2
+        self.set_requires_grad(self.netD3, False)  # D3 requires no gradients when optimizing G3
+        self.set_requires_grad(self.netD4, False)  # D4 requires no gradients when optimizing G4
+        self.set_requires_grad(self.netD51, False)  # D51 requires no gradients when optimizing G51
+        self.set_requires_grad(self.netD52, False)  # D52 requires no gradients when optimizing G52
+        self.set_requires_grad(self.netD53, False)  # D53 requires no gradients when optimizing G53
+        self.set_requires_grad(self.netD54, False)  # D54 requires no gradients when optimizing G54
+        self.set_requires_grad(self.netD55, False)  # D54 requires no gradients when optimizing G54
+
+        self.backward_G()                   # calculate graidents for G
+        self.optimizer_D.train()
+        self.optimizer_G.train()
+        
