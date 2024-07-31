@@ -129,6 +129,8 @@ def cli():
               help='number of epochs with the initial learning rate')
 @click.option('--n-epochs-decay', type=int, default=100,
               help='number of epochs to linearly decay learning rate to zero')
+@click.option('--optimizer', type=str, default='adam',
+              help='optimizer to use, applied to both generators and discriminators [adam | adamw-schedulefree]')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
 @click.option('--lr', default=0.0002, help='initial learning rate for adam')
 @click.option('--lr-policy', default='linear',
@@ -177,7 +179,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
-          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
+          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, 
           modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank):
     """General-purpose training script for multi-task image-to-image translation.
@@ -202,6 +204,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     else: # SDG
         seg_no = 0
         seg_gen = False
+    
+    assert optimizer in ['adam', 'adamw-schedulefree'], f'optimizer {optimizer} is not implemented'
     
     d_params = locals()
 

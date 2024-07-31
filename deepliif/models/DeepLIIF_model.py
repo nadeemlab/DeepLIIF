@@ -1,7 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
-from ..util.adamw_schedulefree import AdamWScheduleFree
+from .networks import get_optimizer
 
 
 class DeepLIIFModel(BaseModel):
@@ -111,12 +111,10 @@ class DeepLIIFModel(BaseModel):
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
-            # self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_G = AdamWScheduleFree(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
             params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters()) + list(self.netD55.parameters())
-            # self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D = AdamWScheduleFree(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -340,8 +338,9 @@ class DeepLIIFModel(BaseModel):
         Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
         """
         # for eval/val, schedule free optimizers need to be set to eval mode: https://github.com/facebookresearch/schedule_free/tree/main?tab=readme-ov-file#how-to-use
-        self.optimizer_D.eval()
-        self.optimizer_G.eval()
+        if 'schedulefree' in self.opt.optimizer:
+            self.optimizer_D.eval()
+            self.optimizer_G.eval()
         
         self.forward()                   # compute fake images: G(A)
         # update D
@@ -369,6 +368,7 @@ class DeepLIIFModel(BaseModel):
         self.set_requires_grad(self.netD55, False)  # D54 requires no gradients when optimizing G54
 
         self.backward_G()                   # calculate graidents for G
-        self.optimizer_D.train()
-        self.optimizer_G.train()
-        
+        if 'schedulefree' in self.opt.optimizer:
+            self.optimizer_D.train()
+            self.optimizer_G.train()
+            

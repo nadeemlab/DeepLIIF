@@ -40,6 +40,7 @@ class Options:
             self.n_layers_D = 4
             self.lambda_L1 = 100
             self.lambda_feat = 100
+            self.optimizer = 'adam' if not hasattr(self,'optimizer') else self.optimizer
         else:
             self.phase = 'test'
             self.is_train = False

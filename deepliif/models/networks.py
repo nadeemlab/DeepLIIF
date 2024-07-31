@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 import functools
-from torch.optim import lr_scheduler
+from torch.optim import lr_scheduler, Adam 
+from ..util.adamw_schedulefree import AdamWScheduleFree
+
 import os
 
 from torchvision import models
@@ -11,7 +13,6 @@ from .att_unet import AttU_Net
 # Helper Functions
 ###############################################################################
 from deepliif.util import util
-
 
 class Identity(nn.Module):
     def forward(self, x):
@@ -37,6 +38,11 @@ def get_norm_layer(norm_type='instance'):
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
+def get_optimizer(optimizer_name):
+    if optimizer_name == 'adam':
+        return Adam
+    elif optimizer_name == 'adamw-schedulefree':
+        return AdamWScheduleFree
 
 def get_scheduler(optimizer, opt):
     """Return a learning rate scheduler
