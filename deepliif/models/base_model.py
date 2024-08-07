@@ -3,7 +3,7 @@ import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
-from ..util import disable_batchnorm_tracking_stats
+from ..util import disable_batchnorm_tracking_stats, enable_batchnorm_tracking_stats
 from deepliif.util import *
 import itertools
 from ..util.adamw_schedulefree import AdamWScheduleFree
@@ -101,6 +101,7 @@ class BaseModel(ABC):
                 else:
                     net = getattr(self, 'net' + name)
                 net.train()
+                net = enable_batchnorm_tracking_stats(net)
 
     def eval(self):
         """Make models eval mode during test time"""
