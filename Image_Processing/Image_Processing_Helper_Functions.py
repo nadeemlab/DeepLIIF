@@ -87,7 +87,7 @@ def create_training_testing_dataset_from_given_directory(input_dir, output_dir, 
             cv2.imwrite(os.path.join(all_dirs[i], filename), all_images[filename])
 
 
-def augment_set(input_dir, output_dir, aug_no=9, modality_types=['hematoxylin', 'CD3', 'PanCK'], tile_size=512):
+def augment_set(input_dir, output_dir, aug_no=9, modality_types=['hematoxylin', 'CD3', 'PanCK']):
     """
     This function augments a co-aligned dataset.
 
@@ -105,20 +105,29 @@ def augment_set(input_dir, output_dir, aug_no=9, modality_types=['hematoxylin', 
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    images = os.listdir(input_dir)
-    for img in images:
+    images_original = os.listdir(input_dir)
+    print(f'{len(images_original)} images found')
+    
+    count = 0
+    for i,img in enumerate(images_original):
         augmented = 0
         while augmented < aug_no:
             images = {}
             image = cv2.imread(os.path.join(input_dir, img))
+            if i == 0:
+                tile_size = image.shape[0]
+            assert image.shape[1] >= len(modality_types) * tile_size, f'image width ({image.shape[1]}) is not enough for {len(modality_types)} modalities with tile size {tile_size}'
             for i in range(0, len(modality_types)):
                 images[modality_types[i]] = image[:, i * tile_size: (i + 1) * tile_size]
             new_images = images.copy()
-            aug = Augmentation(new_images)
+            aug = Augmentation(new_images, tile_size)
             aug.pipeline()
             cv2.imwrite(os.path.join(output_dir, img.replace('.png', '_' + str(augmented) + '.png')),
                         np.concatenate(list(new_images.values()), 1))
             augmented += 1
+        count += 1
+        if count % 10 == 0 or count == len(images_original):
+             print(f'Done {count}/{len(images_original)}')
 
 
 def augment_created_dataset(input_dir, output_dir, aug_no=9, modality_types=['hematoxylin', 'CD3', 'PanCK'], tile_size=512):

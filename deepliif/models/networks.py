@@ -2,16 +2,17 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 import functools
-from torch.optim import lr_scheduler
+from torch.optim import lr_scheduler, Adam 
+from ..util.adamw_schedulefree import AdamWScheduleFree
+
 import os
 
 from torchvision import models
-
+from .att_unet import AttU_Net
 ###############################################################################
 # Helper Functions
 ###############################################################################
 from deepliif.util import util
-
 
 class Identity(nn.Module):
     def forward(self, x):
@@ -37,6 +38,11 @@ def get_norm_layer(norm_type='instance'):
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
+def get_optimizer(optimizer_name):
+    if optimizer_name == 'adam':
+        return Adam
+    elif optimizer_name == 'adamw-schedulefree':
+        return AdamWScheduleFree
 
 def get_scheduler(optimizer, opt):
     """Return a learning rate scheduler
@@ -125,7 +131,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], padding_type='reflect'):
+def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], padding_type='reflect', resize_conv=False):
     """Create a generator
 
     Parameters:
@@ -156,7 +162,7 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     norm_layer = get_norm_layer(norm_type=norm)
 
     if netG == 'resnet_9blocks':
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type)
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type, resize_conv=resize_conv)
     elif netG == 'resnet_6blocks':
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6, padding_type=padding_type)
     elif netG == 'unet_128':
@@ -165,6 +171,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_512':
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif netG == 'unet_512_attention':
+        net = AttU_Net(img_ch=3,output_ch=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -332,9 +340,12 @@ class ResnetGenerator(nn.Module):
     """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
 
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
+    
+    Resize-conv: optional replacement of ConvTranspose2d
+    https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/issues/190#issuecomment-358546675
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='zero'):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='zero', resize_conv=False):
         """Construct a Resnet-based generator
 
         Parameters:
@@ -346,6 +357,7 @@ class ResnetGenerator(nn.Module):
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
         """
+        print('resize_conv',resize_conv)
         assert(n_blocks >= 0)
         super(ResnetGenerator, self).__init__()
         if type(norm_layer) == functools.partial:
@@ -378,11 +390,19 @@ class ResnetGenerator(nn.Module):
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+            if resize_conv:
+                upsample_layer = [#nn.Upsample(scale_factor = 2, mode='bilinear',align_corners=True),
+                                  nn.Upsample(scale_factor = 2, mode='nearest'),
+                                  nn.ReflectionPad2d(1),
+                                  nn.Conv2d(ngf * mult, int(ngf * mult / 2),
+                                  kernel_size=3, stride=1, padding=0)]
+            else:
+                upsample_layer = [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=1, output_padding=1,
-                                         bias=use_bias),
-                      norm_layer(int(ngf * mult / 2)),
+                                         bias=use_bias)]
+            model += upsample_layer
+            model += [norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
 
         if padding_type == 'reflect':
@@ -687,3 +707,15 @@ class VGGLoss(nn.Module):
         for i in range(len(x_vgg)):
             loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
         return loss
+
+
+class TotalVariationLoss(nn.Module):
+    """
+    Absolute difference for neighbouring pixels (i,j to i+1,j, then i,j to i,j+1), averaged on pixel level
+    """ 
+    def __init__(self):
+        super(TotalVariationLoss, self).__init__()
+    
+    def forward(self, x):
+        tv = torch.abs(x[:,:,1:,:]-x[:,:,:-1,:]).sum() + torch.abs(x[:,:,:,1:]-x[:,:,:,:-1]).sum()
+        return tv / torch.prod(torch.tensor(x.size()))

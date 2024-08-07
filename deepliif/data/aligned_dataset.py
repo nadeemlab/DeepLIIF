@@ -11,7 +11,7 @@ class AlignedDataset(BaseDataset):
     During test time, you need to prepare a directory '/path/to/data/test'.
     """
 
-    def __init__(self, opt):
+    def __init__(self, opt, phase='train'):
         """Initialize this dataset class.
 
         Parameters:
@@ -19,7 +19,7 @@ class AlignedDataset(BaseDataset):
         """
         BaseDataset.__init__(self, opt.dataroot)
         self.preprocess = opt.preprocess
-        self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
+        self.dir_AB = os.path.join(opt.dataroot, phase)  # get the image directory
         self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size))  # get image paths
         assert(opt.load_size >= opt.crop_size)   # crop_size should be smaller than the size of loaded image
         self.input_nc = opt.output_nc if opt.direction == 'BtoA' else opt.input_nc
@@ -95,7 +95,6 @@ class AlignedDataset(BaseDataset):
                 A = AB.crop((w2 * i, 0, w2 * (i+1), h))
                 A = A_transform(A)
                 A_Array.append(A)
-            
             for i in range(self.input_no, self.input_no + self.modalities_no + 1):
                 B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
                 B = B_transform(B)

@@ -3,9 +3,10 @@ import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
-from ..util import disable_batchnorm_tracking_stats
+from ..util import disable_batchnorm_tracking_stats, enable_batchnorm_tracking_stats
 from deepliif.util import *
 import itertools
+from ..util.adamw_schedulefree import AdamWScheduleFree
 
 
 class BaseModel(ABC):
@@ -82,11 +83,25 @@ class BaseModel(ABC):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         if self.is_train:
-            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+            if isinstance(self.optimizers[0],AdamWScheduleFree):
+                self.schedulers = self.optimizers # schedulers are not needed in schedule-free optimizers
+            else:
+                self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
         if not self.is_train or opt.continue_train:
             load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
             self.load_networks(load_suffix)
         self.print_networks(opt.verbose)
+
+    def train(self):
+        """Make models train mode """
+        for name in self.model_names:
+            if isinstance(name, str):
+                if '_' in name:
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(self, 'net' + name)
+                net.train()
+                net = enable_batchnorm_tracking_stats(net)
 
     def eval(self):
         """Make models eval mode during test time"""
@@ -134,10 +149,14 @@ class BaseModel(ABC):
         for name in self.visual_names:
             if isinstance(name, str):
                 if not hasattr(self, name):
-                    if len(name.split('_')) == 2:
-                        visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
+                    if len(name.split('_')) != 2:
+                        if self.opt.model == 'DeepLIIF':
+                            img_name = name[:-1] + '_' + name[-1]
+                            visual_ret[name] = getattr(self, img_name)
+                        else:
+                            visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
                     else:
-                        visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
+                        visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
                 else:
                     visual_ret[name] = getattr(self, name)
         return visual_ret
@@ -240,6 +259,7 @@ class BaseModel(ABC):
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         """
         for name in self.model_names:
+            
             if isinstance(name, str):
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)

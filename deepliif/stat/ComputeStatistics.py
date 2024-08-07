@@ -1,52 +1,54 @@
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 import os
 import cv2
 import numpy as np
 import csv
 from numba import cuda
+import time
 
-from Segmentation_Metrics import compute_segmentation_metrics
+from .Segmentation_Metrics import compute_segmentation_metrics
 #from fid_official_tf import calculate_fid_given_paths
-from fid import calculate_fid_given_paths
-from inception_score import calculate_inception_score
+from .fid import calculate_fid_given_paths
+from .inception_score import calculate_inception_score
 
 from skimage.metrics import structural_similarity as ssim
+from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import mean_squared_error
 from skimage import img_as_float, io, measure
 from skimage.color import rgb2gray
 import collections
-from swd import compute_swd
+from .swd import compute_swd
 
-parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('--gt_path', type=str, required=True)
-parser.add_argument('--model_path', type=str, required=True)
-parser.add_argument('--output_path', type=str, required=True)
-parser.add_argument('--model_name', type=str, required=False, default='')
-parser.add_argument('--mode', type=str, default='Segmentation',
-                    help='Mode of the statistics computation including Segmentation, ImageSynthesis, All')
-parser.add_argument('--raw_segmentation', action='store_true')
-parser.add_argument('--device', type=str, default='cuda', help='Device to use. Like cuda, cuda:0 or cpu')
-parser.add_argument('--batch_size', type=int, default=50,
-                    help='Batch size to use')
-parser.add_argument('--num_workers', type=int, default=8,
-                    help='Number of processes to use for data loading')
-parser.add_argument('--image_types', type=str, default='Hema,DAPI,Lap2,Marker', help='These are non-seg modalities to be evaluated.')
-parser.add_argument('--seg_type', type=str, default='Seg', help='This is the seg modality to be evaluated.')
 
+"""
+params:
+  gt_path
+  model_path
+  output_path
+  model_name
+  mode: Mode of the statistics computation including Segmentation, ImageSynthesis, All
+  raw_segmentation
+  device: Device to use. Like cuda, cuda:0 or cpu
+  batch_size: Batch size to use
+  num_workers: Number of processes to use for data loading
+  image_types: These are non-seg modalities to be evaluated.
+  seg_type: This is the seg modality to be evaluated.
+"""
 
 class Statistics:
-    def __init__(self, args):
-        self.gt_path = args.gt_path
-        self.model_path = args.model_path
-        self.output_path = args.output_path
-        self.model_name = args.model_name
-        self.mode = args.mode
-        self.raw_segmentation = args.raw_segmentation
-        self.batch_size = args.batch_size
-        self.num_workers = args.num_workers
-        self.device = args.device
-        self.image_types = args.image_types.replace(' ', '').split(',')
-        self.seg_type = args.seg_type
+    def __init__(self, gt_path, model_path, output_path, model_name='', mode='Segmentation',
+                 raw_segmentation=False, device='cuda', batch_size=50, num_workers=8, 
+                 image_types='Hema,DAPI,Lap2,Marker', seg_type='Seg'):
+        self.gt_path = gt_path
+        self.model_path = model_path
+        self.output_path = output_path
+        self.model_name = model_name
+        self.mode = mode
+        self.raw_segmentation = raw_segmentation
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.device = device
+        self.image_types = image_types.replace(' ', '').split(',')
+        self.seg_type = seg_type
 
         # Image Similarity Metrics
         self.inception_avg = collections.defaultdict(float)
@@ -58,6 +60,9 @@ class Statistics:
         self.ssim_avg = collections.defaultdict(float)
         self.ssim_std = collections.defaultdict(float)
 
+        self.psnr_avg = collections.defaultdict(float)
+        self.psnr_std = collections.defaultdict(float)
+        
         self.fid_value = collections.defaultdict(float)
         self.swd_value = collections.defaultdict(float)
 
@@ -83,15 +88,40 @@ class Statistics:
                     mask_img = img_as_float(rgb2gray(io.imread(os.path.join(self.model_path, img_name))))
 
                     mse_mask = mean_squared_error(orig_img, mask_img)
-                    ssim_mask = ssim(orig_img, mask_img, multichannel=True, gaussian_weights=True, sigma=1.5, use_sample_covariance=False, data_range=255)
+                    ssim_mask = ssim(orig_img, mask_img, multichannel=True, gaussian_weights=True, sigma=1.5, use_sample_covariance=False, data_range=1)
 
                     mse_arr.append(mse_mask)
                     ssim_arr.append(ssim_mask)
+                    
                     # mse_info.append({'image_name': img_name, 'image_type':img_type, 'mse': mse_mask, 'ssim': ssim_mask})
             # self.write_list_to_csv(mse_info, mse_info[0].keys(),
             #                        filename='inference_info_' + img_type + '_' + self.model_name + '.csv')
             self.mse_avg[img_type], self.mse_std[img_type] = np.mean(mse_arr), np.std(mse_arr)
             self.ssim_avg[img_type], self.ssim_std[img_type] = np.mean(ssim_arr), np.std(ssim_arr)
+        self.all_info['mse_avg'] = self.mse_avg
+        self.all_info['mse_std'] = self.mse_std
+        self.all_info['ssim_avg'] = self.ssim_avg
+        self.all_info['ssim_std'] = self.ssim_std
+    
+    def compute_psnr_scores(self):
+        """
+        Peak signal-to-noise ratio
+        """
+        for img_type in self.image_types:
+            images = os.listdir(self.model_path)
+            mse_arr = []
+            score_arr = []
+            # mse_info = []
+            for img_name in images:
+                if img_type in img_name:
+                    orig_img = img_as_float(rgb2gray(io.imread(os.path.join(self.gt_path, img_name))))
+                    mask_img = img_as_float(rgb2gray(io.imread(os.path.join(self.model_path, img_name))))
+                    #print(orig_img)
+
+                    score_arr.append(psnr(orig_img, mask_img, data_range=1))
+            self.psnr_avg[img_type], self.psnr_std[img_type] = np.mean(score_arr), np.std(score_arr)
+        self.all_info['psnr_avg'] = self.psnr_avg
+        self.all_info['psnr_std'] = self.psnr_std
 
     def compute_inception_score(self):
         for img_type in self.image_types:
@@ -107,7 +137,7 @@ class Statistics:
 
     def compute_fid_score(self):
         for img_type in self.image_types:
-            os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+            os.environ['CUDA_VISIBLE_DEVICES'] = self.gpu
             self.fid_value[img_type] = calculate_fid_given_paths([self.gt_path, self.model_path], None, low_profile=False)
             print("FID: ", self.fid_value[img_type])
             # self.fid_value[img_type] = calculate_fid_given_paths(paths=[self.gt_path, self.model_path], batch_size=self.batch_size, dims=self.fid_dims, num_workers=self.num_workers, mod_type='_' + img_type)
@@ -218,17 +248,21 @@ class Statistics:
         writer.writeheader()
         for data in info_dict:
             writer.writerow(data)
-
-
-if __name__ == '__main__':
-    args = parser.parse_args()
-    stat = Statistics(args)
-    print(stat.mode)
-    if stat.mode == 'All':
-        stat.compute_statistics()
-        stat.compute_IHC_scoring()
-    elif stat.mode == 'Segmentation':
-        stat.compute_segmentation_metrics()
-    elif stat.mode == 'ImageSynthesis':
-        stat.compute_image_similarity_metrics()
-    stat.create_all_info()
+    
+    def run(self,write_to_csv=False):
+        if self.mode == 'All':
+            self.compute_statistics()
+            self.compute_IHC_scoring()
+        elif self.mode == 'Segmentation':
+            self.compute_segmentation_metrics()
+        elif self.mode == 'ImageSynthesis':
+            self.compute_image_similarity_metrics()
+        elif self.mode == 'SSIM':
+            self.compute_mse_ssim_scores()
+        elif self.mode == 'Upscaling':
+            self.compute_mse_ssim_scores()
+            self.compute_psnr_scores()
+        if write_to_csv:
+            self.create_all_info()
+        return self.all_info
+    

@@ -6,7 +6,7 @@ import os
 from numba import jit
 from skimage import measure
 import time
-from PostProcessSegmentationMask import positive_negative_masks
+from .PostProcessSegmentationMask import positive_negative_masks
 
 
 @jit(nopython=True)

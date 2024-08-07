@@ -55,28 +55,28 @@ def get_option_setter(dataset_name):
     return dataset_class.modify_commandline_options
 
 
-def create_dataset(opt):
+def create_dataset(opt, phase=None, batch_size=None):
     """Create a dataset given the option.
 
     This function wraps the class CustomDatasetDataLoader.
         This is the main interface between this package and 'train.py'/'test.py'
     """
-    return CustomDatasetDataLoader(opt)
+    return CustomDatasetDataLoader(opt, phase=phase if phase else opt.phase, batch_size=batch_size if batch_size else opt.batch_size)
 
 
 class CustomDatasetDataLoader(object):
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 
-    def __init__(self, opt):
+    def __init__(self, opt, phase=None, batch_size=None):
         """Initialize this class
 
         Step 1: create a dataset instance given the name [dataset_mode]
         Step 2: create a multi-threaded data loader.
         """
-        self.batch_size = opt.batch_size
+        self.batch_size = batch_size if batch_size else opt.batch_size
         self.max_dataset_size = opt.max_dataset_size
         dataset_class = find_dataset_using_name(opt.dataset_mode)
-        self.dataset = dataset_class(opt)
+        self.dataset = dataset_class(opt, phase=phase if phase else opt.phase)
         print("dataset [%s] was created" % type(self.dataset).__name__)
 
         sampler = None
@@ -95,7 +95,7 @@ class CustomDatasetDataLoader(object):
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 sampler=sampler,
-                batch_size=opt.batch_size,
+                batch_size=batch_size,
                 shuffle=not opt.serial_batches if sampler is None else False,
                 num_workers=int(opt.num_threads)
             )
@@ -106,7 +106,7 @@ class CustomDatasetDataLoader(object):
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 sampler=sampler,
-                batch_size=opt.batch_size,
+                batch_size=batch_size,
                 shuffle=not opt.serial_batches if sampler is None else False,
                 num_workers=int(opt.num_threads),
                 worker_init_fn=seed_worker,
