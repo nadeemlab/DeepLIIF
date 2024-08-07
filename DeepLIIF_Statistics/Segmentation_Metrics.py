@@ -102,16 +102,12 @@ def compute_aji(gt_image, mask_image):
     return aji
 
 
-def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512, thresh=100, boundary_thresh=100, small_object_size=20, raw_segmentation=True, suffix_seg=None):
+def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512, thresh=100, boundary_thresh=100, small_object_size=20, raw_segmentation=True):
     info_dict = []
     metrics = collections.defaultdict(float)
     images = os.listdir(model_dir)
-
     counter = 0
-    if suffix_seg is not None:
-        postfix = f'_{suffix_seg}.png'
-    else:
-        postfix = '_Seg.png' if raw_segmentation else '_SegRefined.png'
+    postfix = '_Seg.png' if raw_segmentation else '_SegRefined.png'
     for mask_name in images:
         if postfix in mask_name:
             counter += 1
@@ -127,7 +123,7 @@ def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512, 
             positive_mask[positive_mask > 0] = 1
             negative_mask[negative_mask > 0] = 1
 
-            gt_img = cv2.cvtColor(cv2.imread(os.path.join(gt_dir, mask_name)), cv2.COLOR_BGR2RGB)
+            gt_img = cv2.cvtColor(cv2.imread(os.path.join(gt_dir, mask_name.replace(postfix, '.png'))), cv2.COLOR_BGR2RGB)
             gt_img = cv2.resize(gt_img, (image_size, image_size))
 
             positive_gt = gt_img[:, :, 0]
