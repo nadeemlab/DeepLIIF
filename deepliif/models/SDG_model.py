@@ -91,12 +91,20 @@ class SDGModel(BaseModel):
             params = []
             for i in range(len(self.netG)):
                 params += list(self.netG[i].parameters())
-            self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+                self.optimizer_G = get_optimizer(opt.optimizer)(params)
 
             params = []
             for i in range(len(self.netD)):
                 params += list(self.netD[i].parameters())
-            self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
+                self.optimizer_D = get_optimizer(opt.optimizer)(params)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)

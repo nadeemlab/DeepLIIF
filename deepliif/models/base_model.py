@@ -6,7 +6,6 @@ from . import networks
 from ..util import disable_batchnorm_tracking_stats, enable_batchnorm_tracking_stats
 from deepliif.util import *
 import itertools
-from ..util.adamw_schedulefree import AdamWScheduleFree
 
 
 class BaseModel(ABC):
@@ -83,10 +82,7 @@ class BaseModel(ABC):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         if self.is_train:
-            if isinstance(self.optimizers[0],AdamWScheduleFree):
-                self.schedulers = self.optimizers # schedulers are not needed in schedule-free optimizers
-            else:
-                self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
         if not self.is_train or opt.continue_train:
             load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
             self.load_networks(load_suffix)

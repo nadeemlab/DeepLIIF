@@ -130,7 +130,7 @@ def cli():
 @click.option('--n-epochs-decay', type=int, default=100,
               help='number of epochs to linearly decay learning rate to zero')
 @click.option('--optimizer', type=str, default='adam',
-              help='optimizer to use, applied to both generators and discriminators [adam | adamw-schedulefree]')
+              help='optimizer from torch.optim to use, applied to both generators and discriminators [adam | sgd | adamw | ...]; the current parameters however are set up for adam, so other optimziers may encounter issue')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
 @click.option('--lr', default=0.0002, help='initial learning rate for adam')
 @click.option('--lr-policy', default='linear',
@@ -211,7 +211,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         seg_no = 0
         seg_gen = False
     
-    assert optimizer in ['adam', 'adamw-schedulefree'], f'optimizer {optimizer} is not implemented'
+    if optimizer != 'adam':
+        print(f'Optimizer torch.optim.{optimizer} is not tested. Be careful about the parameters of the optimizer.')
     
     d_params = locals()
 
