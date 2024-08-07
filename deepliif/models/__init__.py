@@ -382,13 +382,8 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
     return images
 
 
-<<<<<<< HEAD
 def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
                    color_dapi=False, color_marker=False, opt=None):
-=======
-def inference(img, tile_size, overlap_size, model_path, use_torchserve=False, eager_mode=False,
-              color_dapi=False, color_marker=False, opt=None, return_seg_intermediate=False):
->>>>>>> main-update-training
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
