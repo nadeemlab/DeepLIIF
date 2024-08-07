@@ -615,7 +615,7 @@ def trainlaunch(**kwargs):
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
 #@click.option('--tile-size', type=int, default=None, help='tile size')
-@click.option('--device', default='cpu', type=str, help='device to load model for the similarity test, either cpu or gpu')
+@click.option('--device', default='cpu', type=str, help='device to run serialization as well as load model for the similarity test, either cpu or gpu')
 @click.option('--epoch', default='latest', type=str, help='epoch to load and serialize')
 @click.option('--verbose', default=0, type=int,help='saves results here.')
 def serialize(model_dir, output_dir, device, epoch, verbose):
@@ -631,8 +631,14 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
     if model_dir != output_dir:
         shutil.copy(f'{model_dir}/train_opt.txt',f'{output_dir}/train_opt.txt')
     
+    # load and update opt for serialization
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     opt.epoch = epoch
+    if device == 'gpu':
+        opt.gpu_ids = (0,) # use gpu 0, in case training was done on larger machines
+    else:
+        opt.gpu_ids = (-1,) # use cpu
+    
     print_options(opt)
     sample = transform(Image.new('RGB', (opt.scale_size, opt.scale_size)))
     sample = torch.cat([sample]*opt.input_no, 1)
@@ -659,6 +665,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
     print('testing similarity between prediction from original vs serialized models...')
     models_original = init_nets(model_dir,eager_mode=True,opt=opt,phase='test')
     models_serialized = init_nets(output_dir,eager_mode=False,opt=opt,phase='test')
+    
     if device == 'gpu':
         sample = sample.cuda()
     else:
@@ -666,7 +673,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
     for name in models_serialized.keys():
         print(name,':')
         model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
-        model_serialized = models_serialized[name].cuda() if device=='gpu' else models_serialized[name].cpu().eval()
+        model_serialized = models_serialized[name].cuda().eval() if device=='gpu' else models_serialized[name].cpu().eval()
         if name.startswith('GS'):
             test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
         else:
