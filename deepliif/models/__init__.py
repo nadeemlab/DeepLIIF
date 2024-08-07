@@ -155,8 +155,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     """ 
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
-        opt.use_dp = False
-        #print_options(opt)
+    opt.use_dp = False
     
     if opt.model == 'DeepLIIF':
         net_groups = [
