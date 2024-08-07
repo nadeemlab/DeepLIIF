@@ -14,11 +14,6 @@ from .visualizer import Visualizer
 from ..postprocessing import imadjust
 import cv2
 
-import bioformats
-import javabridge
-import bioformats.omexml as ome
-import tifffile as tf
-
 import pickle
 import sys
 
@@ -213,6 +208,115 @@ def get_information(filename):
     return size_x, size_y, size_z, size_c, size_t, pixel_type
 
 
+
+
+def write_results_to_pickle_file(output_addr, results):
+    """
+    This function writes data into the pickle file.
+    :param output_addr: The address of the pickle file to write data into.
+    :param results: The data to be written into the pickle file.
+    :return:
+    """
+    pickle_obj = open(output_addr, "wb")
+    pickle.dump(results, pickle_obj)
+    pickle_obj.close()
+
+
+def read_results_from_pickle_file(input_addr):
+    """
+    This function reads data from a pickle file and returns it.
+    :param input_addr: The address to the pickle file.
+    :return: The data inside pickle file.
+    """
+    pickle_obj = open(input_addr, "rb")
+    results = pickle.load(pickle_obj)
+    pickle_obj.close()
+    return results
+
+def test_diff_original_serialized(model_original,model_serialized,example,verbose=0):
+    threshold = 10
+
+    orig_res = model_original(example)
+    if verbose > 0:
+        print('Original:')
+        print(orig_res.shape)
+        print(orig_res[0, 0:10])
+        print('min abs value:{}'.format(torch.min(torch.abs(orig_res))))
+
+    ts_res = model_serialized(example)
+    if verbose > 0:
+        print('Torchscript:')
+        print(ts_res.shape)
+        print(ts_res[0, 0:10])
+        print('min abs value:{}'.format(torch.min(torch.abs(ts_res))))
+
+    abs_diff = torch.abs(orig_res-ts_res)
+    if verbose > 0:
+        print('Dif sum:')
+        print(torch.sum(abs_diff))
+        print('max dif:{}'.format(torch.max(abs_diff)))
+
+    assert torch.sum(abs_diff) <= threshold, f"Sum of difference in predicted values {torch.sum(abs_diff)} is larger than threshold {threshold}"
+
+def disable_batchnorm_tracking_stats(model):
+    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/16
+    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/67
+    # https://github.com/pytorch/pytorch/blob/ca39c5b04e30a67512589cafbd9d063cc17168a5/torch/nn/modules/batchnorm.py#L158
+    for m in model.modules():
+        for child in m.children():
+            if type(child) == torch.nn.BatchNorm2d:
+                child.track_running_stats = False
+                child.running_mean_backup = child.running_mean
+                child.running_mean = None
+                child.running_var_backup = child.running_var
+                child.running_var = None
+    return model
+
+def enable_batchnorm_tracking_stats(model):
+    """
+    This is needed during training when val set loss/metrics calculation is enabled.
+    In this case, we need to switch to eval mode for inference, which triggers
+    disable_batchnorm_tracking_stats(). After the evaluation, the model should be
+    set back to train mode, where running stats are restored for batchnorm layers.
+    """
+    for m in model.modules():
+        for child in m.children():
+            if type(child) == torch.nn.BatchNorm2d:
+                child.track_running_stats = True
+                assert hasattr(child, 'running_mean_backup') and hasattr(child, 'running_var_backup'), 'enable_batchnorm_tracking_stats() is supposed to be executed after disable_batchnorm_tracking_stats() is applied'
+                child.running_mean = child.running_mean_backup
+                child.running_var = child.running_var_backup
+    return model
+    
+  
+def image_variance_gray(img):
+    px = np.asarray(img) if img.mode == 'L' else np.asarray(img.convert('L'))
+    idx = np.logical_and(px != 255, px != 0)
+    val = px[idx]
+    if val.shape[0] == 0:
+        return 0
+    var = np.var(val)
+    return var
+
+
+def image_variance_rgb(img):
+    px = np.asarray(img) if img.mode == 'RGB' else np.asarray(img.convert('RGB'))
+    nonwhite = np.any(px != [255, 255, 255], axis=-1)
+    nonblack = np.any(px != [0, 0, 0], axis=-1)
+    idx = np.logical_and(nonwhite, nonblack)
+    val = px[idx]
+    if val.shape[0] == 0:
+        return [0, 0, 0]
+    var = np.var(val, axis=0)
+    return var
+
+
+
+import bioformats
+import javabridge
+import bioformats.omexml as ome
+import tifffile as tf
+
 def write_big_tiff_file(output_addr, img, tile_size):
     """
     This function write the image into a big tiff file using the tiling and compression.
@@ -354,64 +458,3 @@ def write_ome_tiff_file_array(results_array, output_addr, size_t, size_z, size_c
                         output_addr,
                         SizeT=size_t, SizeZ=size_z, SizeC=len(channel_names), SizeX=size_x, SizeY=size_y,
                         channel_names=channel_names)
-
-
-def write_results_to_pickle_file(output_addr, results):
-    """
-    This function writes data into the pickle file.
-    :param output_addr: The address of the pickle file to write data into.
-    :param results: The data to be written into the pickle file.
-    :return:
-    """
-    pickle_obj = open(output_addr, "wb")
-    pickle.dump(results, pickle_obj)
-    pickle_obj.close()
-
-
-def read_results_from_pickle_file(input_addr):
-    """
-    This function reads data from a pickle file and returns it.
-    :param input_addr: The address to the pickle file.
-    :return: The data inside pickle file.
-    """
-    pickle_obj = open(input_addr, "rb")
-    results = pickle.load(pickle_obj)
-    pickle_obj.close()
-    return results
-
-def test_diff_original_serialized(model_original,model_serialized,example,verbose=0):
-    threshold = 10
-
-    orig_res = model_original(example)
-    if verbose > 0:
-        print('Original:')
-        print(orig_res.shape)
-        print(orig_res[0, 0:10])
-        print('min abs value:{}'.format(torch.min(torch.abs(orig_res))))
-
-    ts_res = model_serialized(example)
-    if verbose > 0:
-        print('Torchscript:')
-        print(ts_res.shape)
-        print(ts_res[0, 0:10])
-        print('min abs value:{}'.format(torch.min(torch.abs(ts_res))))
-
-    abs_diff = torch.abs(orig_res-ts_res)
-    if verbose > 0:
-        print('Dif sum:')
-        print(torch.sum(abs_diff))
-        print('max dif:{}'.format(torch.max(abs_diff)))
-
-    assert torch.sum(abs_diff) <= threshold, f"Sum of difference in predicted values {torch.sum(abs_diff)} is larger than threshold {threshold}"
-
-def disable_batchnorm_tracking_stats(model):
-    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/16
-    # https://discuss.pytorch.org/t/performance-highly-degraded-when-eval-is-activated-in-the-test-phase/3323/67
-    # https://github.com/pytorch/pytorch/blob/ca39c5b04e30a67512589cafbd9d063cc17168a5/torch/nn/modules/batchnorm.py#L158
-    for m in model.modules():
-        for child in m.children():
-            if type(child) == torch.nn.BatchNorm2d:
-                child.track_running_stats = False
-                child.running_mean = None
-                child.running_var = None
-    return model
