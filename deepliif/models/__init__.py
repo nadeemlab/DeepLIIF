@@ -175,7 +175,6 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     number_of_gpus_all = torch.cuda.device_count()
     number_of_gpus = len(opt.gpu_ids)
-    #print(number_of_gpus)
 
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
@@ -510,7 +509,8 @@ def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=Fals
 
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
-              eager_mode=False, color_dapi=False, color_marker=False, opt=None):
+              eager_mode=False, color_dapi=False, color_marker=False, opt=None,
+              return_seg_intermediate=False):
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
@@ -539,6 +539,14 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             'Marker': results['G4'],
             'Seg': results['G5'],
         }
+        
+        if return_seg_intermediate:
+            images({'IHC_s':results['G51'],
+                    'Hema_s':results['G52'],
+                    'DAPI_s':results['G53'],
+                    'Lap2_s':results['G54'],
+                    'Marker_s':results['G55'],})
+        
         if color_dapi:
             matrix = (       0,        0,        0, 0,
                       299/1000, 587/1000, 114/1000, 0,
