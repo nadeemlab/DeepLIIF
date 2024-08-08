@@ -11,8 +11,7 @@ def read_model_params(file_addr):
     for line in lines:
         if ':' in line:
             key = line.split(':')[0].strip()
-            val = line.split(':')[1].strip()
-            #val = line.split(':')[1].split('[')[0].strip()
+            val = line.split(':')[1].split('[')[0].strip()
             try:
                 param_dict[key] = eval(val)
                 #print(f'value of {key} is converted to {type(param_dict[key]).__name__}')

@@ -262,13 +262,13 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     d_params['gpu_ids'] = gpu_ids
     
     # update generator arch
-    net_g = net_g.split(',')
+    net_g = tuple(net_g.split(',')) # avoid using list which will cause problem in option parsing later on
     assert len(net_g) in [1,modalities_no], f'net_g should contain either 1 architecture for all translation generators or the same number of architectures as the number of translation generators ({modalities_no})'
     if len(net_g) == 1:
       net_g = net_g*modalities_no
       
     
-    net_gs = net_gs.split(',')
+    net_gs = tuple(net_gs.split(','))
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
     if len(net_gs) == 1:
       net_gs = net_gs*seg_no
@@ -284,14 +284,16 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     # set dir for train and val
     dataset = create_dataset(opt)
-    dataset_val = create_dataset(opt,phase='val')
-    data_val = [batch for batch in dataset_val]
-    metrics_val = json.load(open(os.path.join(dataset_val.dataset.dir_AB,'metrics.json')))
 
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
-    click.echo('The number of validation images = %d' % len(dataset_val))
-    click.echo('The number of validation images = %d' % len(data_val))
+    
+    if with_val:
+        dataset_val = create_dataset(opt,phase='val')
+        data_val = [batch for batch in dataset_val]
+        metrics_val = json.load(open(os.path.join(dataset_val.dataset.dir_AB,'metrics.json')))
+        click.echo('The number of validation images = %d' % len(dataset_val))
+        click.echo('The number of validation images = %d' % len(data_val))
 
     # create a model given model and other options
     model = create_model(opt)
@@ -638,7 +640,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
     if device == 'gpu':
         opt.gpu_ids = (0,) # use gpu 0, in case training was done on larger machines
     else:
-        opt.gpu_ids = (-1,) # use cpu
+        opt.gpu_ids = () # use cpu
     
     print_options(opt)
     sample = transform(Image.new('RGB', (opt.scale_size, opt.scale_size)))
