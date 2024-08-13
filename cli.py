@@ -262,13 +262,13 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     d_params['gpu_ids'] = gpu_ids
     
     # update generator arch
-    net_g = tuple(net_g.split(',')) # avoid using list which will cause problem in option parsing later on
+    net_g = net_g.split(',')
     assert len(net_g) in [1,modalities_no], f'net_g should contain either 1 architecture for all translation generators or the same number of architectures as the number of translation generators ({modalities_no})'
     if len(net_g) == 1:
       net_g = net_g*modalities_no
       
     
-    net_gs = tuple(net_gs.split(','))
+    net_gs = net_gs.split(',')
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
     if len(net_gs) == 1:
       net_gs = net_gs*seg_no
@@ -638,9 +638,9 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
     opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
     opt.epoch = epoch
     if device == 'gpu':
-        opt.gpu_ids = (0,) # use gpu 0, in case training was done on larger machines
+        opt.gpu_ids = [0] # use gpu 0, in case training was done on larger machines
     else:
-        opt.gpu_ids = () # use cpu
+        opt.gpu_ids = [] # use cpu
     
     print_options(opt)
     sample = transform(Image.new('RGB', (opt.scale_size, opt.scale_size)))

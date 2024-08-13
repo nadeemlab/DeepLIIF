@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 from ..util.util import mkdirs
+import re
 
 def read_model_params(file_addr):
     with open(file_addr) as f:
@@ -11,7 +12,18 @@ def read_model_params(file_addr):
     for line in lines:
         if ':' in line:
             key = line.split(':')[0].strip()
-            val = line.split(':')[1].split('[')[0].strip()
+            val = ':'.join(line.split(':')[1:])
+            
+            # drop default value
+            str_default = [x for x in re.findall(r"\[.+?\]", val) if x.startswith('[default')]
+            if len(str_default) > 1:
+                raise Exception('train_opt.txt should not contain multiple possible default keys in one line:',str_default)
+            elif len(str_default) == 1:
+                str_default = str_default[0]
+                val = val.replace(str_default,'')
+            val = val.strip()
+            
+            # val = line.split(':')[1].split('[')[0].strip()
             try:
                 param_dict[key] = eval(val)
                 #print(f'value of {key} is converted to {type(param_dict[key]).__name__}')
