@@ -585,7 +585,7 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='aut
         processed_images['SegRefined'] = Image.fromarray(refined)
         return processed_images, scoring
 
-    elif model == 'DeepLIIFExt':
+    elif model in ['DeepLIIFExt','SDG']:
         resolution = '40x' if tile_size > 768 else ('20x' if tile_size > 384 else '10x')
         processed_images = {}
         scoring = {}
