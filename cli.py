@@ -390,25 +390,26 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 l_losses_val += [(k,v) for k,v in losses_val_batch.items()]
                 
                 # calculate cell count metrics
-                l_seg_names = ['fake_B_5']
-                assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
-                seg_mod_suffix = l_seg_names[0].split('_')[-1]
-                l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
-                # print(f'Running postprocess for {len(l_seg_names)} generated images ({l_seg_names})')
-    
-                img_name_current = data_val_batch['A_paths'][0].split('/')[-1][:-4] # remove .png
-                metrics_gt = metrics_val[img_name_current]
-                
-                for seg_name in l_seg_names:
-                    images = {'Seg':ToPILImage()((visuals[seg_name][0].cpu()+1)/2),
-                              'Marker':ToPILImage()((visuals['fake_B_4'][0].cpu()+1)/2)}
-                    _, scoring = postprocess(ToPILImage()((data['A'][0]+1)/2), images, opt.scale_size, opt.model)
+                if type(model).__name__ == 'DeepLIIFModel':
+                    l_seg_names = ['fake_B_5']
+                    assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
+                    seg_mod_suffix = l_seg_names[0].split('_')[-1]
+                    l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
+                    # print(f'Running postprocess for {len(l_seg_names)} generated images ({l_seg_names})')
+        
+                    img_name_current = data_val_batch['A_paths'][0].split('/')[-1][:-4] # remove .png
+                    metrics_gt = metrics_val[img_name_current]
                     
-                    for k,v in scoring.items():
-                        if k.startswith('num') or k.startswith('percent'):
-                            # to calculate the rmse, here we calculate (x_pred - x_true) ** 2
-                            l_metrics_val.append((k+'_'+seg_name,(v - metrics_gt[k])**2))
-                
+                    for seg_name in l_seg_names:
+                        images = {'Seg':ToPILImage()((visuals[seg_name][0].cpu()+1)/2),
+                                  'Marker':ToPILImage()((visuals['fake_B_4'][0].cpu()+1)/2)}
+                        _, scoring = postprocess(ToPILImage()((data['A'][0]+1)/2), images, opt.scale_size, opt.model)
+                        
+                        for k,v in scoring.items():
+                            if k.startswith('num') or k.startswith('percent'):
+                                # to calculate the rmse, here we calculate (x_pred - x_true) ** 2
+                                l_metrics_val.append((k+'_'+seg_name,(v - metrics_gt[k])**2))
+                    
                 if debug and epoch_iter >= debug_data_size:
                     print(f'debug mode, epoch {epoch} stopped at epoch iter {epoch_iter} (>= {debug_data_size})')
                     break

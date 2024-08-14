@@ -1,6 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
+from .networks import get_optimizer
 
 
 class SDGModel(BaseModel):
@@ -37,6 +38,13 @@ class SDGModel(BaseModel):
         self.loss_D_weights = [1 / self.mod_gen_no] * self.mod_gen_no
         self.loss_DS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
 
+        # self.gpu_ids is a possibly modifed one for model initialization
+        # self.opt.gpu_ids is the original one received in the command
+        if not opt.is_train:
+            self.gpu_ids = [] # avoid the models being loaded as DP
+        else:
+            self.gpu_ids = opt.gpu_ids
+
         self.loss_names = []
         self.visual_names = ['real_A']
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
@@ -59,23 +67,22 @@ class SDGModel(BaseModel):
                 self.model_names.extend(['G_' + str(i)])
 
         # define networks (both generator and discriminator)
+        if isinstance(opt.net_g, str):
+            self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
+        if isinstance(opt.net_gs, str):
+            self.opt.net_gs = [self.opt.net_gs]*self.mod_gen_no
         self.netG = [None for _ in range(self.mod_gen_no)]
+        self.netGS = [None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
-            self.netG[i] = networks.define_G(self.opt.input_nc * self.opt.input_no, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding, resize_conv=opt.resize_conv)
-            print('***************************************')
-            print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
-            print('***************************************')
-            if i==0:
-                print(self.netG[i])
+            self.netG[i] = networks.define_G(self.opt.input_nc * self.opt.input_no, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
+                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding, resize_conv=opt.resize_conv)
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.netD = [None for _ in range(self.mod_gen_no)]
             for i in range(self.mod_gen_no):
                 self.netD[i] = networks.define_D(self.opt.input_nc * self.opt.input_no + self.opt.output_nc, self.opt.ndf, self.opt.net_d,
                                                  self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                                                 self.opt.gpu_ids)
+                                                 self.gpu_ids)
 
         if self.is_train:
             # define loss functions
@@ -94,8 +101,8 @@ class SDGModel(BaseModel):
             try:
                 self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
             except:
-                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
-                self.optimizer_G = get_optimizer(opt.optimizer)(params)
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             params = []
             for i in range(len(self.netD)):
@@ -103,8 +110,8 @@ class SDGModel(BaseModel):
             try:
                 self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
             except:
-                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
-                self.optimizer_D = get_optimizer(opt.optimizer)(params)
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -210,3 +217,22 @@ class SDGModel(BaseModel):
         self.optimizer_G.zero_grad()  # set G's gradients to zero
         self.backward_G()  # calculate graidents for G
         self.optimizer_G.step()  # udpate G's weights
+    
+    def calculate_losses(self):
+        """
+        Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
+        """
+        self.forward()  # compute fake images: G(A)
+        # update D
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], True)  # enable backprop for D1
+
+        self.optimizer_D.zero_grad()  # set D's gradients to zero
+        self.backward_D()  # calculate gradients for D
+
+        # update G
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], False)
+
+        self.optimizer_G.zero_grad()  # set G's gradients to zero
+        self.backward_G()  # calculate graidents for G

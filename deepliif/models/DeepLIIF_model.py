@@ -113,15 +113,15 @@ class DeepLIIFModel(BaseModel):
             try:
                 self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
             except:
-                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
-                self.optimizer_G = get_optimizer(opt.optimizer)(params)
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters()) + list(self.netD55.parameters())
             try:
                 self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
             except:
-                print(f'lr and betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
-                self.optimizer_D = get_optimizer(opt.optimizer)(params)
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -344,10 +344,6 @@ class DeepLIIFModel(BaseModel):
         """
         Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
         """
-        # for eval/val, schedule free optimizers need to be set to eval mode: https://github.com/facebookresearch/schedule_free/tree/main?tab=readme-ov-file#how-to-use
-        if 'schedulefree' in self.opt.optimizer:
-            self.optimizer_D.eval()
-            self.optimizer_G.eval()
         
         self.forward()                   # compute fake images: G(A)
         # update D
@@ -361,6 +357,7 @@ class DeepLIIFModel(BaseModel):
         self.set_requires_grad(self.netD54, True)  # enable backprop for D54
         self.set_requires_grad(self.netD55, True)  # enable backprop for D54
 
+        self.optimizer_D.zero_grad()        # set D's gradients to zero
         self.backward_D()                # calculate gradients for D
 
         # update G
@@ -374,8 +371,6 @@ class DeepLIIFModel(BaseModel):
         self.set_requires_grad(self.netD54, False)  # D54 requires no gradients when optimizing G54
         self.set_requires_grad(self.netD55, False)  # D54 requires no gradients when optimizing G54
 
+        self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
-        if 'schedulefree' in self.opt.optimizer:
-            self.optimizer_D.train()
-            self.optimizer_G.train()
             
