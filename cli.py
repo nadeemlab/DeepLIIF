@@ -265,13 +265,14 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     net_g = net_g.split(',')
     assert len(net_g) in [1,modalities_no], f'net_g should contain either 1 architecture for all translation generators or the same number of architectures as the number of translation generators ({modalities_no})'
     if len(net_g) == 1:
-      net_g = net_g*modalities_no
-      
+        net_g = net_g*modalities_no
     
     net_gs = net_gs.split(',')
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
-    if len(net_gs) == 1:
-      net_gs = net_gs*seg_no
+    if len(net_gs) == 1 and model == 'DeepLIIF':
+        net_gs = net_gs*(modalities_no + seg_no)
+    elif len(net_gs) == 1:
+        net_gs = net_gs*seg_no
     
     d_params['net_g'] = net_g
     d_params['net_gs'] = net_gs
@@ -463,7 +464,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
               help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 '
                    'PatchGAN. n_layers allows you to specify the layers in the discriminator')
 @click.option('--net-g', default='resnet_9blocks',
-              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128 | unet_512_attention]; to specify different arch for generators, list arch for each generator separated by comma, e.g., --net-g=resnet_9blocks,resnet_9blocks,resnet_9blocks,unet_512_attention,unet_512_attention')
 @click.option('--n-layers-d', default=4, help='only used if netD==n_layers')
 @click.option('--norm', default='batch',
               help='instance normalization or batch normalization [instance | batch | none]')
@@ -506,6 +507,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
               help='number of epochs with the initial learning rate')
 @click.option('--n-epochs-decay', type=int, default=100,
               help='number of epochs to linearly decay learning rate to zero')
+@click.option('--optimizer', type=str, default='adam',
+              help='optimizer from torch.optim to use, applied to both generators and discriminators [adam | sgd | adamw | ...]; the current parameters however are set up for adam, so other optimziers may encounter issue')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
 @click.option('--lr', default=0.0002, help='initial learning rate for adam')
 @click.option('--lr-policy', default='linear',
@@ -542,13 +545,20 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--net-ds', type=str, default='n_layers',
               help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
 @click.option('--net-gs', type=str, default='unet_512',
-              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128 | unet_512_attention]; to specify different arch for generators, list arch for each generator separated by comma, e.g., --net-g=resnet_9blocks,resnet_9blocks,resnet_9blocks,unet_512_attention,unet_512_attention')
 @click.option('--gan-mode', type=str, default='vanilla',
               help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 @click.option('--gan-mode-s', type=str, default='lsgan',
               help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 # DDP related arguments
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
+# Others
+@click.option('--with-val', is_flag=True,
+              help='use validation set to evaluate model performance at the end of each epoch')
+@click.option('--debug', is_flag=True,
+              help='debug mode, limits the number of data points per epoch to a small value')
+@click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+# trainlaunch DDP related arguments
 @click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
 def trainlaunch(**kwargs):
     """

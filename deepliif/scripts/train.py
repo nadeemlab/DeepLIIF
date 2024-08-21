@@ -4,24 +4,23 @@ Keep this train.py up-to-date with train() in cli.py!
 They are EXACTLY THE SAME.
 """
 
-import os
-import json
 import time
+from deepliif.options.train_options import TrainOptions
+from deepliif.data import create_dataset
+from deepliif.models import create_model, postprocess
+from deepliif.options import read_model_params, Options, print_options
+from deepliif.util.visualizer import Visualizer
+from PIL import Image
+import os
+
+import numpy as np
 import random
+import json
+import torch
+import torch.distributed as dist
+from torchvision.transforms import ToPILImage
 
 import click
-import cv2
-import torch
-import numpy as np
-from PIL import Image
-
-from deepliif.data import create_dataset
-from deepliif.models import create_model
-from deepliif.util import Visualizer
-from deepliif.options import Options, print_options
-
-import torch.distributed as dist
-    
 
 def set_seed(seed=0,rank=None):
     """
@@ -54,8 +53,6 @@ def set_seed(seed=0,rank=None):
         return False
 
 
-
-
 @click.command()
 @click.option('--dataroot', required=True, type=str,
               help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
@@ -74,7 +71,7 @@ def set_seed(seed=0,rank=None):
               help='specify discriminator architecture [basic | n_layers | pixel]. The basic model is a 70x70 '
                    'PatchGAN. n_layers allows you to specify the layers in the discriminator')
 @click.option('--net-g', default='resnet_9blocks',
-              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+              help='specify generator architecture [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128 | unet_512_attention]; to specify different arch for generators, list arch for each generator separated by comma, e.g., --net-g=resnet_9blocks,resnet_9blocks,resnet_9blocks,unet_512_attention,unet_512_attention')
 @click.option('--n-layers-d', default=4, help='only used if netD==n_layers')
 @click.option('--norm', default='batch',
               help='instance normalization or batch normalization [instance | batch | none]')
@@ -117,6 +114,8 @@ def set_seed(seed=0,rank=None):
               help='number of epochs with the initial learning rate')
 @click.option('--n-epochs-decay', type=int, default=100,
               help='number of epochs to linearly decay learning rate to zero')
+@click.option('--optimizer', type=str, default='adam',
+              help='optimizer from torch.optim to use, applied to both generators and discriminators [adam | sgd | adamw | ...]; the current parameters however are set up for adam, so other optimziers may encounter issue')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
 @click.option('--lr', default=0.0002, help='initial learning rate for adam')
 @click.option('--lr-policy', default='linear',
@@ -153,21 +152,27 @@ def set_seed(seed=0,rank=None):
 @click.option('--net-ds', type=str, default='n_layers',
               help='specify discriminator architecture for segmentation task [basic | n_layers | pixel]. The basic model is a 70x70 PatchGAN. n_layers allows you to specify the layers in the discriminator')
 @click.option('--net-gs', type=str, default='unet_512',
-              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128]')
+              help='specify generator architecture for segmentation task [resnet_9blocks | resnet_6blocks | unet_512 | unet_256 | unet_128 | unet_512_attention]; to specify different arch for generators, list arch for each generator separated by comma, e.g., --net-g=resnet_9blocks,resnet_9blocks,resnet_9blocks,unet_512_attention,unet_512_attention')
 @click.option('--gan-mode', type=str, default='vanilla',
               help='the type of GAN objective for translation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 @click.option('--gan-mode-s', type=str, default='lsgan',
               help='the type of GAN objective for segmentation task. [vanilla| lsgan | wgangp]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 # DDP related arguments
 @click.option('--local-rank', type=int, default=None, help='placeholder argument for torchrun, no need for manual setup')
+# Others
+@click.option('--with-val', is_flag=True,
+              help='use validation set to evaluate model performance at the end of each epoch')
+@click.option('--debug', is_flag=True,
+              help='debug mode, limits the number of data points per epoch to a small value')
+@click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
-          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, beta1, lr, lr_decay_iters,
+          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, 
-          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank):
+          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -191,6 +196,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         seg_no = 0
         seg_gen = False
     
+    if optimizer != 'adam':
+        print(f'Optimizer torch.optim.{optimizer} is not tested. Be careful about the parameters of the optimizer.')
+    
     d_params = locals()
 
     if gpu_ids and gpu_ids[0] == -1:
@@ -202,8 +210,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     if len(gpu_ids) > 0:
         if local_rank is not None:
             local_rank = int(local_rank)
-            torch.cuda.set_device(local_rank)#gpu_ids[local_rank])
-            gpu_ids = [local_rank]
+            torch.cuda.set_device(gpu_ids[local_rank])
+            gpu_ids=[local_rank]
         else:
             torch.cuda.set_device(gpu_ids[0])
 
@@ -224,17 +232,36 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     dir_data_train = dataroot + '/train'
     fns = os.listdir(dir_data_train)
     fns = [x for x in fns if x.endswith('.png')]
+    print(f'{len(fns)} images found')
     img = Image.open(f"{dir_data_train}/{fns[0]}")
+    print(f'image shape:',img.size)
     
     num_img = img.size[0] / img.size[1]
     assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
     num_img = int(num_img)
     
     input_no = num_img - modalities_no - seg_no
-    assert input_no > 0, f'inferred number of input images is {input_no}; should be greater than 0'
+    assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
     d_params['input_no'] = input_no
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
+    
+    # update generator arch
+    net_g = net_g.split(',')
+    assert len(net_g) in [1,modalities_no], f'net_g should contain either 1 architecture for all translation generators or the same number of architectures as the number of translation generators ({modalities_no})'
+    if len(net_g) == 1:
+      net_g = net_g*modalities_no
+      
+    
+    net_gs = net_gs.split(',')
+    assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
+    if len(net_gs) == 1 and model == 'DeepLIIF':
+        net_gs = net_gs*(modalities_no + seg_no)
+    elif len(net_gs) == 1:
+        net_gs = net_gs*seg_no
+    
+    d_params['net_g'] = net_g
+    d_params['net_gs'] = net_gs
 
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
@@ -242,9 +269,18 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     opt = Options(d_params=d_params)
     print_options(opt, save=True)
     
+    # set dir for train and val
     dataset = create_dataset(opt)
+
     # get the number of images in the dataset.
     click.echo('The number of training images = %d' % len(dataset))
+    
+    if with_val:
+        dataset_val = create_dataset(opt,phase='val')
+        data_val = [batch for batch in dataset_val]
+        metrics_val = json.load(open(os.path.join(dataset_val.dataset.dir_AB,'metrics.json')))
+        click.echo('The number of validation images = %d' % len(dataset_val))
+        click.echo('The number of validation images = %d' % len(data_val))
 
     # create a model given model and other options
     model = create_model(opt)
@@ -274,6 +310,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 
         # inner loop within one epoch
         for i, data in enumerate(dataset):
+            
             # timer for computation per iteration
             iter_start_time = time.time()
             if total_iters % print_freq == 0:
@@ -290,15 +327,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             if total_iters % display_freq == 0:
                 save_result = total_iters % update_html_freq == 0
                 model.compute_visuals()
-                visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
+                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result)
 
             # print training losses and save logging information to the disk
             if total_iters % print_freq == 0:
-                losses = model.get_current_losses()
+                losses = model.get_current_losses() # get training losses
                 t_comp = (time.time() - iter_start_time) / batch_size
-                visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
+                visualizer.print_current_losses(epoch, epoch_iter, {**losses}, t_comp, t_data)
                 if display_id > 0:
-                    visualizer.plot_current_losses(epoch, float(epoch_iter) / len(dataset), losses)
+                    visualizer.plot_current_losses(epoch, float(epoch_iter) / len(dataset), {**losses})
 
             # cache our latest model every <save_latest_freq> iterations
             if total_iters % save_latest_freq == 0:
@@ -306,13 +343,88 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 save_suffix = 'iter_%d' % total_iters if save_by_iter else 'latest'
                 model.save_networks(save_suffix)
 
+
             iter_data_time = time.time()
+            if debug and epoch_iter >= debug_data_size:
+                print(f'debug mode, epoch {epoch} stopped at epoch iter {epoch_iter} (>= {debug_data_size})')
+                break
 
         # cache our model every <save_epoch_freq> epochs
         if epoch % save_epoch_freq == 0:
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
+
+        
+        
+        # validation loss and metrics calculation
+        if with_val:
+            losses = model.get_current_losses() # get training losses to print
+            
+            model.eval()
+            l_losses_val = []
+            l_metrics_val = []
+            
+            # for each val image, calculate validation loss and cell count metrics
+            for j, data_val_batch in enumerate(data_val):
+                # batch size is effectively 1 for validation
+                model.set_input(data_val_batch)
+                model.calculate_losses() # this does not optimize parameters
+                visuals = model.get_current_visuals()  # get image results
+                
+                # val losses
+                losses_val_batch = model.get_current_losses()
+                l_losses_val += [(k,v) for k,v in losses_val_batch.items()]
+                
+                # calculate cell count metrics
+                if type(model).__name__ == 'DeepLIIFModel':
+                    l_seg_names = ['fake_B_5']
+                    assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
+                    seg_mod_suffix = l_seg_names[0].split('_')[-1]
+                    l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
+                    # print(f'Running postprocess for {len(l_seg_names)} generated images ({l_seg_names})')
+        
+                    img_name_current = data_val_batch['A_paths'][0].split('/')[-1][:-4] # remove .png
+                    metrics_gt = metrics_val[img_name_current]
+                    
+                    for seg_name in l_seg_names:
+                        images = {'Seg':ToPILImage()((visuals[seg_name][0].cpu()+1)/2),
+                                  #'Marker':ToPILImage()((visuals['fake_B_4'][0].cpu()+1)/2)
+                                  }
+                        _, scoring = postprocess(ToPILImage()((data['A'][0]+1)/2), images, opt.scale_size, opt.model)
+                        
+                        for k,v in scoring.items():
+                            if k.startswith('num') or k.startswith('percent'):
+                                # to calculate the rmse, here we calculate (x_pred - x_true) ** 2
+                                l_metrics_val.append((k+'_'+seg_name,(v - metrics_gt[k])**2))
+                    
+                if debug and epoch_iter >= debug_data_size:
+                    print(f'debug mode, epoch {epoch} stopped at epoch iter {epoch_iter} (>= {debug_data_size})')
+                    break
+                    
+            d_losses_val = {k+'_val':0 for k in losses_val_batch.keys()}
+            for k,v in l_losses_val:
+                d_losses_val[k+'_val'] += v
+            for k in d_losses_val:
+                d_losses_val[k] = d_losses_val[k] / len(data_val)
+            
+            d_metrics_val = {}
+            for k,v in l_metrics_val:
+                try:
+                    d_metrics_val[k] += v
+                except:
+                    d_metrics_val[k] = v
+            for k in d_metrics_val:
+                # to calculate the rmse, this is the second part, where d_metrics_val[k] now represents sum((x_pred - x_true) ** 2)
+                d_metrics_val[k] = np.sqrt(d_metrics_val[k] / len(data_val))
+            
+            
+            model.train()
+            t_comp = (time.time() - iter_start_time) / batch_size
+            visualizer.print_current_losses(epoch, epoch_iter, {**losses,**d_losses_val, **d_metrics_val}, t_comp, t_data)
+            if display_id > 0:
+                visualizer.plot_current_losses(epoch, float(epoch_iter) / len(dataset), {**losses,**d_losses_val,**d_metrics_val})
+
 
         print('End of epoch %d / %d \t Time Taken: %d sec' % (
             epoch, n_epochs + n_epochs_decay, time.time() - epoch_start_time))
