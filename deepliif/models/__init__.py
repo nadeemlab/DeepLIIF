@@ -174,7 +174,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
     number_of_gpus_all = torch.cuda.device_count()
-    number_of_gpus = len(opt.gpu_ids)
+    number_of_gpus = min(len(opt.gpu_ids),number_of_gpus_all)
 
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
@@ -291,13 +291,6 @@ def is_empty_old(tile):
     else:
         return True if calculate_background_area(tile) > 98 else False
       
-      
-def is_empty(tile):
-    if isinstance(tile, list): # for pair of tiles, only mark it as empty / no need for prediction if ALL tiles are empty
-        return all([True if np.max(image_variance_rgb(tile)) < 15 else False for t in tile])
-    else:
-        return True if np.max(image_variance_rgb(tile)) < 15 else False
-
 
 def is_empty(tile):
     thresh = 15
@@ -541,11 +534,11 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
         }
         
         if return_seg_intermediate:
-            images({'IHC_s':results['G51'],
-                    'Hema_s':results['G52'],
-                    'DAPI_s':results['G53'],
-                    'Lap2_s':results['G54'],
-                    'Marker_s':results['G55'],})
+            images.update({'IHC_s':results['G51'],
+                          'Hema_s':results['G52'],
+                          'DAPI_s':results['G53'],
+                          'Lap2_s':results['G54'],
+                          'Marker_s':results['G55'],})
         
         if color_dapi:
             matrix = (       0,        0,        0, 0,

@@ -402,7 +402,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                     
                     for seg_name in l_seg_names:
                         images = {'Seg':ToPILImage()((visuals[seg_name][0].cpu()+1)/2),
-                                  'Marker':ToPILImage()((visuals['fake_B_4'][0].cpu()+1)/2)}
+                                  #'Marker':ToPILImage()((visuals['fake_B_4'][0].cpu()+1)/2)
+                                  }
                         _, scoring = postprocess(ToPILImage()((data['A'][0]+1)/2), images, opt.scale_size, opt.model)
                         
                         for k,v in scoring.items():
