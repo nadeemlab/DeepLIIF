@@ -1,3 +1,5 @@
+# adapted from https://github.com/LeeJunHyun/Image_Segmentation/blob/master/network.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -147,7 +149,7 @@ class AttU_Net(nn.Module):
         self.Up2 = up_conv(ch_in=128,ch_out=64)
         self.Att2 = Attention_block(F_g=64,F_l=64,F_int=32)
         
-        self.Up1 = up_conv(ch_in=64,ch_out=img_ch,outermost=True)
+        self.Up1 = up_conv(ch_in=64,ch_out=output_ch,outermost=True)
 
     def forward(self,x):
         # encoding path
