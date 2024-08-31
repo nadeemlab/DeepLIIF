@@ -20,7 +20,7 @@ setup(
 
     py_modules=['cli'],
     install_requires=[
-        "opencv-python==4.5.3.56",
+        "opencv-python==4.8.1.78",
         "torchvision==0.10.0",
         "scikit-image==0.18.3",
         "dominate==2.6.0",
