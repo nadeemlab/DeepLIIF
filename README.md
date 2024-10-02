@@ -253,6 +253,13 @@ If you don't have access to GPU or appropriate hardware and don't want to instal
 
 ![DeepLIIF Website Demo](images/deepliif-website-demo-04.gif)
 
+Our deployment at [deepliif.org](https://deepliif.org) also provides virtual slide digitization to generate a single stitched image from a 10x video acquired with a microscope and camera.  The video should be captured with the following guidelines to achieve the best results:
+* Brief but complete pauses at every section of the sample to avoid motion artifacts.
+* Significant overlap between pauses so that there is sufficient context for stitching frames together.
+* Methodical and consistent movement over the sample.  For example, start at the top left corner, then go all the way to the right, then down one step, then all the way to the left, down one step, etc., until the end of the sample is reached.  Again, brief overlapping pauses throughout will allow the best quality images to be generated.
+
+![DeepLIIF Website Demo](images/deepliif-stitch-demo-01.gif)
+
 ## Cloud API Endpoints
 
 DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request containing the original image file, along with optional parameters including postprocessing thresholds:
