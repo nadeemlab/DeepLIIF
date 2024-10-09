@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 from ..util.util import mkdirs
+import re
 
 def read_model_params(file_addr):
     with open(file_addr) as f:
@@ -11,8 +12,27 @@ def read_model_params(file_addr):
     for line in lines:
         if ':' in line:
             key = line.split(':')[0].strip()
-            val = line.split(':')[1].split('[')[0].strip()
-            param_dict[key] = val
+            val = ':'.join(line.split(':')[1:])
+            
+            # drop default value
+            str_default = [x for x in re.findall(r"\[.+?\]", val) if x.startswith('[default')]
+            if len(str_default) > 1:
+                raise Exception('train_opt.txt should not contain multiple possible default keys in one line:',str_default)
+            elif len(str_default) == 1:
+                str_default = str_default[0]
+                val = val.replace(str_default,'')
+            val = val.strip()
+            
+            # val = line.split(':')[1].split('[')[0].strip()
+            try:
+                param_dict[key] = eval(val)
+                #print(f'value of {key} is converted to {type(param_dict[key]).__name__}')
+            except:
+                param_dict[key] = val
+            
+            if isinstance(param_dict[key],list):
+                param_dict[key] = param_dict[key][0]
+            
     return param_dict
 
 class Options:
@@ -33,13 +53,16 @@ class Options:
             except:
                 setattr(self,k,v)            
 
+        self.optimizer = 'adam' if not hasattr(self,'optimizer') else self.optimizer
+        
         if mode == 'train':
             self.is_train = True
-            self.netG = 'resnet_9blocks'
-            self.netD = 'n_layers'
+            self.netG = self.net_g #'resnet_9blocks'
+            self.netD = self.net_d #'n_layers'
             self.n_layers_D = 4
             self.lambda_L1 = 100
             self.lambda_feat = 100
+            
         else:
             self.phase = 'test'
             self.is_train = False

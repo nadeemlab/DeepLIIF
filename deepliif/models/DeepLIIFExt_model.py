@@ -1,6 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
+from .networks import get_optimizer
 
 
 class DeepLIIFExtModel(BaseModel):
@@ -72,22 +73,19 @@ class DeepLIIFExtModel(BaseModel):
                     self.model_names.extend(['GS_' + str(i)])
 
         # define networks (both generator and discriminator)
+        if isinstance(opt.net_g, str):
+            self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
+        if isinstance(opt.net_gs, str):
+            self.opt.net_gs = [self.opt.net_gs]*self.mod_gen_no
         self.netG = [None for _ in range(self.mod_gen_no)]
         self.netGS = [None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
-            self.netG[i] = networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
+            self.netG[i] = networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
                                              not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding)
-            print('***************************************')
-            print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding)
-            print('***************************************')
+
         for i in range(self.mod_gen_no):
             if self.opt.seg_gen:
-                # if i == 0:
-                #     self.netGS[i] = networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_gs, self.opt.norm,
-                #                                       not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids)
-                # else:
-                self.netGS[i] = networks.define_G(self.opt.input_nc * 3, self.opt.output_nc, self.opt.ngf, self.opt.net_gs, self.opt.norm,
+                self.netGS[i] = networks.define_G(self.opt.input_nc * 3, self.opt.output_nc, self.opt.ngf, self.opt.net_gs[i], self.opt.norm,
                                                   not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids)
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
@@ -99,11 +97,6 @@ class DeepLIIFExtModel(BaseModel):
                                                  self.gpu_ids)
             for i in range(self.mod_gen_no):
                 if self.opt.seg_gen:
-                    # if i == 0:
-                    #     self.netDS[i] = networks.define_D(self.opt.input_nc + self.opt.output_nc, self.opt.ndf, self.opt.net_ds,
-                    #                                       self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                    #                                       self.gpu_ids)
-                    # else:
                     self.netDS[i] = networks.define_D(self.opt.input_nc * 3 + self.opt.output_nc, self.opt.ndf, self.opt.net_ds,
                                                       self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
                                                       self.gpu_ids)
@@ -113,9 +106,7 @@ class DeepLIIFExtModel(BaseModel):
             # define loss functions
             self.criterionGAN_mod = networks.GANLoss(self.opt.gan_mode).to(self.device)
             self.criterionGAN_seg = networks.GANLoss(self.opt.gan_mode_s).to(self.device)
-
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
-
             self.criterionVGG = networks.VGGLoss().to(self.device)
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
@@ -125,7 +116,11 @@ class DeepLIIFExtModel(BaseModel):
             for i in range(len(self.netGS)):
                 if self.netGS[i]:
                     params += list(self.netGS[i].parameters())
-            self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             params = []
             for i in range(len(self.netD)):
@@ -133,7 +128,11 @@ class DeepLIIFExtModel(BaseModel):
             for i in range(len(self.netDS)):
                 if self.netDS[i]:
                     params += list(self.netDS[i].parameters())
-            self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -295,3 +294,29 @@ class DeepLIIFExtModel(BaseModel):
         self.optimizer_G.zero_grad()  # set G's gradients to zero
         self.backward_G()  # calculate graidents for G
         self.optimizer_G.step()  # udpate G's weights
+    
+    def calculate_losses(self):
+        """
+        Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
+        """
+        self.forward()  # compute fake images: G(A)
+        # update D
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], True)  # enable backprop for D1
+        for i in range(self.mod_gen_no):
+            if self.netDS[i]:
+                self.set_requires_grad(self.netDS[i], True)
+
+        self.optimizer_D.zero_grad()  # set D's gradients to zero
+        self.backward_D()  # calculate gradients for D
+
+        # update G
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], False)
+        for i in range(self.mod_gen_no):
+            if self.netDS[i]:
+                self.set_requires_grad(self.netDS[i], False)
+
+        self.optimizer_G.zero_grad()  # set G's gradients to zero
+        self.backward_G()  # calculate graidents for G
+

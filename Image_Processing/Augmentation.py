@@ -6,12 +6,13 @@ import scipy.ndimage as ndimage
 
 
 class Augmentation:
-    def __init__(self, images):
+    def __init__(self, images, tile_size=512):
         self.images = images
         self.shape = self.images[list(self.images.keys())[0]].shape
         self.rotation_angle = np.random.choice([0, 90, 180, 270], 1)[0]
         # self.zoom_value = random.randint(0, 5)
         self.alpha_affine = 0.1
+        self.tile_size = tile_size
 
     def pipeline(self):
         """
@@ -30,12 +31,13 @@ class Augmentation:
         :return:
         """
         new_size = random.randint(int(self.shape[0] * 0.75), self.shape[0])
+        assert self.shape[1] - new_size >= 0, f'self.shape[1] - new_size ({self.shape[1]} - {new_size})should not be negative'
         start_point = (random.randint(0, self.shape[0] - new_size), random.randint(0, self.shape[1] - new_size))
         for key in self.images.keys():
             try:
-                self.images[key] = cv2.resize(self.images[key][start_point[0]: start_point[0] + new_size, start_point[1]: start_point[1] + new_size], (512, 512))
-            except:
-                print(key + ' not available')
+                self.images[key] = cv2.resize(self.images[key][start_point[0]: start_point[0] + new_size, start_point[1]: start_point[1] + new_size], (self.tile_size, self.tile_size))
+            except Exception as e:
+                print(e)
 
     def rotate(self):
         """
@@ -47,8 +49,8 @@ class Augmentation:
         for key in self.images.keys():
             try:
                 self.images[key] = ndimage.rotate(self.images[key], self.rotation_angle, reshape=False)
-            except:
-                print(key + ' not available')
+            except Exception as e:
+                print(e)
 
     def elastic_transform(self, random_state=None):
         """
@@ -78,5 +80,5 @@ class Augmentation:
         for key in self.images.keys():
             try:
                 self.images[key] = cv2.warpAffine(self.images[key], M, shape_size[::-1], borderMode=cv2.BORDER_REFLECT_101)
-            except:
-                print(key + ' not available')
+            except Exception as e:
+                print(e)
