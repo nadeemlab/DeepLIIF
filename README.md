@@ -262,7 +262,7 @@ Our deployment at [deepliif.org](https://deepliif.org) also provides virtual sli
 
 ## Cloud API Endpoints
 
-DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request containing the original image file, along with optional parameters including postprocessing thresholds:
+For small images, DeepLIIF can also be accessed programmatically through an endpoint by posting a multipart-encoded request containing the original image file, along with optional parameters including postprocessing thresholds:
 
 ```
 POST /api/infer
@@ -357,6 +357,8 @@ with open(f'{images_dir}/{root}_scoring.json', 'w') as f:
     json.dump(data['scoring'], f, indent=2)
 print(json.dumps(data['scoring'], indent=2))
 ```
+
+Note that since this is a single request to send the image and receive the results, processing must complete within the timeout period (typically about one minute).  If your request is receiving a 504 status code, please try a smaller image or install the `deepliif` package as detailed above to run the process locally.
 
 If you have previously run DeepLIIF on an image and want to postprocess it with different thresholds, the postprocessing routine can be called directly using the previously inferred results:
 
