@@ -512,9 +512,7 @@ DeepLIIF model and release back to the community with full credit to the contrib
 - [x] **Moffitt Cancer Center** [AI-ready multiplex immunofluorescence and multiplex immunohistochemistry dataset](https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=70226184) for head-and-neck squamous cell carcinoma (**MICCAI'23**)   
 
 ## Support
-Please use the [Image.sc Forum](https://forum.image.sc/tag/deepliif) for discussion and questions related to DeepLIIF.
-
-Bugs can be reported in the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab.
+Please use the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab for discussion, questions, or to report bugs related to DeepLIIF.
 
 ## License
 © [Nadeem Lab](https://nadeemlab.org/) - DeepLIIF code is distributed under **Apache 2.0 with Commons Clause** license, 
