@@ -519,7 +519,7 @@ Please use the [GitHub Issues](https://github.com/nadeemlab/DeepLIIF/issues) tab
 and is available for non-commercial academic purposes. 
 
 ## Acknowledgments
-* This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
+This code is inspired by [CycleGAN and pix2pix in PyTorch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 
 ## Reference
 If you find our work useful in your research or if you use parts of this code or our released dataset, please cite the following papers:
@@ -547,6 +547,8 @@ If you find our work useful in your research or if you use parts of this code or
   title={An AI-Ready Multiplex Staining Dataset for Reproducible and Accurate Characterization of Tumor Immune Microenvironment},
   author={Ghahremani, Parmida and Marino, Joseph and Hernandez-Prera, Juan and V. de la Iglesia, Janis and JC Slebos, Robbert and H. Chung, Christine and Nadeem, Saad},
   journal={International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
+  volume={14225},
+  pages={704--713},
   year={2023}
 }
 
@@ -554,14 +556,19 @@ If you find our work useful in your research or if you use parts of this code or
   author = {Nadeem, Saad and Hanna, Matthew G and Viswanathan, Kartik and Marino, Joseph and Ahadi, Mahsa and Alzumaili, Bayan and Bani, Mohamed-Amine and Chiarucci, Federico and Chou, Angela and De Leo, Antonio and Fuchs, Talia L and Lubin, Daniel J and Luxford, Catherine and Magliocca, Kelly and Martinez, Germán and Shi, Qiuying and Sidhu, Stan and Al Ghuzlan, Abir and Gill, Anthony J and Tallini, Giovanni and Ghossein, Ronald and Xu, Bin},
   title = {Ki67 proliferation index in medullary thyroid carcinoma: a comparative study of multiple counting methods and validation of image analysis and deep learning platforms},
   journal = {Histopathology},
+  volume = {83},
+  number = {6},
+  pages = {981--988},
   year = {2023},
   doi = {https://doi.org/10.1111/his.15048}
 }
 
 @article{zehra2024deepliifstitch,
-author = {Zehra, Talat and Marino, Joseph and Wang, Wendy and Frantsuzov, Grigoriy and Nadeem, Saad},
-title = {Rethinking Histology Slide Digitization Workflows for Low-Resource Settings},
-journal = {International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
-year = {2024}
+  author = {Zehra, Talat and Marino, Joseph and Wang, Wendy and Frantsuzov, Grigoriy and Nadeem, Saad},
+  title = {Rethinking Histology Slide Digitization Workflows for Low-Resource Settings},
+  journal = {International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
+  volume = {15004},
+  pages = {427--436},
+  year = {2024}
 }
 ```
