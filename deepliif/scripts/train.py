@@ -63,6 +63,9 @@ def set_seed(seed=0,rank=None):
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
+@click.option('--seg-weights', default='', type=str, help='weights used to aggregate modality images for the final segmentation image; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.25,0.15,0.25,0.1,0.25')
+@click.option('--loss-weights-g', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
+@click.option('--loss-weights-d', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
 @click.option('--input-nc', default=3, help='# of input image channels: 3 for RGB and 1 for grayscale')
 @click.option('--output-nc', default=3, help='# of output image channels: 3 for RGB and 1 for grayscale')
 @click.option('--ngf', default=64, help='# of gen filters in the last conv layer')
@@ -171,7 +174,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr, lr_decay_iters,
-          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, 
+          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, seg_weights, loss_weights_g, loss_weights_d,
           modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
     """General-purpose training script for multi-task image-to-image translation.
 
@@ -250,8 +253,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     net_g = net_g.split(',')
     assert len(net_g) in [1,modalities_no], f'net_g should contain either 1 architecture for all translation generators or the same number of architectures as the number of translation generators ({modalities_no})'
     if len(net_g) == 1:
-      net_g = net_g*modalities_no
-      
+        net_g = net_g*modalities_no
     
     net_gs = net_gs.split(',')
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
@@ -262,7 +264,45 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     d_params['net_g'] = net_g
     d_params['net_gs'] = net_gs
+    
+    # check seg weights and loss weights
+    if len(d_params['seg_weights']) == 0:
+        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+    else:
+        seg_weights = [float(x) for x in seg_weights.split(',')]
+    
+    if len(d_params['loss_weights_g']) == 0:
+        loss_weights_g = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+    else:
+        loss_weights_g = [float(x) for x in loss_weights_g.split(',')]
+    
+    if len(d_params['loss_weights_d']) == 0:
+        loss_weights_d = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+    else:
+        loss_weights_d = [float(x) for x in loss_weights_d.split(',')]
+    
+    assert sum(seg_weights) == 1, 'seg weights should add up to 1'
+    assert sum(loss_weights_g) == 1, 'loss weights g should add up to 1'
+    assert sum(loss_weights_d) == 1, 'loss weights d should add up to 1'
+    
+    if model == 'DeepLIIF':
+        # +1 because input becomes an additional modality used in generating the final segmentation
+        assert len(seg_weights) == modalities_no+1, 'seg weights should have the same number of elements as number of modalities to be generated'
+        assert len(loss_weights_g) == modalities_no+1, 'loss weights g should have the same number of elements as number of modalities to be generated'
+        assert len(loss_weights_d) == modalities_no+1, 'loss weights d should have the same number of elements as number of modalities to be generated'
 
+    else:
+        assert len(seg_weights) == modalities_no, 'seg weights should have the same number of elements as number of modalities to be generated'
+        assert len(loss_weights_g) == modalities_no, 'loss weights g should have the same number of elements as number of modalities to be generated'
+        assert len(loss_weights_d) == modalities_no, 'loss weights d should have the same number of elements as number of modalities to be generated'
+
+    d_params['seg_weights'] = seg_weights
+    d_params['loss_G_weights'] = loss_weights_g
+    d_params['loss_D_weights'] = loss_weights_d
+    
+    del d_params['loss_weights_g']
+    del d_params['loss_weights_d']
+    
     # create a dataset given dataset_mode and other options
     # dataset = AlignedDataset(opt)
 
@@ -311,7 +351,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 
         # inner loop within one epoch
         for i, data in enumerate(dataset):
-            
             # timer for computation per iteration
             iter_start_time = time.time()
             if total_iters % print_freq == 0:

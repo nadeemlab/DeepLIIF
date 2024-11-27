@@ -30,8 +30,8 @@ def read_model_params(file_addr):
             except:
                 param_dict[key] = val
             
-            if isinstance(param_dict[key],list):
-                param_dict[key] = param_dict[key][0]
+            # if isinstance(param_dict[key],list):
+            #     param_dict[key] = param_dict[key][0]
             
     return param_dict
 
@@ -55,10 +55,13 @@ class Options:
 
         self.optimizer = 'adam' if not hasattr(self,'optimizer') else self.optimizer
         
+        
         if mode == 'train':
             self.is_train = True
-            self.netG = self.net_g #'resnet_9blocks'
-            self.netD = self.net_d #'n_layers'
+            if hasattr(self,'net_g') and not hasattr(self,'netG'):
+                self.netG = self.net_g #'resnet_9blocks'
+            if hasattr(self,'net_d') and not hasattr(self,'netD'):
+                self.netD = self.net_d #'n_layers'
             self.n_layers_D = 4
             self.lambda_L1 = 100
             self.lambda_feat = 100
@@ -119,6 +122,19 @@ class Options:
                     self.scale_size = 1024
                 else:
                   raise Exception(f'scale_size cannot be automatically determined for {opt.model}')
+            
+            # weights of the modalities used to generate segmentation mask
+            if not hasattr(self,'seg_weights'):
+                if self.model == 'DeepLIIF':
+                    # self.seg_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+                    self.seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+                    # self.seg_weights = [0.25, 0.25, 0.25, 0.0, 0.25]
+                else:
+                    self.seg_weights = [1 / self.modalities_no] * self.modalities_no
+            
+            # weights of the modalities used to calculate the final loss
+            self.loss_G_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_G_weights') else self.loss_G_weights
+            self.loss_D_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_D_weights') else self.loss_D_weights
 
             
     

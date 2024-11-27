@@ -16,13 +16,10 @@ class DeepLIIFModel(BaseModel):
         BaseModel.__init__(self, opt)
         if not hasattr(opt,'net_gs'):
             opt.net_gs = 'unet_512'
-
-        # weights of the modalities in generating segmentation mask
-        self.seg_weights = [0.25, 0.25, 0.25, 0.0, 0.25]
-
-        # loss weights in calculating the final loss
-        self.loss_G_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
-        self.loss_D_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+        
+        self.seg_weights = opt.seg_weights
+        self.loss_G_weights = opt.loss_G_weights
+        self.loss_D_weights = opt.loss_D_weights
         
         if not opt.is_train:
             self.gpu_ids = [] # avoid the models being loaded as DP

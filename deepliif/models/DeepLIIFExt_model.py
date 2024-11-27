@@ -19,10 +19,7 @@ class DeepLIIFExtModel(BaseModel):
         # self.seg_gen_no = self.opt.modalities_no + 1
 
         # weights of the modalities in generating segmentation mask
-        self.seg_weights = [0, 0, 0]
-        if opt.seg_gen:
-            self.seg_weights = [0.3] * self.mod_gen_no
-            self.seg_weights[1] = 0.4
+        self.seg_weights = opt.seg_weights
 
         # self.seg_weights = opt.seg_weights
         # assert len(self.seg_weights) == self.seg_gen_no, 'The number of the segmentation weights (seg_weights) is not equal to the number of target images (modalities_no)!'
