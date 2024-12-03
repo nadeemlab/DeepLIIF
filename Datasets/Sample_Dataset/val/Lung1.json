@@ -1,0 +1,10 @@
+{
+  "num_total": 60,
+  "num_pos": 11,
+  "num_neg": 49,
+  "percent_pos": 18.3,
+  "prob_thresh": 150,
+  "size_thresh": 78,
+  "size_thresh_upper": null,
+  "marker_thresh": null
+}

@@ -115,7 +115,7 @@ def load_torchscript_model(model_pt_path, device):
 
 
 
-def load_eager_models(opt, devices):
+def load_eager_models(opt, devices=None):
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
@@ -138,7 +138,8 @@ def load_eager_models(opt, devices):
                 net = net.module
 
             nets[name] = net
-            nets[name].to(devices[name])
+            if devices:
+                nets[name].to(devices[name])
             
     return nets
 
@@ -154,8 +155,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     """ 
     if opt is None:
         opt = get_opt(model_dir, mode=phase)
-        opt.use_dp = False
-        #print_options(opt)
+    opt.use_dp = False
     
     if opt.model == 'DeepLIIF':
         net_groups = [
@@ -174,8 +174,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
     number_of_gpus_all = torch.cuda.device_count()
-    number_of_gpus = len(opt.gpu_ids)
-    #print(number_of_gpus)
+    number_of_gpus = min(len(opt.gpu_ids),number_of_gpus_all)
 
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
@@ -263,6 +262,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         seg = torch.stack([torch.mul(segs[k], weights[k]) for k in segs.keys()]).sum(dim=0)
     
         res = {k: tensor_to_pil(v) for k, v in gens.items()}
+        res.update({k: tensor_to_pil(v) for k, v in segs.items()})
         res['G5'] = tensor_to_pil(seg)
     
         return res
@@ -290,7 +290,7 @@ def is_empty_old(tile):
         return all([True if calculate_background_area(t) > 98 else False for t in tile])
     else:
         return True if calculate_background_area(tile) > 98 else False
-
+      
 
 def is_empty(tile):
     thresh = 15
@@ -308,7 +308,12 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
                 'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
                 'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))
+                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G51': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G52': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G53': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
             }
         else:
             return run_fn(tile, model_path, eager_mode, opt)
@@ -385,7 +390,14 @@ def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=Fals
                           'DAPI':'G2',
                           'Lap2':'G3',
                           'Marker':'G4',
-                          'Seg':'G5'}
+                          'Seg':'G5',
+                          }
+        if return_seg_intermediate:
+            d_modality2net.update({'IHC_s':'G51',
+                                  'Hema_s':'G52',
+                                  'DAPI_s':'G53',
+                                  'Lap2_s':'G54',
+                                  'Marker_s':'G55',})
         
         for k in d_modality2net.keys():
             images[k] = create_image_for_stitching(tile_size, rows, cols)
@@ -397,7 +409,7 @@ def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=Fals
                 
                 for modality_name, net_name in d_modality2net.items():
                     stitch_tile(images[modality_name], res[net_name], tile_size, overlap_size, i, j)
-        
+
         for modality_name, output_img in images.items():
             images[modality_name] = output_img.resize(img.size)
     
@@ -490,7 +502,8 @@ def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=Fals
 
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
-              eager_mode=False, color_dapi=False, color_marker=False, opt=None):
+              eager_mode=False, color_dapi=False, color_marker=False, opt=None,
+              return_seg_intermediate=False):
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
@@ -519,6 +532,14 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             'Marker': results['G4'],
             'Seg': results['G5'],
         }
+        
+        if return_seg_intermediate:
+            images.update({'IHC_s':results['G51'],
+                          'Hema_s':results['G52'],
+                          'DAPI_s':results['G53'],
+                          'Lap2_s':results['G54'],
+                          'Marker_s':results['G55'],})
+        
         if color_dapi:
             matrix = (       0,        0,        0, 0,
                       299/1000, 587/1000, 114/1000, 0,
@@ -557,7 +578,7 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='aut
         processed_images['SegRefined'] = Image.fromarray(refined)
         return processed_images, scoring
 
-    elif model == 'DeepLIIFExt':
+    elif model in ['DeepLIIFExt','SDG']:
         resolution = '40x' if tile_size > 768 else ('20x' if tile_size > 384 else '10x')
         processed_images = {}
         scoring = {}
@@ -578,7 +599,8 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='aut
 
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
-                     color_dapi=False, color_marker=False, opt=None):
+                     color_dapi=False, color_marker=False, opt=None,
+                     return_seg_intermediate=False):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -604,7 +626,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         eager_mode=eager_mode,
         color_dapi=color_dapi,
         color_marker=color_marker,
-        opt=opt
+        opt=opt,
+        return_seg_intermediate=return_seg_intermediate
     )
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models

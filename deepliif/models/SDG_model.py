@@ -1,6 +1,7 @@
 import torch
 from .base_model import BaseModel
 from . import networks
+from .networks import get_optimizer
 
 
 class SDGModel(BaseModel):
@@ -15,16 +16,14 @@ class SDGModel(BaseModel):
         BaseModel.__init__(self, opt)
 
         self.mod_gen_no = self.opt.modalities_no
+            
 
         # weights of the modalities in generating segmentation mask
-        self.seg_weights = [0, 0, 0]
-        if opt.seg_gen:
-            self.seg_weights = [0.3] * self.mod_gen_no
-            self.seg_weights[1] = 0.4
+        self.seg_weights = opt.seg_weights
 
         # self.seg_weights = opt.seg_weights
         # assert len(self.seg_weights) == self.seg_gen_no, 'The number of the segmentation weights (seg_weights) is not equal to the number of target images (modalities_no)!'
-        # print(self.seg_weights)
+
         # loss weights in calculating the final loss
         self.loss_G_weights = [1 / self.mod_gen_no] * self.mod_gen_no
         self.loss_GS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
@@ -32,11 +31,19 @@ class SDGModel(BaseModel):
         self.loss_D_weights = [1 / self.mod_gen_no] * self.mod_gen_no
         self.loss_DS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
 
+        # self.gpu_ids is a possibly modifed one for model initialization
+        # self.opt.gpu_ids is the original one received in the command
+        if not opt.is_train:
+            self.gpu_ids = [] # avoid the models being loaded as DP
+        else:
+            self.gpu_ids = opt.gpu_ids
+
         self.loss_names = []
         self.visual_names = ['real_A']
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         for i in range(1, self.mod_gen_no + 1):
-            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'D_real_' + str(i), 'D_fake_' + str(i)])
+            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'G_VGG_'+ str(i),
+                                    'D_real_' + str(i), 'D_fake_' + str(i)])
             self.visual_names.extend(['fake_B_' + str(i), 'real_B_' + str(i)])
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
@@ -52,41 +59,48 @@ class SDGModel(BaseModel):
                 self.model_names.extend(['G_' + str(i)])
 
         # define networks (both generator and discriminator)
+        if isinstance(opt.net_g, str):
+            self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
+        if isinstance(opt.net_gs, str):
+            self.opt.net_gs = [self.opt.net_gs]*self.mod_gen_no
         self.netG = [None for _ in range(self.mod_gen_no)]
+        self.netGS = [None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
-            self.netG[i] = networks.define_G(self.opt.input_nc * self.opt.input_no, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
-            print('***************************************')
-            print(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g, self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.opt.gpu_ids, self.opt.padding)
-            print('***************************************')
+            self.netG[i] = networks.define_G(self.opt.input_nc * self.opt.input_no, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
+                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding)
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.netD = [None for _ in range(self.mod_gen_no)]
             for i in range(self.mod_gen_no):
                 self.netD[i] = networks.define_D(self.opt.input_nc * self.opt.input_no + self.opt.output_nc, self.opt.ndf, self.opt.net_d,
                                                  self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
-                                                 self.opt.gpu_ids)
+                                                 self.gpu_ids)
 
         if self.is_train:
             # define loss functions
             self.criterionGAN_mod = networks.GANLoss(self.opt.gan_mode).to(self.device)
             self.criterionGAN_seg = networks.GANLoss(self.opt.gan_mode_s).to(self.device)
-
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
-
             self.criterionVGG = networks.VGGLoss().to(self.device)
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             params = []
             for i in range(len(self.netG)):
                 params += list(self.netG[i].parameters())
-            self.optimizer_G = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             params = []
             for i in range(len(self.netD)):
                 params += list(self.netD[i].parameters())
-            self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            try:
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+            except:
+                print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -136,7 +150,6 @@ class SDGModel(BaseModel):
             self.loss_D_real.append(self.criterionGAN_mod(pred_real[i], True))
 
         # combine losses and calculate gradients
-        # self.loss_D = (self.loss_D_fake[0] + self.loss_D_real[0]) * 0.5 * self.loss_D_weights[0]
         self.loss_D = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
             self.loss_D += (self.loss_D_fake[i] + self.loss_D_real[i]) * 0.5 * self.loss_D_weights[i]
@@ -159,15 +172,14 @@ class SDGModel(BaseModel):
         for i in range(self.mod_gen_no):
             self.loss_G_L1.append(self.criterionSmoothL1(self.fake_B[i], self.real_B[i]) * self.opt.lambda_L1)
 
-        #self.loss_G_VGG = []
-        #for i in range(self.mod_gen_no):
-        #    self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
+        self.loss_G_VGG = []
+        for i in range(self.mod_gen_no):
+            self.loss_G_VGG.append(self.criterionVGG(self.fake_B[i], self.real_B[i]) * self.opt.lambda_feat)
+        
 
-        # self.loss_G = (self.loss_G_GAN[0] + self.loss_G_L1[0]) * self.loss_G_weights[0]
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(0, self.mod_gen_no):
-            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i]) * self.loss_G_weights[i]
-        #    self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
+            self.loss_G += (self.loss_G_GAN[i] + self.loss_G_L1[i] + self.loss_G_VGG[i]) * self.loss_G_weights[i]
         self.loss_G.backward()
 
     def optimize_parameters(self):
@@ -187,3 +199,22 @@ class SDGModel(BaseModel):
         self.optimizer_G.zero_grad()  # set G's gradients to zero
         self.backward_G()  # calculate graidents for G
         self.optimizer_G.step()  # udpate G's weights
+    
+    def calculate_losses(self):
+        """
+        Calculate losses but do not optimize parameters. Used in validation loss calculation during training.
+        """
+        self.forward()  # compute fake images: G(A)
+        # update D
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], True)  # enable backprop for D1
+
+        self.optimizer_D.zero_grad()  # set D's gradients to zero
+        self.backward_D()  # calculate gradients for D
+
+        # update G
+        for i in range(self.mod_gen_no):
+            self.set_requires_grad(self.netD[i], False)
+
+        self.optimizer_G.zero_grad()  # set G's gradients to zero
+        self.backward_G()  # calculate graidents for G

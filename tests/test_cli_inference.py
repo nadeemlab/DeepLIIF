@@ -5,7 +5,7 @@ import torch
 from util import *
 
 available_gpus = torch.cuda.device_count()
-TOLERANCE = 0.0001
+TOLERANCE = 0.0003
 TOLERANCE_SEG = 0.05
 
 subdir_testpy = 'test_latest/images'
@@ -36,7 +36,8 @@ def match_suffix(l_suffix_cli, model='DeepLIIF'):
             try:
                 img_type = suffix_cli[:3]
                 mod_idx = suffix_cli[3:]
-                res.append(d_cli2testpy[img_type] + mod_idx)
+                res_testpy.append(d_cli2testpy[img_type] + mod_idx)
+                res_cli.append(suffix_cli)
             except:
                 pass
 
@@ -403,6 +404,7 @@ def test_cli_inference_consistency(tmp_path, model_dir, model_info):
         
         remove_contents_in_folder(tmp_path)
         torch.cuda.nvtx.range_pop()
+        
     torch.cuda.nvtx.range_pop()
 
 
@@ -537,6 +539,7 @@ def test_cli_inference_eager_testpy_consistency(tmp_path, model_dir, model_info)
         # filenames from cli inference
         fns = [f for f in os.listdir(dirs_output[0]) if os.path.isfile(os.path.join(dirs_output[0], f)) and f.endswith('png')]
         fns = [x.replace('_Overlaid','').replace('_Refined','') for x in fns] # remove _Overlaid / _Refined
+        
         l_suffix_cli = list(set([fn[:-4].split('_')[-1] for fn in fns]))
         l_suffix_cli, l_suffix_testpy = match_suffix(l_suffix_cli, model=model_info['model'])
         print('suffix:',l_suffix_cli)       

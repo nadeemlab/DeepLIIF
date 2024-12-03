@@ -1,13 +1,9 @@
-"""General-purpose training script for multi-task image-to-image translation.
-
-This script works for various models (with option '--model': e.g., DeepLIIF) and
-different datasets (with option '--dataset_mode': e.g., aligned, unaligned, single, colorization).
-You need to specify the dataset ('--dataroot'), experiment name ('--name'), and model ('--model').
-
-It first creates model, dataset, and visualizer given the option.
-It then does standard network training. During the training, it also visualize/save the images, print/save the loss plot, and save models.
-The script supports continue/resume training. Use '--continue_train' to resume your previous training.
 """
+This script is used by cli.py trainlaunch command for DDP.
+Keep this train.py up-to-date with train() in cli.py!
+They are EXACTLY THE SAME.
+"""
+
 import time
 from deepliif.options.train_options import TrainOptions
 from deepliif.data import create_dataset
@@ -474,6 +470,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             epoch, n_epochs + n_epochs_decay, time.time() - epoch_start_time))
         # update learning rates at the end of every epoch.
         model.update_learning_rate()
+
 
 if __name__ == '__main__':
     train()
