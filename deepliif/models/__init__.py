@@ -23,6 +23,7 @@ import itertools
 import importlib
 from functools import lru_cache
 from io import BytesIO
+import json
 
 import requests
 import torch
@@ -684,12 +685,15 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
     :param region_size: The size of each individual region to be processed at once.
     :return:
     """
-    results_dir = os.path.join(output_dir, filename)
+    basename, _ = os.path.splitext(filename)
+    results_dir = os.path.join(output_dir, basename)
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
     size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(os.path.join(input_dir, filename))
     print(filename, size_x, size_y, size_z, size_c, size_t, pixel_type)
+
     results = {}
+    scoring = None
     start_x, start_y = 0, 0
     while start_x < size_x:
         while start_y < size_y:
@@ -698,6 +702,15 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
             region = read_bioformats_image_with_reader(os.path.join(input_dir, filename), region=region_XYWH)
 
             region_modalities, region_scoring = infer_modalities(Image.fromarray((region * 255).astype(np.uint8)), tile_size, model_dir)
+            if region_scoring is not None:
+                if scoring is None:
+                    scoring = {
+                        'num_pos': region_scoring['num_pos'],
+                        'num_neg': region_scoring['num_neg'],
+                    }
+                else:
+                    scoring['num_pos'] += region_scoring['num_pos']
+                    scoring['num_neg'] += region_scoring['num_neg']
 
             for name, img in region_modalities.items():
                 if name not in results:
@@ -708,11 +721,16 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
         start_y = 0
         start_x += region_size
 
-    write_results_to_pickle_file(os.path.join(results_dir, "results.pickle"), results)
+    # write_results_to_pickle_file(os.path.join(results_dir, "results.pickle"), results)
     # read_results_from_pickle_file(os.path.join(results_dir, "results.pickle"))
 
     for name, img in results.items():
-        write_big_tiff_file(os.path.join(results_dir, filename.replace('.svs', '_' + name + '.ome.tiff')), img,
-                            tile_size)
+        write_big_tiff_file(os.path.join(results_dir, f'{basename}_{name}.ome.tiff'), img, tile_size)
+
+    if scoring is not None:
+        scoring['num_total'] = scoring['num_pos'] + scoring['num_neg']
+        scoring['percent_pos'] = round(scoring['num_pos'] / scoring['num_total'] * 100, 1) if scoring['num_pos'] > 0 else 0
+        with open(os.path.join(results_dir, f'{basename}.json'), 'w') as f:
+            json.dump(scoring, f, indent=2)
 
     javabridge.kill_vm()
