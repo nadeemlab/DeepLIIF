@@ -72,7 +72,7 @@ class Options:
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
-            self.norm = 'batch'
+            self.norm = 'batch' if not hasattr(self,'norm') else self.norm
             self.use_dropout = True
             #self.padding_type = 'zero' # some models use reflect etc. which adds additional randomness 
             #self.padding = 'zero'
