@@ -36,7 +36,7 @@ from dask import delayed, compute
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
-from deepliif.postprocessing import compute_results
+from deepliif.postprocessing import compute_final_results
 from deepliif.options import Options, print_options
 
 from .base_model import BaseModel
@@ -370,7 +370,7 @@ def inference_old(img, tile_size, overlap_size, model_path, use_torchserve=False
 
     run_fn = run_torchserve if use_torchserve else run_dask
     # res = [Tile(t.i, t.j, run_fn(t.img, model_path)) for t in tiles]
-    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, eager_modek)) for t in tiles]
+    res = [Tile(t.i, t.j, run_wrapper(t.img, run_fn, model_path, eager_mode)) for t in tiles]
 
     def get_net_tiles(n):
         return [Tile(t.i, t.j, t.img[n]) for t in res]
@@ -602,12 +602,12 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
         return results # return result images with default key names (i.e., net names)
 
 
-def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='auto', marker_thresh=None, size_thresh_upper=None):
+def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='default', marker_thresh=None, size_thresh_upper=None):
     if model == 'DeepLIIF':
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
-        overlay, refined, scoring = compute_results(np.array(orig), np.array(images['Seg']),
-                                                    np.array(images['Marker'].convert('L')) if 'Marker' in images else None,
-                                                    resolution, seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
+        overlay, refined, scoring = compute_final_results(
+            orig, images['Seg'], images.get('Marker'), resolution,
+            size_thresh, marker_thresh, size_thresh_upper, seg_thresh)
         processed_images = {}
         processed_images['SegOverlaid'] = Image.fromarray(overlay)
         processed_images['SegRefined'] = Image.fromarray(refined)
@@ -620,9 +620,9 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='aut
         for img_name in list(images.keys()):
             if 'Seg' in img_name:
                 seg_img = images[img_name]
-                overlay, refined, score = compute_results(np.array(orig), np.array(images[img_name]),
-                                                          None, resolution,
-                                                          seg_thresh, size_thresh, marker_thresh, size_thresh_upper)
+                overlay, refined, score = compute_final_results(
+                    orig, images[img_name], None, resolution,
+                    size_thresh, marker_thresh, size_thresh_upper, seg_thresh)
     
                 processed_images[img_name + '_Overlaid'] = Image.fromarray(overlay)
                 processed_images[img_name + '_Refined'] = Image.fromarray(refined)
