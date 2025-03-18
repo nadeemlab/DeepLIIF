@@ -6,10 +6,10 @@ import cv2
 import numpy as np
 import scipy.ndimage as ndi
 
-from deepliif.postprocessing import compute_results
+from deepliif.postprocessing import compute_final_results
 
 
-def post_process_segmentation_mask(input_dir, seg_thresh=150, size_thresh='auto'):
+def post_process_segmentation_mask(input_dir, seg_thresh=150, size_thresh='default'):
     images = os.listdir(input_dir)
     image_extensions = ['.png', '.jpg', '.tif', '.tiff']
 
@@ -40,7 +40,7 @@ def post_process_segmentation_mask(input_dir, seg_thresh=150, size_thresh='auto'
             else:
                 orig_image = cv2.cvtColor(cv2.imread(seg_file), cv2.COLOR_BGR2RGB)
             seg_image = cv2.cvtColor(cv2.imread(seg_file), cv2.COLOR_BGR2RGB)
-            overlaid, refined, scoring = compute_results(orig_image, seg_image, None, '40x', seg_thresh, size_thresh)
+            overlaid, refined, scoring = compute_final_results(orig_image, seg_image, None, '40x', size_thresh, seg_thresh=seg_thresh)
             if orig_file is not None:
                 cv2.imwrite(overlaid_file, cv2.cvtColor(overlaid, cv2.COLOR_RGB2BGR))
             cv2.imwrite(refined_file, cv2.cvtColor(refined, cv2.COLOR_RGB2BGR))
@@ -52,7 +52,7 @@ def post_process_segmentation_mask(input_dir, seg_thresh=150, size_thresh='auto'
 if __name__ == '__main__':
     base_dir = sys.argv[1]
     segmentation_thresh = 150
-    size_thresh = 'auto'
+    size_thresh = 'default'
     if len(sys.argv) > 2:
         segmentation_thresh = int(sys.argv[2])
     if len(sys.argv) > 3:
