@@ -272,7 +272,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             img = Image.open(f"{dir_data_train}/{fns[0]}")
             print(f'image shape:',img.size)
         
-        input_no = None
+        input_no = 1
         num_img = None
         
         lambda_identity = 0
@@ -554,6 +554,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
+@click.option('--upsample', default='convtranspose', help='use upsampling instead of convtranspose [convtranspose | resize_conv | pixel_shuffle]')
+@click.option('--label-smoothing', type=float,default=0.0, help='label smoothing factor to prevent the discriminator from being too confident')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
 @click.option('--serial-batches', is_flag=True,
@@ -592,7 +594,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--optimizer', type=str, default='adam',
               help='optimizer from torch.optim to use, applied to both generators and discriminators [adam | sgd | adamw | ...]; the current parameters however are set up for adam, so other optimziers may encounter issue')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
-@click.option('--lr', default=0.0002, help='initial learning rate for adam')
+#@click.option('--lr', default=0.0002, help='initial learning rate for adam')
+@click.option('--lr-g', default=0.0002, help='initial learning rate for generator adam optimizer')
+@click.option('--lr-d', default=0.0002, help='initial learning rate for discriminator adam optimizer')
 @click.option('--lr-policy', default='linear',
               help='learning rate policy. [linear | step | plateau | cosine]')
 @click.option('--lr-decay-iters', type=int, default=50,
