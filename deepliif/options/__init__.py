@@ -78,6 +78,11 @@ class Options:
             #self.padding = 'zero'
             self.use_dropout = False #if self.no_dropout == 'True' else True
             
+            if self.model in ['CycleGAN']:
+                # this is only used for inference (whether to load generators Bs instead of As)
+                # and can be configured in the inference function
+                self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
+            
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
             model_dir = Path(path_file).parent

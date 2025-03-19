@@ -65,7 +65,10 @@ class CycleGANModel(BaseModel):
         if self.is_train:
             self.model_names = [f'GA_{i}' for i in l_suffix] + [f'GB_{i}' for i in l_suffix] + [f'DA_{i}' for i in l_suffix] + [f'DB_{i}' for i in l_suffix]
         else:  # during test time, only load Gs
-            self.model_names = [f'GA_{i}' for i in l_suffix] + [f'GB_{i}' for i in l_suffix] 
+            if self.opt.BtoA:
+                self.model_names = [f'GB_{i}' for i in l_suffix] 
+            else:
+                self.model_names = [f'GA_{i}' for i in l_suffix] 
 
         # define networks (both Generators and discriminators)
         # The naming is different from those used in the paper.
@@ -76,12 +79,14 @@ class CycleGANModel(BaseModel):
         self.netGA = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
         self.netGB = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
         for i in range(self.mod_gen_no):
-            self.netGA.append(networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding, 
-                                            upsample=self.opt.upsample))
-            self.netGB.append(networks.define_G(self.opt.output_nc, self.opt.input_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
-                                             not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding, 
-                                             upsample=self.opt.upsample))
+            if self.is_train or not self.opt.BtoA:
+                self.netGA.append(networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
+                                                 not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding, 
+                                                upsample=self.opt.upsample))
+            if self.is_train or self.opt.BtoA:
+                self.netGB.append(networks.define_G(self.opt.output_nc, self.opt.input_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
+                                                 not self.opt.no_dropout, self.opt.init_type, self.opt.init_gain, self.gpu_ids, self.opt.padding, 
+                                                 upsample=self.opt.upsample))
         
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.netDA = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
