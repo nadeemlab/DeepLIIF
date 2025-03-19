@@ -30,6 +30,14 @@ MODEL_INFO = {'latest':{'model':'DeepLIIF', # cli.py train looks for subfolder "
                      'dir_model':['../checkpoints/sdg_20240104'],
                      'modalities_no': [4],
                      'seg_gen':[False],
+                     'tile_size':512},
+              'cyclegan':{'model':'CycleGAN',
+                     'dir_input_train':['Datasets/Sample_Dataset_cyclegan'],
+                     'dir_input_testpy':['Datasets/Sample_Dataset_cyclegan'],
+                     'dir_input_inference':['Datasets/Sample_Dataset_cyclegan/test_cli'],
+                     'dir_model':['../checkpoints/pasto3mods_test'],
+                     'modalities_no': [1],
+                     'seg_gen':[False],
                      'tile_size':512}}
 
 def pytest_addoption(parser):
