@@ -40,12 +40,8 @@ class CycleGANModel(BaseModel):
         
         use_spectral_norm = self.opt.norm == 'spectral'
         
-        # self.seg_weights = opt.seg_weights
-        # assert len(self.seg_weights) == self.seg_gen_no, 'The number of the segmentation weights (seg_weights) is not equal to the number of target images (modalities_no)!'
-        # print(self.seg_weights)
-        # loss weights in calculating the final loss
-        self.loss_G_weights = [1 / self.mod_gen_no] * self.mod_gen_no
-        self.loss_D_weights = [1 / self.mod_gen_no] * self.mod_gen_no
+        self.loss_G_weights = opt.loss_G_weights
+        self.loss_D_weights = opt.loss_D_weights
         self.loss_cyc_weights = [1 / self.mod_gen_no] * self.mod_gen_no
         
         self.opt.lambda_identity = 0 # do not use lambda identity for the first trial
@@ -76,8 +72,8 @@ class CycleGANModel(BaseModel):
         if isinstance(opt.net_g, str):
             self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
 
-        self.netGA = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
-        self.netGB = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
+        self.netGA = nn.ModuleList()
+        self.netGB = nn.ModuleList()
         for i in range(self.mod_gen_no):
             if self.is_train or not self.opt.BtoA:
                 self.netGA.append(networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
@@ -89,8 +85,8 @@ class CycleGANModel(BaseModel):
                                                  upsample=self.opt.upsample))
         
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
-            self.netDA = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
-            self.netDB = nn.ModuleList()#[None for _ in range(self.mod_gen_no)]
+            self.netDA = nn.ModuleList()
+            self.netDB = nn.ModuleList()
             for i in range(self.mod_gen_no):
                 self.netDA.append(networks.define_D(self.opt.output_nc, self.opt.ndf, self.opt.net_d,
                                                  self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
@@ -159,7 +155,11 @@ class CycleGANModel(BaseModel):
         self.image_paths = input['A_paths']
 
     def forward(self):
-        """Run forward pass; called by both functions <optimize_parameters> and <test>."""
+        """
+        Run forward pass; called by both functions <optimize_parameters> and <test>.
+        During inference, some output list could be empty. For example, if only netGAs are loaded,
+        there will not be valid elements in self.rec_As and self.fake_As.
+        """
         self.fake_Bs = [netGA(real_A) for netGA, real_A in zip(self.netGA, self.real_As)]  # G_A(A)
         self.rec_As = [netGB(fake_B) for netGB, fake_B in zip(self.netGB, self.fake_Bs)]   # G_B(G_A(A))
         

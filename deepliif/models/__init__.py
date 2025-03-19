@@ -28,7 +28,7 @@ import json
 import requests
 import torch
 from PIL import Image
-Image.MAX_IMAGE_PIXELS = 1000000000
+Image.MAX_IMAGE_PIXELS = None
 
 import numpy as np
 from dask import delayed, compute
