@@ -151,7 +151,14 @@ class BaseModel(ABC):
                             img_name = name[:-1] + '_' + name[-1]
                             visual_ret[name] = getattr(self, img_name)
                         else:
-                            visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
+                            if self.opt.model == 'CycleGAN':
+                                l_output = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])
+                                if len(l_output) > 0:
+                                    visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
+                                else:
+                                    print('No output for',name)
+                            else:
+                                visual_ret[name] = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])[int(name.split('_')[-1]) - 1]
                     else:
                         visual_ret[name] = getattr(self, name.split('_')[0])[int(name.split('_')[-1]) -1]
                 else:
@@ -261,13 +268,7 @@ class BaseModel(ABC):
                 load_filename = '%s_net_%s.pth' % (epoch, name)
                 load_path = os.path.join(self.save_dir, load_filename)
                 if '_' in name:
-                    if self.opt.model == 'CycleGAN':
-                        try:
-                            net = getattr(self, 'net'+name)
-                        except:
-                            net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
-                    else:
-                        net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                    net = getattr(self, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
                 else:
                     net = getattr(self, 'net' + name)
                 if isinstance(net, torch.nn.DataParallel):
