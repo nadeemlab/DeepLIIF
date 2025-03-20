@@ -26,7 +26,7 @@ setup(
         "dominate==2.6.0",
         "numba==0.57.1",
         "Click==8.0.3",
-        "requests==2.26.0",
+        "requests==2.32.2",
         "dask==2021.11.2",
         "visdom>=0.1.8.3",
         "python-bioformats>=4.0.6"
