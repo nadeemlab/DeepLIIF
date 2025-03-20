@@ -25,10 +25,10 @@ class SDGModel(BaseModel):
         # assert len(self.seg_weights) == self.seg_gen_no, 'The number of the segmentation weights (seg_weights) is not equal to the number of target images (modalities_no)!'
 
         # loss weights in calculating the final loss
-        self.loss_G_weights = [1 / self.mod_gen_no] * self.mod_gen_no
+        self.loss_G_weights = opt.loss_G_weights
         self.loss_GS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
 
-        self.loss_D_weights = [1 / self.mod_gen_no] * self.mod_gen_no
+        self.loss_D_weights = opt.loss_D_weights
         self.loss_DS_weights = [1 / self.mod_gen_no] * self.mod_gen_no
 
         # self.gpu_ids is a possibly modifed one for model initialization
@@ -88,19 +88,19 @@ class SDGModel(BaseModel):
             for i in range(len(self.netG)):
                 params += list(self.netG[i].parameters())
             try:
-                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g, betas=(opt.beta1, 0.999))
             except:
                 print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
-                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g)
 
             params = []
             for i in range(len(self.netD)):
                 params += list(self.netD[i].parameters())
             try:
-                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr_d, betas=(opt.beta1, 0.999))
             except:
                 print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
-                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr_d)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)

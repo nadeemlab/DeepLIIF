@@ -35,8 +35,10 @@ def get_norm_layer(norm_type='instance'):
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':
         norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
-    elif norm_type == 'none':
+    elif norm_type in ['none','spectral']:
         def norm_layer(x): return Identity()
+    # elif norm_type == 'spectral':
+    #     norm_layer = torch.nn.utils.parametrizations.spectral_norm # this needs to be called on nn modules individually, not on nn.Sequential
     else:
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
@@ -137,7 +139,9 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], padding_type='reflect', resize_conv=False):
+def define_G(
+  input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], padding_type='reflect', 
+             upsample='convtranspose'):
     """Create a generator
 
     Parameters:
@@ -166,11 +170,14 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     """
     net = None
     norm_layer = get_norm_layer(norm_type=norm)
+    use_spectral_norm = norm == 'spectral'
 
     if netG == 'resnet_9blocks':
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, padding_type=padding_type, resize_conv=resize_conv)
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9, 
+                              padding_type=padding_type, upsample=upsample, use_spectral_norm=use_spectral_norm)
     elif netG == 'resnet_6blocks':
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6, padding_type=padding_type)
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6, 
+                              padding_type=padding_type, upsample=upsample, use_spectral_norm=use_spectral_norm)
     elif netG == 'unet_128':
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
@@ -216,11 +223,12 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
     """
     net = None
     norm_layer = get_norm_layer(norm_type=norm)
+    use_spectral_norm = norm == 'spectral'
 
     if netD == 'basic':  # default PatchGAN classifier
-        net = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer)
+        net = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
     elif netD == 'n_layers':  # more options
-        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
+        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
     elif netD == 'pixel':     # classify if each pixel is real or fake
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
     else:
@@ -238,7 +246,7 @@ class GANLoss(nn.Module):
     that has the same size as the input.
     """
 
-    def __init__(self, gan_mode, target_real_label=1.0, target_fake_label=0.0):
+    def __init__(self, gan_mode, target_real_label=1.0, target_fake_label=0.0, label_smoothing=0.0):
         """ Initialize the GANLoss class.
 
         Parameters:
@@ -253,6 +261,7 @@ class GANLoss(nn.Module):
         self.register_buffer('real_label', torch.tensor(target_real_label))
         self.register_buffer('fake_label', torch.tensor(target_fake_label))
         self.gan_mode = gan_mode
+        self.label_smoothing = label_smoothing
         if gan_mode == 'lsgan':
             self.loss = nn.MSELoss()
         elif gan_mode == 'vanilla':
@@ -275,9 +284,10 @@ class GANLoss(nn.Module):
 
         if target_is_real:
             target_tensor = self.real_label
+            return target_tensor.expand_as(prediction) * (1 - self.label_smoothing)
         else:
             target_tensor = self.fake_label
-        return target_tensor.expand_as(prediction)
+            return target_tensor.expand_as(prediction) * self.label_smoothing
 
     def __call__(self, prediction, target_is_real, epsilon=1.0):
         """Calculate loss given Discriminator's output and grount truth labels.
@@ -351,7 +361,8 @@ class ResnetGenerator(nn.Module):
     https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/issues/190#issuecomment-358546675
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='zero', resize_conv=False):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='zero', 
+                 upsample='convtranspose', use_spectral_norm=False):
         """Construct a Resnet-based generator
 
         Parameters:
@@ -363,7 +374,6 @@ class ResnetGenerator(nn.Module):
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
         """
-        print('resize_conv',resize_conv)
         assert(n_blocks >= 0)
         super(ResnetGenerator, self).__init__()
         if type(norm_layer) == functools.partial:
@@ -373,40 +383,52 @@ class ResnetGenerator(nn.Module):
 
         if padding_type == 'reflect':
             model = [nn.ReflectionPad2d(3),
-                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
-                 norm_layer(ngf),
-                 nn.ReLU(True)]
+                     SpectralNorm(nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                                  use_spectral_norm=use_spectral_norm),
+                     norm_layer(ngf),
+                     nn.ReLU(True)]
         else:
             model = [nn.ZeroPad2d(3),
-                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
-                 norm_layer(ngf),
-                 nn.ReLU(True)]
+                     SpectralNorm(nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                                  use_spectral_norm=use_spectral_norm),
+                     norm_layer(ngf),
+                     nn.ReLU(True)]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
-            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+            model += [SpectralNorm(nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),use_spectral_norm=use_spectral_norm),
                       norm_layer(ngf * mult * 2),
                       nn.ReLU(True)]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
 
-            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias,
+                                  use_spectral_norm=use_spectral_norm)]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            if resize_conv:
+            if upsample == 'resize_conv':
                 upsample_layer = [#nn.Upsample(scale_factor = 2, mode='bilinear',align_corners=True),
                                   nn.Upsample(scale_factor = 2, mode='nearest'),
                                   nn.ReflectionPad2d(1),
-                                  nn.Conv2d(ngf * mult, int(ngf * mult / 2),
-                                  kernel_size=3, stride=1, padding=0)]
+                                  SpectralNorm(nn.Conv2d(ngf * mult, int(ngf * mult / 2),
+                                            kernel_size=3, stride=1, padding=0),use_spectral_norm=use_spectral_norm)]
+            elif upsample == 'pixel_shuffle':
+                upsample_layer = [SpectralNorm(nn.Conv2d(ngf * mult, int(ngf * mult * 2),use_spectral_norm=use_spectral_norm), 
+                                            kernel_size=3, padding=1),
+                                  nn.PixelShuffle(2),
+                                  nn.ReLU()]
+            elif upsample == 'convtranspose':
+                upsample_layer = [SpectralNorm(nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+                                                                 kernel_size=3, stride=2,
+                                                                 padding=1, output_padding=1,
+                                                                 bias=use_bias),
+                                              use_spectral_norm=use_spectral_norm)]
             else:
-                upsample_layer = [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
-                                         kernel_size=3, stride=2,
-                                         padding=1, output_padding=1,
-                                         bias=use_bias)]
+                raise Exception(f'upsample layer type {upsample} not implemented')
+                
             model += upsample_layer
             model += [norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
@@ -416,7 +438,7 @@ class ResnetGenerator(nn.Module):
         else:
             model += [nn.ZeroPad2d(3)]
 
-        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [SpectralNorm(nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0),use_spectral_norm=use_spectral_norm)]
         model += [nn.Tanh()]
 
         self.model = nn.Sequential(*model)
@@ -429,7 +451,7 @@ class ResnetGenerator(nn.Module):
 class ResnetBlock(nn.Module):
     """Define a Resnet block"""
 
-    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias, use_spectral_norm=False):
         """Initialize the Resnet block
 
         A resnet block is a conv block with skip connections
@@ -438,9 +460,9 @@ class ResnetBlock(nn.Module):
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
         """
         super(ResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias, use_spectral_norm)
 
-    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias, use_spectral_norm):
         """Construct a convolutional block.
 
         Parameters:
@@ -463,7 +485,9 @@ class ResnetBlock(nn.Module):
         else:
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
 
-        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), nn.ReLU(True)]
+        conv_block += [SpectralNorm(nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias),use_spectral_norm=use_spectral_norm), 
+                       norm_layer(dim), 
+                       nn.ReLU(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 
@@ -476,7 +500,8 @@ class ResnetBlock(nn.Module):
             p = 1
         else:
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
+        conv_block += [SpectralNorm(nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias),use_spectral_norm=use_spectral_norm), 
+                       norm_layer(dim)]
 
         return nn.Sequential(*conv_block)
 
@@ -591,7 +616,7 @@ class UnetSkipConnectionBlock(nn.Module):
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_spectral_norm=False):
         """Construct a PatchGAN discriminator
 
         Parameters:
@@ -608,14 +633,15 @@ class NLayerDiscriminator(nn.Module):
 
         kw = 4
         padw = 1
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [SpectralNorm(nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),use_spectral_norm=use_spectral_norm), 
+                    nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             sequence += [
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                SpectralNorm(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),use_spectral_norm=use_spectral_norm),
                 norm_layer(ndf * nf_mult),
                 nn.LeakyReLU(0.2, True)
             ]
@@ -623,12 +649,12 @@ class NLayerDiscriminator(nn.Module):
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            SpectralNorm(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),use_spectral_norm=use_spectral_norm),
             norm_layer(ndf * nf_mult),
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+        sequence += [SpectralNorm(nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw),use_spectral_norm=use_spectral_norm)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
 
     def forward(self, input):
@@ -725,3 +751,13 @@ class TotalVariationLoss(nn.Module):
     def forward(self, x):
         tv = torch.abs(x[:,:,1:,:]-x[:,:,:-1,:]).sum() + torch.abs(x[:,:,:,1:]-x[:,:,:,:-1]).sum()
         return tv / torch.prod(torch.tensor(x.size()))
+
+def SpectralNorm(x, use_spectral_norm=False):
+    """
+    A custom wrapper for nn.utils.parametrizations.spectral_norm,
+    with a flag to turn it on or off.
+    """
+    if use_spectral_norm:
+        return nn.utils.parametrizations.spectral_norm(x)
+    else:
+        return x

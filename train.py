@@ -56,7 +56,7 @@ def set_seed(seed=0,rank=None):
         print(f'not using deterministic training')
         return False
 
-
+        
 @click.command()
 @click.option('--dataroot', required=True, type=str,
               help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
@@ -86,6 +86,8 @@ def set_seed(seed=0,rank=None):
               help='network initialization [normal | xavier | kaiming | orthogonal]')
 @click.option('--init-gain', default=0.02, help='scaling factor for normal, xavier and orthogonal.')
 @click.option('--no-dropout', is_flag=True, help='no dropout for the generator')
+@click.option('--upsample', default='convtranspose', help='use upsampling instead of convtranspose [convtranspose | resize_conv | pixel_shuffle]')
+@click.option('--label-smoothing', type=float,default=0.0, help='label smoothing factor to prevent the discriminator from being too confident')
 # dataset parameters
 @click.option('--direction', default='AtoB', help='AtoB or BtoA')
 @click.option('--serial-batches', is_flag=True,
@@ -124,7 +126,9 @@ def set_seed(seed=0,rank=None):
 @click.option('--optimizer', type=str, default='adam',
               help='optimizer from torch.optim to use, applied to both generators and discriminators [adam | sgd | adamw | ...]; the current parameters however are set up for adam, so other optimziers may encounter issue')
 @click.option('--beta1', default=0.5, help='momentum term of adam')
-@click.option('--lr', default=0.0002, help='initial learning rate for adam')
+#@click.option('--lr', default=0.0002, help='initial learning rate for adam')
+@click.option('--lr-g', default=0.0002, help='initial learning rate for generator adam optimizer')
+@click.option('--lr-d', default=0.0002, help='initial learning rate for discriminator adam optimizer')
 @click.option('--lr-policy', default='linear',
               help='learning rate policy. [linear | step | plateau | cosine]')
 @click.option('--lr-decay-iters', type=int, default=50,
@@ -173,11 +177,11 @@ def set_seed(seed=0,rank=None):
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
-          n_layers_d, norm, init_type, init_gain, no_dropout, direction, serial_batches, num_threads,
+          n_layers_d, norm, init_type, init_gain, no_dropout, upsample, label_smoothing, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
-          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr, lr_decay_iters,
+          continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, seg_weights, loss_weights_g, loss_weights_d,
           modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
     """General-purpose training script for multi-task image-to-image translation.
@@ -191,7 +195,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
-    assert model in ['DeepLIIF','DeepLIIFExt','SDG'], f'model class {model} is not implemented'
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN'], f'model class {model} is not implemented'
     if model == 'DeepLIIF':
         seg_no = 1
     elif model == 'DeepLIIFExt':
@@ -199,9 +203,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             seg_no = modalities_no
         else:
             seg_no = 0
-    else: # SDG
+    else: # SDG, CycleGAN
         seg_no = 0
         seg_gen = False
+    
+    if model == 'CycleGAN':
+        dataset_mode = "unaligned"
     
     if optimizer != 'adam':
         print(f'Optimizer torch.optim.{optimizer} is not tested. Be careful about the parameters of the optimizer.')
@@ -236,22 +243,53 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # infer number of input images
-    dir_data_train = dataroot + '/train'
-    fns = os.listdir(dir_data_train)
-    fns = [x for x in fns if x.endswith('.png')]
-    print(f'{len(fns)} images found')
-    img = Image.open(f"{dir_data_train}/{fns[0]}")
-    print(f'image shape:',img.size)
     
-    num_img = img.size[0] / img.size[1]
-    assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
-    num_img = int(num_img)
     
-    input_no = num_img - modalities_no - seg_no
-    assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
+    if dataset_mode == 'unaligned':
+        dir_data_train = dataroot + '/trainA'
+        fns = os.listdir(dir_data_train)
+        fns = [x for x in fns if x.endswith('.png')]
+        print(f'{len(fns)} images found in trainA')
+        img = Image.open(f"{dir_data_train}/{fns[0]}")
+        print(f'image shape:',img.size)
+
+        for i in range(1, modalities_no + 1):
+            dir_data_train = dataroot + f'/trainB{i}'
+            fns = os.listdir(dir_data_train)
+            fns = [x for x in fns if x.endswith('.png')]
+            print(f'{len(fns)} images found in trainB{i}')
+            img = Image.open(f"{dir_data_train}/{fns[0]}")
+            print(f'image shape:',img.size)
+        
+        input_no = 1
+        num_img = None
+        
+        lambda_identity = 0
+        pool_size = 50 # https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/scripts/train_cyclegan.sh
+        
+    else:
+        dir_data_train = dataroot + '/train'
+        fns = os.listdir(dir_data_train)
+        fns = [x for x in fns if x.endswith('.png')]
+        print(f'{len(fns)} images found')
+        img = Image.open(f"{dir_data_train}/{fns[0]}")
+        print(f'image shape:',img.size)
+        
+        num_img = img.size[0] / img.size[1]
+        assert int(num_img) == num_img, f'img size {img.size[0]} / {img.size[1]} = {num_img} is not an integer'
+        num_img = int(num_img)
+        
+        input_no = num_img - modalities_no - seg_no
+        assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
+        
+        pool_size = 0
+        
     d_params['input_no'] = input_no
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
+    d_params['lambda_identity'] = 0
+    d_params['pool_size'] = pool_size
+    
     
     # update generator arch
     net_g = net_g.split(',')

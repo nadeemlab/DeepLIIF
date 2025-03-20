@@ -12,7 +12,7 @@ In the function <__init__>, you need to define four lists:
     -- self.loss_names (str list):          specify the training losses that you want to plot and save.
     -- self.model_names (str list):         define networks used in our training.
     -- self.visual_names (str list):        specify the images that you want to display and save.
-    -- self.optimizers (optimizer list):    define and initialize optimizers. You can define one optimizer for each network. If two networks are updated at the same time, you can use itertools.chain to group them. See cycle_gan_model.py for an usage.
+    -- self.optimizers (optimizer list):    define and initialize optimizers. You can define one optimizer for each network. If two networks are updated at the same time, you can use itertools.chain to group them. See CycleGAN_model.py for an usage.
 
 Now you can use the model class by specifying flag '--model dummy'.
 See our template model class 'template_model.py' for more details.
@@ -28,6 +28,8 @@ import json
 import requests
 import torch
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
+
 import numpy as np
 from dask import delayed, compute
 
@@ -123,7 +125,12 @@ def load_eager_models(opt, devices=None):
     model.setup(opt)
 
     nets = {}
-    for name in model.model_names:
+    if devices:
+        model_names = list(devices.keys())
+    else:
+        model_names = model.model_names
+    
+    for name in model_names:#model.model_names:
         if isinstance(name, str):
             if '_' in name:
                 net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
@@ -171,6 +178,11 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
             net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
         else:
             net_groups = [(f'G_{i+1}',) for i in range(opt.modalities_no)]
+    elif opt.model == 'CycleGAN':
+        if opt.BtoA:
+            net_groups = [(f'GB_{i+1}',) for i in range(opt.modalities_no)]
+        else:
+            net_groups = [(f'GA_{i+1}',) for i in range(opt.modalities_no)]
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
@@ -230,6 +242,7 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
 def run_dask(img, model_path, eager_mode=False, opt=None):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
+    use_dask = True if opt.norm != 'spectral' else False
     
     if opt.input_no > 1 or opt.model == 'SDG':
         l_ts = [transform(img_i.resize((opt.scale_size,opt.scale_size))) for img_i in img]
@@ -238,10 +251,15 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         ts = transform(img.resize((opt.scale_size, opt.scale_size)))
     
 
-    @delayed
-    def forward(input, model):
-        with torch.no_grad():
-            return model(input.to(next(model.parameters()).device))
+    if use_dask:
+        @delayed
+        def forward(input, model):
+            with torch.no_grad():
+                return model(input.to(next(model.parameters()).device))
+    else: # some train settings like spectral norm some how in inference mode is not compatible with dask
+        def forward(input, model):
+            with torch.no_grad():
+                return model(input.to(next(model.parameters()).device))
     
     if opt.model == 'DeepLIIF':
         seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
@@ -267,17 +285,26 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
         res['G5'] = tensor_to_pil(seg)
     
         return res
-    elif opt.model in ['DeepLIIFExt','SDG']:
-        seg_map = {'G_' + str(i): 'GS_' + str(i) for i in range(1, opt.modalities_no + 1)}
+    elif opt.model in ['DeepLIIFExt','SDG','CycleGAN']:
+        if opt.model == 'CycleGAN':
+            seg_map = {f'GB_{i+1}':None for i in range(opt.modalities_no)} if opt.BtoA else {f'GA_{i+1}':None for i in range(opt.modalities_no)}
+        else:
+            seg_map = {'G_' + str(i): 'GS_' + str(i) for i in range(1, opt.modalities_no + 1)}
         
-        lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
-        gens = compute(lazy_gens)[0]
+        if use_dask:
+            lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+            gens = compute(lazy_gens)[0]
+        else:
+            gens = {k: forward(ts, nets[k]) for k in seg_map}
         
         res = {k: tensor_to_pil(v) for k, v in gens.items()}
     
         if opt.seg_gen:
-            lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-            segs = compute(lazy_segs)[0]
+            if use_dask:
+                lazy_segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+                segs = compute(lazy_segs)[0]
+            else:
+                segs = {v: forward(torch.cat([ts.to(torch.device('cpu')), gens[next(iter(seg_map))].to(torch.device('cpu')), gens[k].to(torch.device('cpu'))], 1), nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
             res.update({k: tensor_to_pil(v) for k, v in segs.items()})
     
         return res
@@ -322,6 +349,13 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
         if is_empty(tile):
             res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
             res.update({'GS_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)})
+            return res
+        else:
+            return run_fn(tile, model_path, eager_mode, opt)
+    elif opt.model in ['CycleGAN']:
+        if is_empty(tile):
+            net_names = ['GB_{i+1}' for i in range(opt.modalities_no)] if opt.BtoA else [f'GA_{i+1}' for i in range(opt.modalities_no)]
+            res = {net_name: Image.new(mode='RGB', size=(512, 512)) for net_name in net_names}
             return res
         else:
             return run_fn(tile, model_path, eager_mode, opt)

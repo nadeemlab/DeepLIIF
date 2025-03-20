@@ -26,9 +26,17 @@ MODEL_INFO = {'latest':{'model':'DeepLIIF', # cli.py train looks for subfolder "
               'sdg':{'model':'SDG',
                      'dir_input_train':['Datasets/Sample_Dataset_sdg'],
                      'dir_input_testpy':['Datasets/Sample_Dataset_sdg'],
-                     'dir_input_inference':['Datasets/Sample_Dataset/test_cli'],
+                     'dir_input_inference':['Datasets/Sample_Dataset_sdg/test_cli'],
                      'dir_model':['../checkpoints/sdg_20240104'],
                      'modalities_no': [4],
+                     'seg_gen':[False],
+                     'tile_size':512},
+              'cyclegan':{'model':'CycleGAN',
+                     'dir_input_train':['Datasets/Sample_Dataset_cyclegan'],
+                     'dir_input_testpy':['Datasets/Sample_Dataset_cyclegan'],
+                     'dir_input_inference':['Datasets/Sample_Dataset_cyclegan/test_cli'],
+                     'dir_model':['../checkpoints/pasto3mods_test'],
+                     'modalities_no': [1],
                      'seg_gen':[False],
                      'tile_size':512}}
 
@@ -48,3 +56,10 @@ def model_info(model_type):
 @pytest.fixture(scope="session")
 def model_dir(model_info):
     return model_info['dir_model']
+
+@pytest.fixture(scope="session")
+def foldername_suffix(model_info):
+    if model_info['model'] in ['CycleGAN']:
+        return 'A' # trainA, testA, ...
+    else:
+        return '' # train, test, ...
