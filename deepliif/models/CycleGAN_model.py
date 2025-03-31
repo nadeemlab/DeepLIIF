@@ -71,9 +71,14 @@ class CycleGANModel(BaseModel):
         # Code (vs. paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
         if isinstance(opt.net_g, str):
             self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
-
-        self.netGA = nn.ModuleList()
-        self.netGB = nn.ModuleList()
+        
+        try:
+            self.netGA = nn.ModuleList()
+            self.netGB = nn.ModuleList()
+        except:
+            self.netGA = list()
+            self.netGB = list()
+        
         for i in range(self.mod_gen_no):
             if self.is_train or not self.opt.BtoA:
                 self.netGA.append(networks.define_G(self.opt.input_nc, self.opt.output_nc, self.opt.ngf, self.opt.net_g[i], self.opt.norm,
