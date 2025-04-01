@@ -1,4 +1,5 @@
 import torch
+from packaging import version
 from torch import nn
 import itertools
 from ..util.image_pool import ImagePool
@@ -6,12 +7,6 @@ from .base_model import BaseModel
 from . import networks
 from .networks import get_optimizer
 
-# https://github.com/brownvc/R3GAN/blob/main/R3GAN/Trainer.py
-def ZeroCenteredGradientPenalty(Samples, Critics):
-    
-    # print(Samples.requires_grad, Critics.requires_grad)
-    Gradient, = torch.autograd.grad(outputs=Critics.sum(), inputs=Samples, create_graph=True)
-    return Gradient.square().sum([1, 2, 3])
 
 class CycleGANModel(BaseModel):
     """
@@ -72,12 +67,12 @@ class CycleGANModel(BaseModel):
         if isinstance(opt.net_g, str):
             self.opt.net_g = [self.opt.net_g] * self.mod_gen_no
         
-        try:
-            self.netGA = nn.ModuleList()
-            self.netGB = nn.ModuleList()
-        except:
+        if version.parse(torch.__version__) < version.parse('1.11.0'):
             self.netGA = list()
             self.netGB = list()
+        else:
+            self.netGA = nn.ModuleList()
+            self.netGB = nn.ModuleList()
         
         for i in range(self.mod_gen_no):
             if self.is_train or not self.opt.BtoA:
@@ -90,8 +85,13 @@ class CycleGANModel(BaseModel):
                                                  upsample=self.opt.upsample))
         
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
-            self.netDA = nn.ModuleList()
-            self.netDB = nn.ModuleList()
+            if version.parse(torch.__version__) < version.parse('1.11.0'):
+                self.netDA = list()
+                self.netDB = list()
+            else:
+                self.netDA = nn.ModuleList()
+                self.netDB = nn.ModuleList()
+            
             for i in range(self.mod_gen_no):
                 self.netDA.append(networks.define_D(self.opt.output_nc, self.opt.ndf, self.opt.net_d,
                                                  self.opt.n_layers_D, self.opt.norm, self.opt.init_type, self.opt.init_gain,
