@@ -25,7 +25,7 @@ assert res.returncode == 0
 #----------------------
 #---- gpu: single -----
 #----------------------
-def test_cli_trainlaunch_single_gpu(tmp_path, model_info):
+def test_cli_trainlaunch_single_gpu(tmp_path, model_info, foldername_suffix):
     if available_gpus > 0:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu")
         dirs_input = model_info['dir_input_train']
@@ -34,7 +34,7 @@ def test_cli_trainlaunch_single_gpu(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_single_gpu {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
     
@@ -52,7 +52,7 @@ def test_cli_trainlaunch_single_gpu(tmp_path, model_info):
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
 
-def test_cli_trainlaunch_single_gpu_optimizer(tmp_path, model_info):
+def test_cli_trainlaunch_single_gpu_optimizer(tmp_path, model_info, foldername_suffix):
     if available_gpus > 0:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu_optimizer")
         dirs_input = model_info['dir_input_train']
@@ -60,7 +60,8 @@ def test_cli_trainlaunch_single_gpu_optimizer(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_single_gpu {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
     
@@ -78,7 +79,7 @@ def test_cli_trainlaunch_single_gpu_optimizer(tmp_path, model_info):
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
 
-def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info):
+def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info, foldername_suffix):
     if available_gpus > 0:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu_netg")
         dirs_input = model_info['dir_input_train']
@@ -86,7 +87,7 @@ def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_single_gpu {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
     
@@ -113,7 +114,7 @@ def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info):
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
         
 
-def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info):
+def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info, foldername_suffix):
     if available_gpus > 0:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu_netgs")
         dirs_input = model_info['dir_input_train']
@@ -121,7 +122,7 @@ def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_single_gpu {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
     
@@ -148,7 +149,7 @@ def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info):
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
 
 
-def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info):
+def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info, foldername_suffix):
     if available_gpus > 0:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu_withval")
         dirs_input = model_info['dir_input_train']
@@ -156,7 +157,7 @@ def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_single_gpu {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
     
@@ -176,7 +177,7 @@ def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info):
 #----------------------
 #---- gpu: multi ------
 #----------------------
-def test_cli_trainlaunch_multi_gpu_dp(tmp_path, model_info):
+def test_cli_trainlaunch_multi_gpu_dp(tmp_path, model_info, foldername_suffix):
     if available_gpus > 1:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_multi_gpu_dp")
         dirs_input = model_info['dir_input_train']
@@ -184,7 +185,7 @@ def test_cli_trainlaunch_multi_gpu_dp(tmp_path, model_info):
             torch.cuda.nvtx.range_push(f"test_cli_trainlaunch_multi_gpu_dp {dirs_input[i]}")
             dir_save = tmp_path
             
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train') if os.path.isfile(os.path.join(dirs_input[i] + '/train', f)) and f.endswith('png')]
+            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
             num_input = len(fns_input)
             assert num_input > 0
             

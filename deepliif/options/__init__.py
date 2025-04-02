@@ -72,11 +72,16 @@ class Options:
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
-            self.norm = 'batch'
+            self.norm = 'batch' if not hasattr(self,'norm') else self.norm
             self.use_dropout = True
             #self.padding_type = 'zero' # some models use reflect etc. which adds additional randomness 
             #self.padding = 'zero'
             self.use_dropout = False #if self.no_dropout == 'True' else True
+            
+            if self.model in ['CycleGAN']:
+                # this is only used for inference (whether to load generators Bs instead of As)
+                # and can be configured in the inference function
+                self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
             
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 

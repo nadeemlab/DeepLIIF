@@ -109,17 +109,17 @@ class DeepLIIFModel(BaseModel):
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
             try:
-                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g, betas=(opt.beta1, 0.999))
             except:
                 print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
-                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr)
+                self.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g)
 
             params = list(self.netD1.parameters()) + list(self.netD2.parameters()) + list(self.netD3.parameters()) + list(self.netD4.parameters()) + list(self.netD51.parameters()) + list(self.netD52.parameters()) + list(self.netD53.parameters()) + list(self.netD54.parameters()) + list(self.netD55.parameters())
             try:
-                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr_d, betas=(opt.beta1, 0.999))
             except:
                 print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in discriminators')
-                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr)
+                self.optimizer_D = get_optimizer(opt.optimizer)(params, lr=opt.lr_d)
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
