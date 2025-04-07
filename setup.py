@@ -29,7 +29,9 @@ setup(
         "requests==2.32.2",
         "dask==2021.11.2",
         "visdom>=0.1.8.3",
-        "python-bioformats>=4.0.6"
+        "python-bioformats>=4.0.6",
+        "openslide-bin==4.0.0.6",
+        "openslide-python==1.4.1",
     ],
     entry_points={
         'console_scripts': [
