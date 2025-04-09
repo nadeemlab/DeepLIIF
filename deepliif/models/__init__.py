@@ -218,12 +218,13 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
+def run_torchserve(img, model_path=None, eager_mode=False, opt=None, seg_only=False):
     """
     eager_mode: not used in this function; put in place to be consistent with run_dask
            so that run_wrapper() could call either this function or run_dask with
            same syntax
     opt: same as eager_mode
+    seg_only: same as eager_mode
     """
     buffer = BytesIO()
     torch.save(transform(img.resize((opt.scale_size, opt.scale_size))), buffer)
@@ -242,7 +243,7 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None):
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path, eager_mode=False, opt=None):
+def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
     model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
     nets = init_nets(model_dir, eager_mode, opt)
     use_dask = True if opt.norm != 'spectral' else False
@@ -265,15 +266,6 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
                 return model(input.to(next(model.parameters()).device))
     
     if opt.model == 'DeepLIIF':
-        seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
-        
-        lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
-        gens = compute(lazy_gens)[0]
-        
-        lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-        lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
-        segs = compute(lazy_segs)[0]
-    
         weights = {
             'G51': 0.25, # IHC
             'G52': 0.25, # Hema
@@ -281,6 +273,19 @@ def run_dask(img, model_path, eager_mode=False, opt=None):
             'G54': 0.00, # Lap2
             'G55': 0.25, # Marker
         }
+
+        seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+        if seg_only:
+            seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
+        
+        lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+        gens = compute(lazy_gens)[0]
+        
+        lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+        if weights['G51'] != 0:
+            lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+        segs = compute(lazy_segs)[0]
+    
         seg = torch.stack([torch.mul(segs[k], weights[k]) for k in segs.keys()]).sum(dim=0)
     
         res = {k: tensor_to_pil(v) for k, v in gens.items()}
@@ -331,7 +336,7 @@ def is_empty(tile):
         return True if np.max(image_variance_rgb(tile)) < thresh else False
 
 
-def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
+def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None, seg_only=False):
     if opt.model == 'DeepLIIF':
         if is_empty(tile):
             return {
@@ -347,7 +352,7 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None):
                 'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
             }
         else:
-            return run_fn(tile, model_path, eager_mode, opt)
+            return run_fn(tile, model_path, eager_mode, opt, seg_only)
     elif opt.model in ['DeepLIIFExt', 'SDG']:
         if is_empty(tile):
             res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
@@ -541,7 +546,7 @@ def inference_old2(img, tile_size, overlap_size, model_path, use_torchserve=Fals
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
               eager_mode=False, color_dapi=False, color_marker=False, opt=None,
-              return_seg_intermediate=False):
+              return_seg_intermediate=False, seg_only=False):
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
@@ -559,31 +564,36 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
     tiler = InferenceTiler(orig, tile_size, overlap_size)
     for tile in tiler:
-        tiler.stitch(run_wrapper(tile, run_fn, model_path, eager_mode, opt))
+        tiler.stitch(run_wrapper(tile, run_fn, model_path, eager_mode, opt, seg_only))
     results = tiler.results()
 
     if opt.model == 'DeepLIIF':
-        images = {
-            'Hema': results['G1'],
-            'DAPI': results['G2'],
-            'Lap2': results['G3'],
-            'Marker': results['G4'],
-            'Seg': results['G5'],
-        }
+        if seg_only:
+            images = {'Seg': results['G5']}
+            if 'G4' in results:
+                images.update({'Marker': results['G4']})
+        else:
+            images = {
+                'Hema': results['G1'],
+                'DAPI': results['G2'],
+                'Lap2': results['G3'],
+                'Marker': results['G4'],
+                'Seg': results['G5'],
+            }
         
-        if return_seg_intermediate:
+        if return_seg_intermediate and not seg_only:
             images.update({'IHC_s':results['G51'],
                           'Hema_s':results['G52'],
                           'DAPI_s':results['G53'],
                           'Lap2_s':results['G54'],
                           'Marker_s':results['G55'],})
         
-        if color_dapi:
+        if color_dapi and not seg_only:
             matrix = (       0,        0,        0, 0,
                       299/1000, 587/1000, 114/1000, 0,
                       299/1000, 587/1000, 114/1000, 0)
             images['DAPI'] = images['DAPI'].convert('RGB', matrix)
-        if color_marker:
+        if color_marker and not seg_only:
             matrix = (299/1000, 587/1000, 114/1000, 0,
                       299/1000, 587/1000, 114/1000, 0,
                              0,        0,        0, 0)
@@ -798,9 +808,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 color_dapi=False,
                 color_marker=False,
                 opt=None,
-                return_seg_intermediate=False
+                return_seg_intermediate=False,
+                seg_only=True,
             )
-            region_data = compute_cell_results(images['Seg'], images['Marker'], resolution, version=version)
+            region_data = compute_cell_results(images['Seg'], images.get('Marker'), resolution, version=version)
 
             if start_x != 0 or start_y != 0:
                 for i in range(len(region_data['cells'])):
@@ -817,7 +828,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
             else:
                 data['cells'] += region_data['cells']
 
-            if region_data['settings']['default_marker_thresh'] != 0:
+            if region_data['settings']['default_marker_thresh'] is not None and region_data['settings']['default_marker_thresh'] != 0:
                 default_marker_thresh += region_data['settings']['default_marker_thresh']
                 count_marker_thresh += 1
             if region_data['settings']['default_size_thresh'] != 0:
