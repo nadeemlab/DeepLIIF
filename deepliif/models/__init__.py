@@ -707,32 +707,36 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
 
     results = {}
     scoring = None
-    start_x, start_y = 0, 0
-    while start_x < size_x:
-        while start_y < size_y:
-            print(start_x, start_y)
-            region_XYWH = (start_x, start_y, min(region_size, size_x - start_x), min(region_size, size_y - start_y))
-            region = read_bioformats_image_with_reader(os.path.join(input_dir, filename), region=region_XYWH)
 
-            region_modalities, region_scoring = infer_modalities(Image.fromarray((region * 255).astype(np.uint8)), tile_size, model_dir)
-            if region_scoring is not None:
-                if scoring is None:
-                    scoring = {
-                        'num_pos': region_scoring['num_pos'],
-                        'num_neg': region_scoring['num_neg'],
-                    }
-                else:
-                    scoring['num_pos'] += region_scoring['num_pos']
-                    scoring['num_neg'] += region_scoring['num_neg']
+    # javabridge already set up from previous call to get_information()
+    with bioformats.ImageReader(os.path.join(input_dir, filename)) as reader:
+        start_x, start_y = 0, 0
 
-            for name, img in region_modalities.items():
-                if name not in results:
-                    results[name] = np.zeros((size_y, size_x, 3), dtype=np.uint8)
-                results[name][region_XYWH[1]: region_XYWH[1] + region_XYWH[3],
-                region_XYWH[0]: region_XYWH[0] + region_XYWH[2]] = np.array(img)
-            start_y += region_size
-        start_y = 0
-        start_x += region_size
+        while start_x < size_x:
+            while start_y < size_y:
+                print(start_x, start_y)
+                region_XYWH = (start_x, start_y, min(region_size, size_x - start_x), min(region_size, size_y - start_y))
+                region = reader.read(XYWH=region_XYWH)
+
+                region_modalities, region_scoring = infer_modalities(Image.fromarray((region * 255).astype(np.uint8)), tile_size, model_dir)
+                if region_scoring is not None:
+                    if scoring is None:
+                        scoring = {
+                            'num_pos': region_scoring['num_pos'],
+                            'num_neg': region_scoring['num_neg'],
+                        }
+                    else:
+                        scoring['num_pos'] += region_scoring['num_pos']
+                        scoring['num_neg'] += region_scoring['num_neg']
+
+                for name, img in region_modalities.items():
+                    if name not in results:
+                        results[name] = np.zeros((size_y, size_x, 3), dtype=np.uint8)
+                    results[name][region_XYWH[1]: region_XYWH[1] + region_XYWH[3],
+                    region_XYWH[0]: region_XYWH[0] + region_XYWH[2]] = np.array(img)
+                start_y += region_size
+            start_y = 0
+            start_x += region_size
 
     # write_results_to_pickle_file(os.path.join(results_dir, "results.pickle"), results)
     # read_results_from_pickle_file(os.path.join(results_dir, "results.pickle"))
@@ -751,13 +755,25 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
 
 def get_wsi_resolution(filename):
     """
-    Use OpenSlide to get the resolution (magnification) of the slide.
-    Return the resolution and corresponding tile size for DeepLIIF.
+    Use OpenSlide to get the resolution (magnification) of the slide
+    and the corresponding tile size to use by default for DeepLIIF.
+    If it cannot be found, return (None, None) instead.
+
+    Parameters
+    ----------
+    filename : str
+        Full path to the file.
+
+    Returns
+    -------
+    str :
+        Magnification (objective power) as found by OpenSlide.
+    int :
+        Corresponding tile size for DeepLIIF.
     """
     try:
         image = openslide.OpenSlide(filename)
         mag = image.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER)
-        print(mag, type(mag), flush=True)
         tile_size = round((float(mag) / 40) * 512)
         return mag, tile_size
     except Exception as e:
@@ -766,7 +782,27 @@ def get_wsi_resolution(filename):
 
 def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False):
     """
-    Perform inference on slide split into regions of maximum region_size and return cell data
+    Perform inference on a slide and get the results individual cell data.
+
+    Parameters
+    ----------
+    filename : str
+        Full path to the file.
+    model_dir : str
+        Full path to the directory with the DeepLIIF model files.
+    tile_size : int
+        Size of tiles to extract and perform inference on.
+    region_size : int
+        Maximum size to split the slide for processing.
+    version : int
+        Version of cell data to return (3 or 4).
+    print_log : bool
+        Whether or not to print updates while processing.
+
+    Returns
+    -------
+    dict :
+        Individual cell data and associated values.
     """
 
     def print_info(*args):
@@ -797,7 +833,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
                 print_info('Region:', region_XYWH)
 
-                region = reader.read(t=0, XYWH=region_XYWH) #TESTING
+                region = reader.read(XYWH=region_XYWH)
                 print_info(region.shape, region.dtype)
                 img = Image.fromarray((region * 255).astype(np.uint8))
                 print_info(img.size, img.mode)
@@ -839,6 +875,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                     count_size_thresh += 1
 
                 start_x += stride_x
+
             start_x = 0
             start_y += stride_y
 
