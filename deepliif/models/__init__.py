@@ -788,56 +788,59 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
     default_marker_thresh, count_marker_thresh = 0, 0
     default_size_thresh, count_size_thresh = 0, 0
 
-    start_x, start_y = 0, 0
-    while start_y < size_y:
-        while start_x < size_x:
-            region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
-            print_info('Region:', region_XYWH)
+    # javabridge already set up from previous call to get_information()
+    with bioformats.ImageReader(filename) as reader:
+        start_x, start_y = 0, 0
 
-            region = read_bioformats_image_with_reader(filename, region=region_XYWH)
-            print_info(region.shape, region.dtype)
-            img = Image.fromarray((region * 255).astype(np.uint8))
-            print_info(img.size, img.mode)
+        while start_y < size_y:
+            while start_x < size_x:
+                region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
+                print_info('Region:', region_XYWH)
 
-            images = inference(
-                img,
-                tile_size=tile_size,
-                overlap_size=tile_size//16,
-                model_path=model_dir,
-                eager_mode=False,
-                color_dapi=False,
-                color_marker=False,
-                opt=None,
-                return_seg_intermediate=False,
-                seg_only=True,
-            )
-            region_data = compute_cell_results(images['Seg'], images.get('Marker'), resolution, version=version)
+                region = reader.read(t=0, XYWH=region_XYWH) #TESTING
+                print_info(region.shape, region.dtype)
+                img = Image.fromarray((region * 255).astype(np.uint8))
+                print_info(img.size, img.mode)
 
-            if start_x != 0 or start_y != 0:
-                for i in range(len(region_data['cells'])):
-                    cell = decode_cell_data_v4(region_data['cells'][i]) if version == 4 else region_data['cells'][i]
-                    for j in range(2):
-                        cell['bbox'][j] = (cell['bbox'][j][0] + start_x, cell['bbox'][j][1] + start_y)
-                    cell['centroid'] = (cell['centroid'][0] + start_x, cell['centroid'][1] + start_y)
-                    for j in range(len(cell['boundary'])):
-                        cell['boundary'][j] = (cell['boundary'][j][0] + start_x, cell['boundary'][j][1] + start_y)
-                    region_data['cells'][i] = encode_cell_data_v4(cell) if version == 4 else cell
+                images = inference(
+                    img,
+                    tile_size=tile_size,
+                    overlap_size=tile_size//16,
+                    model_path=model_dir,
+                    eager_mode=False,
+                    color_dapi=False,
+                    color_marker=False,
+                    opt=None,
+                    return_seg_intermediate=False,
+                    seg_only=True,
+                )
+                region_data = compute_cell_results(images['Seg'], images.get('Marker'), resolution, version=version)
 
-            if data is None:
-                data = region_data
-            else:
-                data['cells'] += region_data['cells']
+                if start_x != 0 or start_y != 0:
+                    for i in range(len(region_data['cells'])):
+                        cell = decode_cell_data_v4(region_data['cells'][i]) if version == 4 else region_data['cells'][i]
+                        for j in range(2):
+                            cell['bbox'][j] = (cell['bbox'][j][0] + start_x, cell['bbox'][j][1] + start_y)
+                        cell['centroid'] = (cell['centroid'][0] + start_x, cell['centroid'][1] + start_y)
+                        for j in range(len(cell['boundary'])):
+                            cell['boundary'][j] = (cell['boundary'][j][0] + start_x, cell['boundary'][j][1] + start_y)
+                        region_data['cells'][i] = encode_cell_data_v4(cell) if version == 4 else cell
 
-            if region_data['settings']['default_marker_thresh'] is not None and region_data['settings']['default_marker_thresh'] != 0:
-                default_marker_thresh += region_data['settings']['default_marker_thresh']
-                count_marker_thresh += 1
-            if region_data['settings']['default_size_thresh'] != 0:
-                default_size_thresh += region_data['settings']['default_size_thresh']
-                count_size_thresh += 1
+                if data is None:
+                    data = region_data
+                else:
+                    data['cells'] += region_data['cells']
 
-            start_x += stride_x
-        start_x = 0
-        start_y += stride_y
+                if region_data['settings']['default_marker_thresh'] is not None and region_data['settings']['default_marker_thresh'] != 0:
+                    default_marker_thresh += region_data['settings']['default_marker_thresh']
+                    count_marker_thresh += 1
+                if region_data['settings']['default_size_thresh'] != 0:
+                    default_size_thresh += region_data['settings']['default_size_thresh']
+                    count_size_thresh += 1
+
+                start_x += stride_x
+            start_x = 0
+            start_y += stride_y
 
     javabridge.kill_vm()
 
