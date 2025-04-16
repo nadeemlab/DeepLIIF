@@ -703,6 +703,7 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
     size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(os.path.join(input_dir, filename))
+    rescale = (pixel_type != 'uint8')
     print(filename, size_x, size_y, size_z, size_c, size_t, pixel_type)
 
     results = {}
@@ -716,9 +717,10 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
             while start_y < size_y:
                 print(start_x, start_y)
                 region_XYWH = (start_x, start_y, min(region_size, size_x - start_x), min(region_size, size_y - start_y))
-                region = reader.read(XYWH=region_XYWH)
+                region = reader.read(XYWH=region_XYWH, rescale=rescale)
+                img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
 
-                region_modalities, region_scoring = infer_modalities(Image.fromarray((region * 255).astype(np.uint8)), tile_size, model_dir)
+                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir)
                 if region_scoring is not None:
                     if scoring is None:
                         scoring = {
@@ -812,6 +814,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
     resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
 
     size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(filename)
+    rescale = (pixel_type != 'uint8')
     print_info('Info:', size_x, size_y, size_z, size_c, size_t, pixel_type)
 
     num_regions_x = math.ceil(size_x / region_size)
@@ -833,9 +836,9 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
                 print_info('Region:', region_XYWH)
 
-                region = reader.read(XYWH=region_XYWH)
+                region = reader.read(XYWH=region_XYWH, rescale=rescale)
                 print_info(region.shape, region.dtype)
-                img = Image.fromarray((region * 255).astype(np.uint8))
+                img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
                 print_info(img.size, img.mode)
 
                 images = inference(
