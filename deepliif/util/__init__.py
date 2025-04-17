@@ -17,6 +17,12 @@ import cv2
 import pickle
 import sys
 
+import bioformats
+import javabridge
+import bioformats.omexml as ome
+import tifffile as tf
+
+
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
 image_extensions = ['.png', '.jpg', '.tif', '.jpeg', '.svs']
@@ -514,35 +520,7 @@ def enable_batchnorm_tracking_stats(model):
                 child.running_mean = child.running_mean_backup
                 child.running_var = child.running_var_backup
     return model
-    
-  
-def image_variance_gray(img):
-    px = np.asarray(img) if img.mode == 'L' else np.asarray(img.convert('L'))
-    idx = np.logical_and(px != 255, px != 0)
-    val = px[idx]
-    if val.shape[0] == 0:
-        return 0
-    var = np.var(val)
-    return var
 
-
-def image_variance_rgb(img):
-    px = np.asarray(img) if img.mode == 'RGB' else np.asarray(img.convert('RGB'))
-    nonwhite = np.any(px != [255, 255, 255], axis=-1)
-    nonblack = np.any(px != [0, 0, 0], axis=-1)
-    idx = np.logical_and(nonwhite, nonblack)
-    val = px[idx]
-    if val.shape[0] == 0:
-        return [0, 0, 0]
-    var = np.var(val, axis=0)
-    return var
-
-
-
-import bioformats
-import javabridge
-import bioformats.omexml as ome
-import tifffile as tf
 
 def write_big_tiff_file(output_addr, img, tile_size):
     """
