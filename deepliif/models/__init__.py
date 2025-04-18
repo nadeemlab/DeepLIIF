@@ -288,8 +288,11 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
     
         seg = torch.stack([torch.mul(segs[k], weights[k]) for k in segs.keys()]).sum(dim=0)
     
-        res = {k: tensor_to_pil(v) for k, v in gens.items()}
-        res.update({k: tensor_to_pil(v) for k, v in segs.items()})
+        if seg_only:
+            res = {'G4': tensor_to_pil(gens['G4'])} if 'G4' in gens else {}
+        else:
+            res = {k: tensor_to_pil(v) for k, v in gens.items()}
+            res.update({k: tensor_to_pil(v) for k, v in segs.items()})
         res['G5'] = tensor_to_pil(seg)
     
         return res
