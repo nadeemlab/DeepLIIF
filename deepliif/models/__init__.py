@@ -282,7 +282,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
         gens = compute(lazy_gens)[0]
         
         lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
-        if weights['G51'] != 0:
+        if not seg_only or weights['G51'] != 0:
             lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
         segs = compute(lazy_segs)[0]
     
@@ -321,7 +321,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
         return res
     else:
         raise Exception(f'run_dask() not fully implemented for {opt.model}')
-      
+
 
 def is_empty(tile):
     thresh = 15
