@@ -279,6 +279,8 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
             seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
         
         lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
+        if 'G4' not in seg_map:
+            lazy_gens['G4'] = forward(ts, nets['G4'])
         gens = compute(lazy_gens)[0]
         
         lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
@@ -334,18 +336,24 @@ def is_empty(tile):
 def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None, seg_only=False):
     if opt.model == 'DeepLIIF':
         if is_empty(tile):
-            return {
-                'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
-                'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-                'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-                'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G51': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G52': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G53': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-            }
+            if seg_only:
+                return {
+                    'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                    'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                }
+            else :
+                return {
+                    'G1': Image.new(mode='RGB', size=(512, 512), color=(201, 211, 208)),
+                    'G2': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                    'G3': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G4': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                    'G5': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G51': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G52': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G53': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                }
         else:
             return run_fn(tile, model_path, eager_mode, opt, seg_only)
     elif opt.model in ['DeepLIIFExt', 'SDG']:
