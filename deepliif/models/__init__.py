@@ -478,7 +478,7 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='def
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
                      color_dapi=False, color_marker=False, opt=None,
-                     return_seg_intermediate=False):
+                     return_seg_intermediate=False, seg_only=False):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -505,7 +505,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         color_dapi=color_dapi,
         color_marker=color_marker,
         opt=opt,
-        return_seg_intermediate=return_seg_intermediate
+        return_seg_intermediate=return_seg_intermediate,
+        seg_only=seg_only
     )
     
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
