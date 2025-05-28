@@ -854,7 +854,7 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
         for filename in bar:
             if '.svs' in filename:
                 start_time = time.time()
-                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size)
+                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size, seg_only=seg_only)
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
