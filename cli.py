@@ -795,16 +795,21 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--epoch', default='latest',
               help='for eager mode, which epoch to load? set to latest to use latest cached model')
+@click.option('--seg-intermediate', is_flag=True, help='also save intermediate segmentation images (currently only applies to DeepLIIF model)')
+@click.option('--seg-only', is_flag=True, help='save only the final segmentation image (currently only applies to DeepLIIF model); overwrites --seg-intermediate')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
 @click.option('--BtoA', is_flag=True, help='for models trained with unaligned dataset, this flag instructs to load generatorB instead of generatorA')
 def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids, region_size, eager_mode, epoch,
-         color_dapi, color_marker, btoa):
+         seg_intermediate, seg_only, color_dapi, color_marker, btoa):
     
     """Test trained models
     """
     output_dir = output_dir or input_dir
     ensure_exists(output_dir)
+    
+    if seg_intermediate and seg_only:
+        seg_intermediate = False
 
     if filename_pattern == '*':
         print('use all alowed files')
@@ -853,7 +858,7 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
                 print(time.time() - start_time)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt)
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
 
                 for name, i in images.items():
                     i.save(os.path.join(
