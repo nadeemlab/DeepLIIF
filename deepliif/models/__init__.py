@@ -517,7 +517,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         return images, None
 
 
-def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, seg_only=False, seg_intermediate=False):
+def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, color_dapi=False, color_marker=False, seg_intermediate=False, seg_only=False):
     """
     This function infers modalities and segmentation mask for the given WSI image. It
 
@@ -535,7 +535,7 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
         os.makedirs(results_dir)
     size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(os.path.join(input_dir, filename))
     rescale = (pixel_type != 'uint8')
-    print(filename, size_x, size_y, size_z, size_c, size_t, pixel_type)
+    print(filename, size_x, size_y, size_z, size_c, size_t, pixel_type, flush=True)
 
     results = {}
     scoring = None
@@ -546,12 +546,12 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
 
         while start_x < size_x:
             while start_y < size_y:
-                print(start_x, start_y)
+                print(start_x, start_y, flush=True)
                 region_XYWH = (start_x, start_y, min(region_size, size_x - start_x), min(region_size, size_y - start_y))
                 region = reader.read(XYWH=region_XYWH, rescale=rescale)
                 img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
 
-                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
+                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, color_dapi=color_dapi, color_marker=color_marker, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
                 if region_scoring is not None:
                     if scoring is None:
                         scoring = {

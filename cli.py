@@ -877,8 +877,12 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
                                                    'This parameter specifies the size each region to be read into GPU for inferrence.')
 @click.option('--seg-intermediate', is_flag=True, help='also save intermediate segmentation images (currently only applies to DeepLIIF model)')
 @click.option('--seg-only', is_flag=True, help='save only the final segmentation image (currently only applies to DeepLIIF model)')
-def test_wsi(input_dir, filename, output_dir, tile_size, model_dir, region_size, seg_intermediate, seg_only):
-    infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size, seg_only=seg_only, seg_intermediate=seg_intermediate)
+@click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
+@click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
+def test_wsi(input_dir, filename, output_dir, tile_size, model_dir, region_size, seg_intermediate, seg_only, color_dapi, color_marker):
+    infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size,
+                          color_dapi=color_dapi, color_marker=color_marker,
+                          seg_intermediate=seg_intermediate, seg_only=seg_only)
 
 
 @cli.command()
