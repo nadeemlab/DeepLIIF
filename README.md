@@ -200,23 +200,46 @@ python test.py --dataroot /path/to/input/images
 * The tile size must be specified and is used to split the image into tiles for processing.  The tile size is based on the resolution (scan magnification) of the input image, and the recommended values are a tile size of 512 for 40x images, 256 for 20x, and 128 for 10x.  Note that the smaller the tile size, the longer inference will take.
 * Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
+**Test Command Options:**  
+In addition to the required parameters given above, the following optional parameters are available for `deepliif test`:
+* `--eager-mode` Run the original model files (instead of serialized model files).
+* `--seg-intermediate` Save the intermediate segmentation maps created for each modality.
+* `--seg-only` Save only the segmentation files, and do not infer images that are not needed.
+* `--color-dapi` Color the inferred DAPI image.
+* `--color-marker` Color the inferred marker image.
+
 **Whole Slide Image (WSI) Inference:**  
 For translation and segmentation of whole slide images, 
-you can simply use the same test command 
-giving path to the directory containing your whole slide images as the input-dir.
+you can simply use the `test-wsi` command 
+giving path to the directory containing your WSI as the input-dir 
+and specifying the filename of the WSI.
 DeepLIIF automatically reads the WSI region by region, 
 and translate and segment each region separately and stitches the regions 
 to create the translation and segmentation for whole slide image, 
 then saves all masks in the format of ome.tiff in the given output-dir. 
-Based on the available GPU resources, the region-size can be changed.
+Based on the available resources, the region-size can be changed.
 ```
-deepliif test --input-dir /path/to/input/images 
-              --output-dir /path/to/output/images 
-              --model-dir /path/to/the/serialized/model
-              --tile-size 512
-              --region-size 20000
+deepliif test-wsi --input-dir /path/to/input/image 
+                  --filename wsiFile.svs
+                  --output-dir /path/to/output/images 
+                  --model-dir /path/to/the/serialized/model
+                  --tile-size 512
 ```
 
+**WSI Inference Options:**  
+In addition to the required parameters given above, the following optional parameters are available for `deepliif test-wsi`:
+* `--region-size` Set the size of each region to read from the WSI (default is 20000).
+* `--seg-intermediate` Save the intermediate segmentation maps created for each modality.
+* `--seg-only` Save only the segmentation files, and do not infer images that are not needed.
+* `--color-dapi` Color the inferred DAPI image.
+* `--color-marker` Color the inferred marker image.
+
+**Reducing Run Time**  
+If you need only the final segmentation and not the inferred multiplex images, 
+it is recommended to run `deepliif test` or `deepliif test-wsi` with the `--seg-only` 
+option.  This will generate only the necessary images, thus reducing the overall run time.
+
+**Torchserve**  
 If you prefer, it is possible to run the models using Torchserve.
 Please see [the documentation](https://nadeemlab.github.io/DeepLIIF/deployment/#deploying-deepliif-with-torchserve)
 on how to deploy the model with Torchserve and for an example of how to run the inference.
