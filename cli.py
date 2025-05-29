@@ -789,9 +789,6 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
 @click.option('--filename-pattern', default='*', help='run inference on files of which the name matches the pattern.')
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
-@click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
-                                                   'So the WSI image is read region by region. '
-                                                   'This parameter specifies the size each region to be read into GPU for inferrence.')
 @click.option('--eager-mode', is_flag=True, help='use eager mode (loading original models, otherwise serialized ones)')
 @click.option('--epoch', default='latest',
               help='for eager mode, which epoch to load? set to latest to use latest cached model')
@@ -800,7 +797,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
 @click.option('--BtoA', is_flag=True, help='for models trained with unaligned dataset, this flag instructs to load generatorB instead of generatorA')
-def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids, region_size, eager_mode, epoch,
+def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids, eager_mode, epoch,
          seg_intermediate, seg_only, color_dapi, color_marker, btoa):
     
     """Test trained models
@@ -852,26 +849,21 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            if '.svs' in filename:
-                start_time = time.time()
-                infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size, seg_only=seg_only)
-                print(time.time() - start_time)
-            else:
-                img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
+            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+            images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
 
-                for name, i in images.items():
-                    i.save(os.path.join(
+            for name, i in images.items():
+                i.save(os.path.join(
+                    output_dir,
+                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+                ))
+
+            if scoring is not None:
+                with open(os.path.join(
                         output_dir,
-                        filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                    ))
-
-                if scoring is not None:
-                    with open(os.path.join(
-                            output_dir,
-                            filename.replace('.' + filename.split('.')[-1], f'.json')
-                    ), 'w') as f:
-                        json.dump(scoring, f, indent=2)
+                        filename.replace('.' + filename.split('.')[-1], f'.json')
+                ), 'w') as f:
+                    json.dump(scoring, f, indent=2)
 
 
 @cli.command()
