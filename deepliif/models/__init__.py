@@ -508,10 +508,14 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         return_seg_intermediate=return_seg_intermediate,
         seg_only=seg_only
     )
-    
+
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
         post_images, scoring = postprocess(img, images, tile_size, opt.model)
         images = {**images, **post_images}
+        if seg_only:
+            delete_keys = [k for k in images.keys() if 'Seg' not in k]
+            for name in delete_keys:
+                del images[name]
         return images, scoring
     else:
         return images, None
