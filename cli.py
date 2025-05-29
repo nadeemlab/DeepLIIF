@@ -873,6 +873,22 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
                     ), 'w') as f:
                         json.dump(scoring, f, indent=2)
 
+
+@cli.command()
+@click.option('--input-dir', required=True, help='directory containing WSI file')
+@click.option('--filename', required=True, help='name of WSI to read')
+@click.option('--output-dir', required=True, help='saves results here.')
+@click.option('--tile-size', type=click.IntRange(min=1, max=None), required=True, help='tile size')
+@click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model/', help='load models from here.')
+@click.option('--region-size', default=20000, help='Due to limits in the resources, the whole slide image cannot be processed in whole.'
+                                                   'So the WSI image is read region by region. '
+                                                   'This parameter specifies the size each region to be read into GPU for inferrence.')
+@click.option('--seg-intermediate', is_flag=True, help='also save intermediate segmentation images (currently only applies to DeepLIIF model)')
+@click.option('--seg-only', is_flag=True, help='save only the final segmentation image (currently only applies to DeepLIIF model)')
+def test_wsi(input_dir, filename, output_dir, tile_size, model_dir, region_size, seg_intermediate, seg_only):
+    infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size, seg_only=seg_only, seg_intermediate=seg_intermediate)
+
+
 @cli.command()
 @click.option('--input-dir', type=str, required=True, help='Path to input images')
 @click.option('--output-dir', type=str, required=True, help='Path to output images')

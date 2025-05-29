@@ -517,7 +517,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         return images, None
 
 
-def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, seg_only=False):
+def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, seg_only=False, seg_intermediate=False):
     """
     This function infers modalities and segmentation mask for the given WSI image. It
 
@@ -551,7 +551,7 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
                 region = reader.read(XYWH=region_XYWH, rescale=rescale)
                 img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
 
-                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, seg_only=seg_only)
+                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
                 if region_scoring is not None:
                     if scoring is None:
                         scoring = {
