@@ -17,11 +17,6 @@ import cv2
 import pickle
 import sys
 
-import bioformats
-import javabridge
-import bioformats.omexml as ome
-import tifffile as tf
-
 
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
@@ -544,122 +539,128 @@ def write_big_tiff_file(output_addr, img, tile_size):
 
     # bioformats.write_image(output_addr, img, bioformats.PT_UINT8, c=0, z=0, t=0, size_c=1, size_z=1, size_t=1, channel_names=None)
 
-
-def write_ome_tiff_file(img, output_file, SizeT=1, SizeZ=1, SizeC=1, SizeX=2048, SizeY=2048, channel_names=None, Series = 0, scalex = 0.10833, scaley = 0.10833, scalez = 0.3, pixeltype ='uint8', dimorder ='TZCYX'):
-    """
-    This function writes an ome tiff image along with the corresponding xml file.
-
-    :param img: The image array.
-    :param output_file: The address for saving the output image.
-    :param SizeT: Size t
-    :param SizeZ: Size z
-    :param SizeC: Size c
-    :param SizeX: Size x
-    :param SizeY: Size y
-    :param channel_names: The name of the channels to be saved.
-    :param Series: The series number.
-    :param scalex: Physical Size x
-    :param scaley: Physical Size y
-    :param scalez: Physical Size z
-    :param pixeltype: The pixeltype.
-    :param dimorder: The dimension order to save the image (default: TZCYX).
-    :return:
-    """
-
-    if channel_names is None:
-        channel_names = ['C1']
-
-    def writeplanes(pixel, SizeT=1, SizeZ=1, SizeC=1, order='TZCYX', verbose=False):
-        if order == 'TZCYX':
-            p.DimensionOrder = ome.DO_XYCZT
-            counter = 0
-            for t in range(SizeT):
-                for z in range(SizeZ):
-                    for c in range(SizeC):
-
-                        if verbose:
-                            print('Write PlaneTable: ', t, z, c),
-                            sys.stdout.flush()
-
-                        pixel.Plane(counter).TheT = t
-                        pixel.Plane(counter).TheZ = z
-                        pixel.Plane(counter).TheC = c
-                        counter = counter + 1
-
-        return pixel
-
-
-
-    # Getting metadata info
-    omexml = ome.OMEXML()
-    omexml.image(Series).Name = output_file
-    p = omexml.image(Series).Pixels
-    p.SizeX, p.SizeY, p.SizeC, p.SizeT, p.SizeZ = SizeX, SizeY, SizeC, SizeT, SizeZ
-    p.PhysicalSizeX, p.PhysicalSizeY, p.PhysicalSizeZ = np.float(scalex), np.float(scaley), np.float(scalez)
-    p.PixelType = pixeltype
-    p.channel_count = SizeC
-
-    for i in range(len(channel_names)):
-        p.Channel(i).set_Name(channel_names[i])
-        p.Channel(i).set_ID(channel_names[i])
-    p.plane_count = SizeZ * SizeT * SizeC
-    p = writeplanes(p, SizeT=SizeT, SizeZ=SizeZ, SizeC=SizeC, order=dimorder)
-
-    for c in range(SizeC):
-        if pixeltype == 'uint8':
-            p.Channel(c).SamplesPerPixel = 1
-        if pixeltype == 'uint16':
-            p.Channel(c).SamplesPerPixel = 2
-
-    omexml.structured_annotations.add_original_metadata(
-        ome.OM_SAMPLES_PER_PIXEL, str(SizeC))
-
-    # Converting to omexml
-    xml = omexml.to_xml()
-
-    with tf.TiffWriter(output_file, bigtiff=True) as tif:
-        tif.write(img
-                 , tile=1000
-                 , description=xml
-                 , photometric='minisblack'
-                 , metadata={'axes': 'TZCYX'
-                 , 'DimensionOrder': 'TZCYX'
-                 , 'Resolution': 0.10833
-                 , 'Channels': channel_names}
-                 )
-
-
-def write_ome_tiff_file_array(results_array, output_addr, size_t, size_z, size_c, size_x, size_y):
-    """
-    This function writes an ome tiff file where each channel is a modality.
-    :param results_array: The dictionary containing all modalities
-    where the key is the modality name and the value is the modality array.
-    :param output_addr: The address to the ome tiff file for saving the multi-channel image.
-    :param size_t: Size T
-    :param size_z: Size z
-    :param size_c: Number of channels
-    :param size_x: Size x
-    :param size_y: Size y
-    :return:
-    """
-    all_images = []
-    channel_names = []
-    dapi = results_array['DAPI']
-    lap2 = results_array['Lap2']
-    marker = results_array['Marker']
-    seg = results_array['Seg']
-    all_images = np.zeros((dapi.shape[0], dapi.shape[1], 6), dtype=np.uint8)
-    all_images[:, :, 0] = dapi[:, :, 0]
-    all_images[:, :, 1] = lap2[:, :, 1]
-    all_images[:, :, 2] = marker[:, :, 0]
-    all_images[:, :, 3] = seg[:, :, 1]
-    all_images[:, :, 4] = seg[:, :, 0]
-    all_images[:, :, 5] = seg[:, :, 2]
-    channel_names = ['DAPI', 'Lap2', 'Marker', 'Segmentation', 'Positive', 'Negative']
-    all_images = np.array(all_images)
-    all_images = all_images.reshape((1, 1, all_images.shape[0], all_images.shape[1], all_images.shape[2]))
-
-    write_ome_tiff_file(all_images,
-                        output_addr,
-                        SizeT=size_t, SizeZ=size_z, SizeC=len(channel_names), SizeX=size_x, SizeY=size_y,
-                        channel_names=channel_names)
+try:
+    import bioformats
+    import javabridge
+    import bioformats.omexml as ome
+    import tifffile as tf
+    def write_ome_tiff_file(img, output_file, SizeT=1, SizeZ=1, SizeC=1, SizeX=2048, SizeY=2048, channel_names=None, Series = 0, scalex = 0.10833, scaley = 0.10833, scalez = 0.3, pixeltype ='uint8', dimorder ='TZCYX'):
+        """
+        This function writes an ome tiff image along with the corresponding xml file.
+    
+        :param img: The image array.
+        :param output_file: The address for saving the output image.
+        :param SizeT: Size t
+        :param SizeZ: Size z
+        :param SizeC: Size c
+        :param SizeX: Size x
+        :param SizeY: Size y
+        :param channel_names: The name of the channels to be saved.
+        :param Series: The series number.
+        :param scalex: Physical Size x
+        :param scaley: Physical Size y
+        :param scalez: Physical Size z
+        :param pixeltype: The pixeltype.
+        :param dimorder: The dimension order to save the image (default: TZCYX).
+        :return:
+        """
+    
+        if channel_names is None:
+            channel_names = ['C1']
+    
+        def writeplanes(pixel, SizeT=1, SizeZ=1, SizeC=1, order='TZCYX', verbose=False):
+            if order == 'TZCYX':
+                p.DimensionOrder = ome.DO_XYCZT
+                counter = 0
+                for t in range(SizeT):
+                    for z in range(SizeZ):
+                        for c in range(SizeC):
+    
+                            if verbose:
+                                print('Write PlaneTable: ', t, z, c),
+                                sys.stdout.flush()
+    
+                            pixel.Plane(counter).TheT = t
+                            pixel.Plane(counter).TheZ = z
+                            pixel.Plane(counter).TheC = c
+                            counter = counter + 1
+    
+            return pixel
+    
+    
+    
+        # Getting metadata info
+        omexml = ome.OMEXML()
+        omexml.image(Series).Name = output_file
+        p = omexml.image(Series).Pixels
+        p.SizeX, p.SizeY, p.SizeC, p.SizeT, p.SizeZ = SizeX, SizeY, SizeC, SizeT, SizeZ
+        p.PhysicalSizeX, p.PhysicalSizeY, p.PhysicalSizeZ = np.float(scalex), np.float(scaley), np.float(scalez)
+        p.PixelType = pixeltype
+        p.channel_count = SizeC
+    
+        for i in range(len(channel_names)):
+            p.Channel(i).set_Name(channel_names[i])
+            p.Channel(i).set_ID(channel_names[i])
+        p.plane_count = SizeZ * SizeT * SizeC
+        p = writeplanes(p, SizeT=SizeT, SizeZ=SizeZ, SizeC=SizeC, order=dimorder)
+    
+        for c in range(SizeC):
+            if pixeltype == 'uint8':
+                p.Channel(c).SamplesPerPixel = 1
+            if pixeltype == 'uint16':
+                p.Channel(c).SamplesPerPixel = 2
+    
+        omexml.structured_annotations.add_original_metadata(
+            ome.OM_SAMPLES_PER_PIXEL, str(SizeC))
+    
+        # Converting to omexml
+        xml = omexml.to_xml()
+    
+        with tf.TiffWriter(output_file, bigtiff=True) as tif:
+            tif.write(img
+                     , tile=1000
+                     , description=xml
+                     , photometric='minisblack'
+                     , metadata={'axes': 'TZCYX'
+                     , 'DimensionOrder': 'TZCYX'
+                     , 'Resolution': 0.10833
+                     , 'Channels': channel_names}
+                     )
+    
+    
+    def write_ome_tiff_file_array(results_array, output_addr, size_t, size_z, size_c, size_x, size_y):
+        """
+        This function writes an ome tiff file where each channel is a modality.
+        :param results_array: The dictionary containing all modalities
+        where the key is the modality name and the value is the modality array.
+        :param output_addr: The address to the ome tiff file for saving the multi-channel image.
+        :param size_t: Size T
+        :param size_z: Size z
+        :param size_c: Number of channels
+        :param size_x: Size x
+        :param size_y: Size y
+        :return:
+        """
+        all_images = []
+        channel_names = []
+        dapi = results_array['DAPI']
+        lap2 = results_array['Lap2']
+        marker = results_array['Marker']
+        seg = results_array['Seg']
+        all_images = np.zeros((dapi.shape[0], dapi.shape[1], 6), dtype=np.uint8)
+        all_images[:, :, 0] = dapi[:, :, 0]
+        all_images[:, :, 1] = lap2[:, :, 1]
+        all_images[:, :, 2] = marker[:, :, 0]
+        all_images[:, :, 3] = seg[:, :, 1]
+        all_images[:, :, 4] = seg[:, :, 0]
+        all_images[:, :, 5] = seg[:, :, 2]
+        channel_names = ['DAPI', 'Lap2', 'Marker', 'Segmentation', 'Positive', 'Negative']
+        all_images = np.array(all_images)
+        all_images = all_images.reshape((1, 1, all_images.shape[0], all_images.shape[1], all_images.shape[2]))
+    
+        write_ome_tiff_file(all_images,
+                            output_addr,
+                            SizeT=size_t, SizeZ=size_z, SizeC=len(channel_names), SizeX=size_x, SizeY=size_y,
+                            channel_names=channel_names)
+except:
+    pass

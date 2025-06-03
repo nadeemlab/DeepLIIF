@@ -14,6 +14,7 @@ from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
 from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
 from deepliif.util.util import mkdirs
+from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
 from deepliif.options import Options, print_options
 
@@ -78,6 +79,7 @@ def cli():
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
+@click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
 @click.option('--seg-weights', default='', type=str, help='weights used to aggregate modality images for the final segmentation image; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.25,0.15,0.25,0.1,0.25')
 @click.option('--loss-weights-g', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
 @click.option('--loss-weights-d', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
@@ -193,7 +195,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
-          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, seg_weights, loss_weights_g, loss_weights_d,
+          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, model_dir_teacher,
+          seg_weights, loss_weights_g, loss_weights_d,
           modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
     """General-purpose training script for multi-task image-to-image translation.
 
@@ -206,8 +209,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
-    assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN'], f'model class {model} is not implemented'
-    if model == 'DeepLIIF':
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN','DeepLIIFKD'], f'model class {model} is not implemented'
+    if model in ['DeepLIIF','DeepLIIFKD']:
         seg_no = 1
     elif model == 'DeepLIIFExt':
         if seg_gen:
@@ -220,6 +223,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
+    
+    if model == 'DeepLIIFKD':
+        assert len(model_dir_teacher) > 0 and os.path.isdir(model_dir_teacher), f'Teacher model directory {model_dir_teacher} is not valid.'
     
     if optimizer != 'adam':
         print(f'Optimizer torch.optim.{optimizer} is not tested. Be careful about the parameters of the optimizer.')
@@ -310,7 +316,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     net_gs = net_gs.split(',')
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
-    if len(net_gs) == 1 and model == 'DeepLIIF':
+    if len(net_gs) == 1 and model in ['DeepLIIF','DeepLIIFKD']:
         net_gs = net_gs*(modalities_no + seg_no)
     elif len(net_gs) == 1:
         net_gs = net_gs*seg_no
@@ -320,34 +326,21 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     # check seg weights and loss weights
     if len(d_params['seg_weights']) == 0:
-        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
     else:
         seg_weights = [float(x) for x in seg_weights.split(',')]
     
     if len(d_params['loss_weights_g']) == 0:
-        loss_weights_g = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        loss_weights_g = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
     else:
         loss_weights_g = [float(x) for x in loss_weights_g.split(',')]
     
     if len(d_params['loss_weights_d']) == 0:
-        loss_weights_d = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        loss_weights_d = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
     else:
         loss_weights_d = [float(x) for x in loss_weights_d.split(',')]
     
-    assert sum(seg_weights) == 1, 'seg weights should add up to 1'
-    assert sum(loss_weights_g) == 1, 'loss weights g should add up to 1'
-    assert sum(loss_weights_d) == 1, 'loss weights d should add up to 1'
-    
-    if model == 'DeepLIIF':
-        # +1 because input becomes an additional modality used in generating the final segmentation
-        assert len(seg_weights) == modalities_no+1, 'seg weights should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_g) == modalities_no+1, 'loss weights g should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_d) == modalities_no+1, 'loss weights d should have the same number of elements as number of modalities to be generated'
-
-    else:
-        assert len(seg_weights) == modalities_no, 'seg weights should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_g) == modalities_no, 'loss weights g should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_d) == modalities_no, 'loss weights d should have the same number of elements as number of modalities to be generated'
+    check_weights(model, modalities_no, seg_weights, loss_weights_g, loss_weights_d)
 
     d_params['seg_weights'] = seg_weights
     d_params['loss_G_weights'] = loss_weights_g

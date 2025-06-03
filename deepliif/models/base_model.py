@@ -147,7 +147,7 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 if not hasattr(self, name):
                     if len(name.split('_')) != 2:
-                        if self.opt.model == 'DeepLIIF':
+                        if self.opt.model in ['DeepLIIF','DeepLIIFKD']:
                             img_name = name[:-1] + '_' + name[-1]
                             visual_ret[name] = getattr(self, img_name)
                         else:

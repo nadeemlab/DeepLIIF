@@ -50,7 +50,7 @@ class AlignedDataset(BaseDataset):
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size
-        if self.model == 'DeepLIIF':
+        if self.model in ['DeepLIIF','DeepLIIFKD']:
             num_img = self.modalities_no + 1 + 1 # +1 for segmentation channel, +1 for input image
         elif self.model == 'DeepLIIFExt':
             num_img = self.modalities_no * 2 + 1 if self.seg_gen else self.modalities_no + 1 # +1 for segmentation channel   
@@ -68,7 +68,7 @@ class AlignedDataset(BaseDataset):
 
         A = A_transform(A)
         B_Array = []
-        if self.model == 'DeepLIIF':
+        if self.model in ['DeepLIIF','DeepLIIFKD']:
             for i in range(1, num_img):
                 B = AB.crop((w2 * i, 0, w2 * (i + 1), h))
                 B = B_transform(B)

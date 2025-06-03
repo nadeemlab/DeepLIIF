@@ -178,6 +178,9 @@ def define_G(
     elif netG == 'resnet_6blocks':
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6, 
                               padding_type=padding_type, upsample=upsample, use_spectral_norm=use_spectral_norm)
+    elif netG == 'resnet_3blocks':
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=3, 
+                              padding_type=padding_type, upsample=upsample, use_spectral_norm=use_spectral_norm)
     elif netG == 'unet_128':
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
