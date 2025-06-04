@@ -331,7 +331,7 @@ class DeepLIIFKDModel(BaseModel):
                       (self.loss_G_GAN_5 + self.loss_G_L1_5) * self.loss_G_weights[4] + \
                       (self.loss_G_KLDiv_1 + self.loss_G_KLDiv_2 + self.loss_G_KLDiv_3 + self.loss_G_KLDiv_4 + \
                       self.loss_G_KLDiv_5 + self.loss_G_KLDiv_5_1 + self.loss_G_KLDiv_5_2 + self.loss_G_KLDiv_5_3 + \
-                      self.loss_G_KLDiv_5_4 + self.loss_G_KLDiv_5_5) * 0.5
+                      self.loss_G_KLDiv_5_4 + self.loss_G_KLDiv_5_5) * 10
 
         # combine loss and calculate gradients
         # self.loss_G = (self.loss_G_GAN_1 + self.loss_G_L1_1) * self.loss_G_weights[0] + \
