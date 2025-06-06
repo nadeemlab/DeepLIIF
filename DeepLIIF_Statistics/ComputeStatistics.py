@@ -150,10 +150,11 @@ class Statistics:
     def compute_IHC_scoring(self):
         images = os.listdir(self.gt_path)
         IHC_info = []
+        metric_diff_ihc_score = 0
         for img in images:
             gt_image = cv2.cvtColor(cv2.imread(os.path.join(self.gt_path, img)), cv2.COLOR_BGR2RGB)
             if 'DeepLIIF' in self.model_name:
-                mask_image = cv2.cvtColor(cv2.imread(os.path.join(self.model_path, img.replace('_Seg', '_Seg_Refined'))), cv2.COLOR_BGR2RGB)
+                mask_image = cv2.cvtColor(cv2.imread(os.path.join(self.model_path, img.replace('.png', '_SegRefined.png'))), cv2.COLOR_BGR2RGB)
             else:
                 mask_image = cv2.cvtColor(cv2.imread(os.path.join(self.model_path, img)), cv2.COLOR_BGR2RGB)
             gt_image[gt_image < 10] = 0
@@ -173,8 +174,12 @@ class Statistics:
             mask_IHC_score = number_of_positive_cells_mask / number_of_all_cells_mask if number_of_all_cells_mask > 0 else 0
             diff = abs(gt_IHC_score * 100 - mask_IHC_score * 100)
             IHC_info.append({'Model': self.model_name, 'Sample': img, 'Diff_IHC_Score': diff})
+            metric_diff_ihc_score += diff
         self.write_list_to_csv(IHC_info, IHC_info[0].keys(),
                                filename='IHC_Scoring_info_' + self.mode + '_' + self.model_name + '.csv')
+        metric_diff_ihc_score /= len(images)
+        print('Diff_IHC_Score:', metric_diff_ihc_score)
+        print('-------------------------------------------------------')
 
     def compute_segmentation_metrics(self):
         # max_dice = [0, 0, 0]
@@ -226,5 +231,6 @@ if __name__ == '__main__':
         stat.compute_IHC_scoring()
     elif stat.mode == 'Segmentation':
         stat.compute_segmentation_metrics()
+        stat.compute_IHC_scoring()
     elif stat.mode == 'ImageSynthesis':
         stat.compute_image_similarity_metrics()
