@@ -21,7 +21,8 @@ setup(
     py_modules=['cli'],
     install_requires=[
         "opencv-python==4.8.1.78",
-        "torchvision==0.10.0",
+        "torch==1.13.1",
+        "torchvision==0.14.1",
         "scikit-image==0.18.3",
         "dominate==2.6.0",
         "numba==0.57.1",
@@ -30,7 +31,6 @@ setup(
         "dask==2021.11.2",
         "visdom>=0.1.8.3",
         "python-bioformats>=4.0.6",
-        "openslide-bin==4.0.0.6",
         "openslide-python==1.4.1",
     ],
     entry_points={
