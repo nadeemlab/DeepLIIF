@@ -33,7 +33,6 @@ Image.MAX_IMAGE_PIXELS = None
 
 import numpy as np
 from dask import delayed, compute
-import openslide
 
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil
@@ -592,9 +591,12 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
 
 def get_wsi_resolution(filename):
     """
-    Use OpenSlide to get the resolution (magnification) of the slide
-    and the corresponding tile size to use by default for DeepLIIF.
+    Try to get the resolution (magnification) of the slide and
+    the corresponding tile size to use by default for DeepLIIF.
     If it cannot be found, return (None, None) instead.
+
+    Note: This will start the javabridge VM, but not kill it.
+          It must be killed elsewhere.
 
     Parameters
     ----------
@@ -604,13 +606,42 @@ def get_wsi_resolution(filename):
     Returns
     -------
     str :
-        Magnification (objective power) as found by OpenSlide.
+        Magnification (objective power) from image metadata.
     int :
         Corresponding tile size for DeepLIIF.
     """
+
+    # make sure javabridge is already set up from with call to get_information()
+    size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(filename)
+
+    mag = None
+    metadata = bioformats.get_omexml_metadata(filename)
     try:
-        image = openslide.OpenSlide(filename)
-        mag = image.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER)
+        omexml = bioformats.OMEXML(metadata)
+        mag = omexml.instrument().Objective.NominalMagnification
+    except Exception as e:
+        fields = ['AppMag', 'NominalMagnification']
+        try:
+            for field in fields:
+                idx = metadata.find(field)
+                if idx >= 0:
+                    for i in range(idx, len(metadata)):
+                        if metadata[i].isdigit() or metadata[i] == '.':
+                            break
+                    for j in range(i, len(metadata)):
+                        if not metadata[j].isdigit() and metadata[j] != '.':
+                            break
+                    if i == j:
+                        continue
+                    mag = metadata[i:j]
+                    break
+        except Exception as e:
+            pass
+
+    if mag is None:
+        return None, None
+
+    try:
         tile_size = round((float(mag) / 40) * 512)
         return mag, tile_size
     except Exception as e:
