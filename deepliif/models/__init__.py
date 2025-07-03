@@ -34,7 +34,6 @@ Image.MAX_IMAGE_PIXELS = None
 import numpy as np
 from dask import delayed, compute
 
-
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
@@ -618,35 +617,64 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
 
     javabridge.kill_vm()
 
-try:
-    import openslide
-    def get_wsi_resolution(filename):
-        """
-        Use OpenSlide to get the resolution (magnification) of the slide
-        and the corresponding tile size to use by default for DeepLIIF.
-        If it cannot be found, return (None, None) instead.
-    
-        Parameters
-        ----------
-        filename : str
-            Full path to the file.
-    
-        Returns
-        -------
-        str :
-            Magnification (objective power) as found by OpenSlide.
-        int :
-            Corresponding tile size for DeepLIIF.
-        """
+
+def get_wsi_resolution(filename):
+    """
+    Try to get the resolution (magnification) of the slide and
+    the corresponding tile size to use by default for DeepLIIF.
+    If it cannot be found, return (None, None) instead.
+
+    Note: This will start the javabridge VM, but not kill it.
+          It must be killed elsewhere.
+
+    Parameters
+    ----------
+    filename : str
+        Full path to the file.
+
+    Returns
+    -------
+    str :
+        Magnification (objective power) from image metadata.
+    int :
+        Corresponding tile size for DeepLIIF.
+    """
+
+    # make sure javabridge is already set up from with call to get_information()
+    size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(filename)
+
+    mag = None
+    metadata = bioformats.get_omexml_metadata(filename)
+    try:
+        omexml = bioformats.OMEXML(metadata)
+        mag = omexml.instrument().Objective.NominalMagnification
+    except Exception as e:
+        fields = ['AppMag', 'NominalMagnification']
         try:
-            image = openslide.OpenSlide(filename)
-            mag = image.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER)
-            tile_size = round((float(mag) / 40) * 512)
-            return mag, tile_size
+            for field in fields:
+                idx = metadata.find(field)
+                if idx >= 0:
+                    for i in range(idx, len(metadata)):
+                        if metadata[i].isdigit() or metadata[i] == '.':
+                            break
+                    for j in range(i, len(metadata)):
+                        if not metadata[j].isdigit() and metadata[j] != '.':
+                            break
+                    if i == j:
+                        continue
+                    mag = metadata[i:j]
+                    break
         except Exception as e:
-            return None, None
-except:
-    pass
+            pass
+
+    if mag is None:
+        return None, None
+
+    try:
+        tile_size = round((float(mag) / 40) * 512)
+        return mag, tile_size
+    except Exception as e:
+        return None, None
 
 
 def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False):

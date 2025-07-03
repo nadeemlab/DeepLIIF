@@ -366,7 +366,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         data_val = [batch for batch in dataset_val]
         click.echo('The number of validation images = %d' % len(dataset_val))
         
-        if model in ['DeepLIIF']: 
+        if model in ['DeepLIIF', 'DeepLIIFKD']: 
             metrics_val = json.load(open(os.path.join(dataset_val.dataset.dir_AB,'metrics.json')))
 
     # create a model given model and other options

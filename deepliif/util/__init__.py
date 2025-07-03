@@ -432,7 +432,7 @@ def get_information(filename):
                                                          omexml.image().Pixels.SizeC, \
                                                          omexml.image().Pixels.SizeT, \
                                                          omexml.image().Pixels.PixelType
-    print('SizeX:', size_x, ' SizeY:', size_y, ' SizeZ:', size_z, ' SizeC:', size_c, ' SizeT:', size_t, ' PixelType:', pixel_type)
+    #print('SizeX:', size_x, ' SizeY:', size_y, ' SizeZ:', size_z, ' SizeC:', size_c, ' SizeT:', size_t, ' PixelType:', pixel_type)
     return size_x, size_y, size_z, size_c, size_t, pixel_type
 
 
