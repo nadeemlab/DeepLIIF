@@ -167,7 +167,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         opt = get_opt(model_dir, mode=phase)
     opt.use_dp = False
     
-    if opt.model == 'DeepLIIF':
+    if opt.model in ['DeepLIIF','DeepLIIFKD']:
         net_groups = [
             ('G1', 'G52'),
             ('G2', 'G53'),
@@ -217,13 +217,14 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, eager_mode=False, opt=None, seg_only=False):
+def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
     """
     eager_mode: not used in this function; put in place to be consistent with run_dask
            so that run_wrapper() could call either this function or run_dask with
            same syntax
     opt: same as eager_mode
     seg_only: same as eager_mode
+    nets: same as eager_mode
     """
     buffer = BytesIO()
     torch.save(transform(img.resize((opt.scale_size, opt.scale_size))), buffer)
@@ -242,16 +243,28 @@ def run_torchserve(img, model_path=None, eager_mode=False, opt=None, seg_only=Fa
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
-    model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
-    nets = init_nets(model_dir, eager_mode, opt)
-    use_dask = True if opt.norm != 'spectral' else False
+def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
+    """
+    Provide either the model path or the networks object.
     
-    if opt.input_no > 1 or opt.model == 'SDG':
-        l_ts = [transform(img_i.resize((opt.scale_size,opt.scale_size))) for img_i in img]
-        ts = torch.cat(l_ts, dim=1)
+    `eager_mode` is only applicable if model_path is provided.
+    """
+    assert model_path is not None or nets is not None, 'Provide either the model path or the networks object.'
+    if nets is None:
+        model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
+        nets = init_nets(model_dir, eager_mode, opt)
+    
+    if use_dask: # check if use_dask should be overwritten
+        use_dask = True if opt.norm != 'spectral' else False
+    
+    if isinstance(img,torch.Tensor): # if img input is already a tensor, pass
+        ts = img
     else:
-        ts = transform(img.resize((opt.scale_size, opt.scale_size)))
+        if opt.input_no > 1 or opt.model == 'SDG':
+            l_ts = [transform(img_i.resize((opt.scale_size,opt.scale_size))) for img_i in img]
+            ts = torch.cat(l_ts, dim=1)
+        else:
+            ts = transform(img.resize((opt.scale_size, opt.scale_size)))
     
 
     if use_dask:
@@ -264,7 +277,7 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
             with torch.no_grad():
                 return model(input.to(next(model.parameters()).device))
     
-    if opt.model == 'DeepLIIF':
+    if opt.model in ['DeepLIIF','DeepLIIFKD']:
         weights = {
             'G51': 0.25, # IHC
             'G52': 0.25, # Hema
@@ -282,19 +295,27 @@ def run_dask(img, model_path, eager_mode=False, opt=None, seg_only=False):
             lazy_gens['G4'] = forward(ts, nets['G4'])
         gens = compute(lazy_gens)[0]
         
-        lazy_segs = {v: forward(gens[k], nets[v]).to(torch.device('cpu')) for k, v in seg_map.items()}
+        lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
         if not seg_only or weights['G51'] != 0:
-            lazy_segs['G51'] = forward(ts, nets['G51']).to(torch.device('cpu'))
+            lazy_segs['G51'] = forward(ts, nets['G51'])
         segs = compute(lazy_segs)[0]
-    
-        seg = torch.stack([torch.mul(segs[k], weights[k]) for k in segs.keys()]).sum(dim=0)
-    
-        if seg_only:
-            res = {'G4': tensor_to_pil(gens['G4'])} if 'G4' in gens else {}
+        
+        device = next(nets['G1'].parameters()).device # take the device of the first net and move all outputs there for seg aggregation
+        seg = torch.stack([torch.mul(segs[k].to(device), weights[k]) for k in segs.keys()]).sum(dim=0)
+        
+        if output_tensor:
+            if seg_only:
+                res = {'G4': gens['G4']} if 'G4' in gens else {}
+            else:
+                res = {**gens, **segs}
+            res['G5'] = seg
         else:
-            res = {k: tensor_to_pil(v) for k, v in gens.items()}
-            res.update({k: tensor_to_pil(v) for k, v in segs.items()})
-        res['G5'] = tensor_to_pil(seg)
+            if seg_only:
+                res = {'G4': tensor_to_pil(gens['G4'].to(torch.device('cpu')))} if 'G4' in gens else {}
+            else:
+                res = {k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in gens.items()}
+                res.update({k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in segs.items()})
+            res['G5'] = tensor_to_pil(seg.to(torch.device('cpu')))
     
         return res
     elif opt.model in ['DeepLIIFExt','SDG','CycleGAN']:
@@ -332,8 +353,8 @@ def is_empty(tile):
         return True if np.max(image_variance_rgb(tile)) < thresh else False
 
 
-def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None, seg_only=False):
-    if opt.model == 'DeepLIIF':
+def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
+    if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
             if seg_only:
                 return {
@@ -354,7 +375,7 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None, seg_only=F
                     'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 }
         else:
-            return run_fn(tile, model_path, eager_mode, opt, seg_only)
+            return run_fn(tile, model_path, None, eager_mode, opt, seg_only)
     elif opt.model in ['DeepLIIFExt', 'SDG']:
         if is_empty(tile):
             res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
@@ -368,17 +389,24 @@ def run_wrapper(tile, run_fn, model_path, eager_mode=False, opt=None, seg_only=F
             res = {net_name: Image.new(mode='RGB', size=(512, 512)) for net_name in net_names}
             return res
         else:
-            return run_fn(tile, model_path, eager_mode, opt)
+            return run_fn(tile, model_path, None, eager_mode, opt)
     else:
         raise Exception(f'run_wrapper() not implemented for model {opt.model}')
 
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
               eager_mode=False, color_dapi=False, color_marker=False, opt=None,
-              return_seg_intermediate=False, seg_only=False):
+              return_seg_intermediate=False, seg_only=False, opt_args={}):
+    """
+    opt_args: a dictionary of key and values to add/overwrite to opt
+    """
     if not opt:
         opt = get_opt(model_path)
         #print_options(opt)
+    
+    for k,v in opt_args.items():
+        setattr(opt,k,v)
+    #print_options(opt)
 
     run_fn = run_torchserve if use_torchserve else run_dask
 
@@ -393,10 +421,11 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
     tiler = InferenceTiler(orig, tile_size, overlap_size)
     for tile in tiler:
-        tiler.stitch(run_wrapper(tile, run_fn, model_path, eager_mode, opt, seg_only))
+        tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only))
+        
     results = tiler.results()
 
-    if opt.model == 'DeepLIIF':
+    if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if seg_only:
             images = {'Seg': results['G5']}
             if 'G4' in results:
@@ -445,7 +474,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
 
 def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='default', marker_thresh=None, size_thresh_upper=None):
-    if model == 'DeepLIIF':
+    if model in ['DeepLIIF','DeepLIIFKD']:
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
         overlay, refined, scoring = compute_final_results(
             orig, images['Seg'], images.get('Marker'), resolution,

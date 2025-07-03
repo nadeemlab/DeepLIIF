@@ -163,3 +163,45 @@ def check_multi_scale(img1, img2):
             if max_ssim[1] < image_ssim:
                 max_ssim = (tile_size, image_ssim)
     return max_ssim[0]
+
+
+import subprocess
+import os
+from threading import Thread , Timer
+import sched, time
+
+# modified from https://stackoverflow.com/questions/67707828/how-to-get-every-seconds-gpu-usage-in-python
+def get_gpu_memory(gpu_id=0):
+    """
+    Currently collects gpu memory info for a given gpu id.
+    """
+    output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
+    ACCEPTABLE_AVAILABLE_MEMORY = 1024
+    COMMAND = "nvidia-smi --query-gpu=memory.used --format=csv"
+    try:
+        memory_use_info = output_to_list(subprocess.check_output(COMMAND.split(),stderr=subprocess.STDOUT))[1:]
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
+    memory_use_values = [int(x.split()[0]) for i, x in enumerate(memory_use_info)]
+    
+    #assert len(memory_use_values)==1, f"get_gpu_memory::memory_use_values should have only 1 value, now has {len(memory_use_values)} (memory_use_values)"
+    return memory_use_values[gpu_id]
+
+class HardwareStatus():
+    def __init__(self):
+        self.gpu_mem = []
+        self.timer = None
+    
+    def get_status_every_sec(self, gpu_id=0):
+        """
+            This function calls itself every 1 sec and appends the gpu_memory.
+        """
+        self.timer = Timer(1.0, self.get_status_every_sec)
+        self.timer.start()
+        self.gpu_mem.append(get_gpu_memory(gpu_id))
+        # print('self.gpu_mem',self.gpu_mem)
+    
+    def stop_timer(self):
+        self.timer.cancel()
+
+
