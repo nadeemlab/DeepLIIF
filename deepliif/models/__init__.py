@@ -382,7 +382,7 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
             res.update({'GS_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)})
             return res
         else:
-            return run_fn(tile, model_path, eager_mode, opt)
+            return run_fn(tile, model_path, None, eager_mode, opt)
     elif opt.model in ['CycleGAN']:
         if is_empty(tile):
             net_names = ['GB_{i+1}' for i in range(opt.modalities_no)] if opt.BtoA else [f'GA_{i+1}' for i in range(opt.modalities_no)]
