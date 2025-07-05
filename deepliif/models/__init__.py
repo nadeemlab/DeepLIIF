@@ -25,6 +25,8 @@ from functools import lru_cache
 from io import BytesIO
 import json
 import math
+import importlib.metadata
+import pathlib
 
 import requests
 import torch
@@ -785,5 +787,15 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
         count_size_thresh = 1
     data['settings']['default_marker_thresh'] = round(default_marker_thresh / count_marker_thresh)
     data['settings']['default_size_thresh'] = round(default_size_thresh / count_size_thresh)
+
+    try:
+        data['deepliifVersion'] = importlib.metadata.version('deepliif')
+    except Exception as e:
+        data['deepliifVersion'] = 'unknown'
+
+    try:
+        data['modelVersion'] = pathlib.PurePath(model_dir).name
+    except Exception as e:
+        data['modelVersion'] = 'unknown'
 
     return data
