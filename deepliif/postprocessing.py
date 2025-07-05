@@ -209,7 +209,7 @@ def mark_background(mask):
 
 
 @jit(nopython=True)
-def compute_cell_mapping(mask, marker, noise_thresh):
+def compute_cell_mapping(mask, marker, noise_thresh, large_noise_thresh):
     """
     Compute the mapping from mask to positive and negative cells.
 
@@ -264,7 +264,7 @@ def compute_cell_mapping(mask, marker, noise_thresh):
                             center_x += idx[1]
                             count += 1
 
-                if count > noise_thresh:
+                if count > noise_thresh and (large_noise_thresh is None or count < large_noise_thresh):
                     center_y = int(round(center_y / count))
                     center_x = int(round(center_x / count))
                     positive = True if count_positive >= count_negative else False
@@ -273,7 +273,7 @@ def compute_cell_mapping(mask, marker, noise_thresh):
     return cells
 
 
-def get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh):
+def get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh, large_noise_thresh):
     """
     Find all cells in the segmentation image that are larger than the noise threshold.
 
@@ -289,6 +289,8 @@ def get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh):
         Threshold for tiny noise to ignore (include only cells larger than this value).
     seg_thresh : int
         Threshold to use in determining if a pixel should be labeled as positive/negative.
+    large_noise_thresh : int | None
+        Threshold for large noise to ignore (include only cells smaller than this value).
 
     Returns
     -------
@@ -305,7 +307,7 @@ def get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh):
         marker = to_array(marker, True)
     mask = create_posneg_mask(seg, seg_thresh)
     mark_background(mask)
-    cellsinfo = compute_cell_mapping(mask, marker, noise_thresh)
+    cellsinfo = compute_cell_mapping(mask, marker, noise_thresh, large_noise_thresh)
 
     defaults = {}
     sizes = np.zeros(len(cellsinfo), dtype=np.int64)
@@ -1040,9 +1042,21 @@ def fill_cells(mask):
                     mask[y, x] = LABEL_NEGATIVE
 
 
+def calculate_large_noise_thresh(large_noise_thresh, resolution):
+    if large_noise_thresh != 'default':
+        return large_noise_thresh
+    if resolution == '10x':
+        return 250
+    elif resolution == '20x':
+        return 1000
+    else: # 40x
+        return 4000
+
+
 def compute_cell_results(seg, marker, resolution, version=3,
                          seg_thresh=DEFAULT_SEG_THRESH,
-                         noise_thresh=DEFAULT_NOISE_THRESH):
+                         noise_thresh=DEFAULT_NOISE_THRESH,
+                         large_noise_thresh='default'):
     """
     Perform postprocessing to compute individual cell results.
 
@@ -1060,6 +1074,9 @@ def compute_cell_results(seg, marker, resolution, version=3,
         Threshold to use in determining if a pixel should be labeled as positive/negative.
     noise_thresh : int
         Threshold for tiny noise to ignore (include only cells larger than this value).
+    large_noise_thresh : int | string | None
+        Threshold for large noise to ignore (include only cells smaller than this value).
+        Valid arguments can be an integer value, the string value 'default', or None.
 
     Returns
     -------
@@ -1071,7 +1088,8 @@ def compute_cell_results(seg, marker, resolution, version=3,
         warnings.warn('Invalid cell data version provided, defaulting to version 3.')
         version = 3
 
-    mask, cellsinfo, defaults = get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh)
+    large_noise_thresh = calculate_large_noise_thresh(large_noise_thresh, resolution)
+    mask, cellsinfo, defaults = get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh, large_noise_thresh)
 
     cells = []
     for cell in cellsinfo:
@@ -1094,6 +1112,7 @@ def compute_cell_results(seg, marker, resolution, version=3,
             'default_marker_thresh': defaults['marker_thresh'] if 'marker_thresh' in defaults else None,
             'default_size_thresh': defaults['size_thresh'],
             'noise_thresh': noise_thresh,
+            'large_noise_thresh': large_noise_thresh,
             'seg_thresh': seg_thresh,
         },
         'dataVersion': version,
@@ -1107,7 +1126,8 @@ def compute_final_results(orig, seg, marker, resolution,
                           marker_thresh=None,
                           size_thresh_upper=None,
                           seg_thresh=DEFAULT_SEG_THRESH,
-                          noise_thresh=DEFAULT_NOISE_THRESH):
+                          noise_thresh=DEFAULT_NOISE_THRESH,
+                          large_noise_thresh='default'):
     """
     Perform postprocessing to compute final count and image results.
 
@@ -1131,6 +1151,9 @@ def compute_final_results(orig, seg, marker, resolution,
         Threshold to use in determining if a pixel should be labeled as positive/negative.
     noise_thresh : int
         Threshold for tiny noise to ignore (include only cells larger than this value).
+    large_noise_thresh : int | string | None
+        Threshold for large noise to ignore (include only cells smaller than this value).
+        Valid arguments can be an integer value, the string value 'default', or None.
 
     Returns
     -------
@@ -1142,7 +1165,8 @@ def compute_final_results(orig, seg, marker, resolution,
         Dictionary with scoring and settings information.
     """
 
-    mask, cellsinfo, defaults = get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh)
+    large_noise_thresh = calculate_large_noise_thresh(large_noise_thresh, resolution)
+    mask, cellsinfo, defaults = get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh, large_noise_thresh)
 
     if size_thresh is None:
         size_thresh = 0
