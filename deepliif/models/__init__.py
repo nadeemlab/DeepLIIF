@@ -737,6 +737,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 print_info(region.shape, region.dtype)
                 img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
                 print_info(img.size, img.mode)
+                del region
 
                 images = inference(
                     img,
@@ -750,7 +751,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                     return_seg_intermediate=False,
                     seg_only=True,
                 )
+                del img
+
                 region_data = compute_cell_results(images['Seg'], images.get('Marker'), resolution, version=version)
+                del images
 
                 if start_x != 0 or start_y != 0:
                     for i in range(len(region_data['cells'])):

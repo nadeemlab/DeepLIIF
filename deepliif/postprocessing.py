@@ -188,24 +188,27 @@ def mark_background(mask):
     for i in range(mask.shape[0]):
         if mask[i, 0] == LABEL_UNKNOWN:
             seeds.append((i, 0))
+            mask[seeds[-1]] = LABEL_BACKGROUND
         if mask[i, mask.shape[1]-1] == LABEL_UNKNOWN:
             seeds.append((i, mask.shape[1]-1))
+            mask[seeds[-1]] = LABEL_BACKGROUND
     for j in range(mask.shape[1]):
         if mask[0, j] == LABEL_UNKNOWN:
             seeds.append((0, j))
+            mask[seeds[-1]] = LABEL_BACKGROUND
         if mask[mask.shape[0]-1, j] == LABEL_UNKNOWN:
             seeds.append((mask.shape[0]-1, j))
+            mask[seeds[-1]] = LABEL_BACKGROUND
 
     neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     while len(seeds) > 0:
         seed = seeds.pop()
-        if mask[seed] == LABEL_UNKNOWN:
-            mask[seed] = LABEL_BACKGROUND
-            for n in neighbors:
-                idx = (seed[0] + n[0], seed[1] + n[1])
-                if in_bounds(mask, idx) and mask[idx] == LABEL_UNKNOWN:
-                    seeds.append(idx)
+        for n in neighbors:
+            idx = (seed[0] + n[0], seed[1] + n[1])
+            if in_bounds(mask, idx) and mask[idx] == LABEL_UNKNOWN:
+                mask[idx] = LABEL_BACKGROUND
+                seeds.append(idx)
 
 
 @jit(nopython=True)
