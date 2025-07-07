@@ -626,9 +626,6 @@ def get_wsi_resolution(filename):
     the corresponding tile size to use by default for DeepLIIF.
     If it cannot be found, return (None, None) instead.
 
-    Note: This will start the javabridge VM, but not kill it.
-          It must be killed elsewhere.
-
     Parameters
     ----------
     filename : str
@@ -642,11 +639,10 @@ def get_wsi_resolution(filename):
         Corresponding tile size for DeepLIIF.
     """
 
-    # make sure javabridge is already set up from with call to get_information()
-    size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(filename)
+    init_javabridge_bioformats()
+    metadata = bioformats.get_omexml_metadata(filename)
 
     mag = None
-    metadata = bioformats.get_omexml_metadata(filename)
     try:
         omexml = bioformats.OMEXML(metadata)
         mag = omexml.instrument().Objective.NominalMagnification
@@ -724,7 +720,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
     default_marker_thresh, count_marker_thresh = 0, 0
     default_size_thresh, count_size_thresh = 0, 0
 
-    # javabridge already set up from previous call to get_information()
+    init_javabridge_bioformats() # should not be needed due to get_information() call above
     with bioformats.ImageReader(filename) as reader:
         start_x, start_y = 0, 0
 
@@ -787,8 +783,6 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
 
             start_x = 0
             start_y += stride_y
-
-    javabridge.kill_vm()
 
     if count_marker_thresh == 0:
         count_marker_thresh = 1

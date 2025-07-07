@@ -2,6 +2,10 @@
 import os
 import collections
 
+import atexit
+import functools
+import threading
+
 import torch
 import numpy as np
 from PIL import Image, ImageOps
@@ -392,6 +396,30 @@ def image_variance_rgb(img):
     return var
 
 
+def init_javabridge_bioformats():
+    """
+    Initialize javabridge for use with bioformats.
+    Run as daemon so no need to explicitly call kill_vm.
+    This function will only run once; repeat calls do nothing.
+    """
+
+    if not hasattr(init_javabridge_bioformats, 'called'):
+        # https://github.com/LeeKamentsky/python-javabridge/issues/155
+        old_init = threading.Thread.__init__
+        threading.Thread.__init__ = functools.partialmethod(old_init, daemon=True)
+        javabridge.start_vm(class_path=bioformats.JARS)
+        threading.Thread.__init__ = old_init
+        atexit.register(javabridge.kill_vm)
+
+        rootLoggerName = javabridge.get_static_field("org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;")
+        rootLogger = javabridge.static_call("org/slf4j/LoggerFactory", "getLogger",
+                                            "(Ljava/lang/String;)Lorg/slf4j/Logger;", rootLoggerName)
+        logLevel = javabridge.get_static_field("ch/qos/logback/classic/Level", "WARN", "Lch/qos/logback/classic/Level;")
+        javabridge.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
+
+        init_javabridge_bioformats.called = True
+
+
 def read_bioformats_image_with_reader(path, channel=0, region=(0, 0, 0, 0)):
     """
     Using this function, you can read a specific region of a large image by giving the region bounding box (XYWH format)
@@ -402,14 +430,7 @@ def read_bioformats_image_with_reader(path, channel=0, region=(0, 0, 0, 0)):
     :param region: The bounding box around the region of interest (XYWH format).
     :return: The specified region of interest image (numpy array).
     """
-    javabridge.start_vm(class_path=bioformats.JARS)
-
-    rootLoggerName = javabridge.get_static_field("org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;")
-    rootLogger = javabridge.static_call("org/slf4j/LoggerFactory", "getLogger",
-                                        "(Ljava/lang/String;)Lorg/slf4j/Logger;", rootLoggerName)
-    logLevel = javabridge.get_static_field("ch/qos/logback/classic/Level", "WARN", "Lch/qos/logback/classic/Level;")
-    javabridge.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
-
+    init_javabridge_bioformats()
     with bioformats.ImageReader(path) as reader:
         return reader.read(t=channel, XYWH=region)
 
@@ -421,14 +442,7 @@ def get_information(filename):
     :param filename: The address to the ome image.
     :return: size_x, size_y, size_z, size_c, size_t, pixel_type
     """
-    javabridge.start_vm(class_path=bioformats.JARS)
-
-    rootLoggerName = javabridge.get_static_field("org/slf4j/Logger", "ROOT_LOGGER_NAME", "Ljava/lang/String;")
-    rootLogger = javabridge.static_call("org/slf4j/LoggerFactory", "getLogger",
-                                        "(Ljava/lang/String;)Lorg/slf4j/Logger;", rootLoggerName)
-    logLevel = javabridge.get_static_field("ch/qos/logback/classic/Level", "WARN", "Lch/qos/logback/classic/Level;")
-    javabridge.call(rootLogger, "setLevel", "(Lch/qos/logback/classic/Level;)V", logLevel)
-
+    init_javabridge_bioformats()
     metadata = bioformats.get_omexml_metadata(filename)
     omexml = bioformats.OMEXML(metadata)
     size_x, size_y, size_z, size_c, size_t, pixel_type = omexml.image().Pixels.SizeX, \
