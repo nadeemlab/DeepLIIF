@@ -184,31 +184,34 @@ def mark_background(mask):
         After the function executes, the pixels will be labeled as background, positive, negative, or unknown.
     """
 
-    seeds = []
     for i in range(mask.shape[0]):
         if mask[i, 0] == LABEL_UNKNOWN:
-            seeds.append((i, 0))
-            mask[seeds[-1]] = LABEL_BACKGROUND
+            mask[i, 0] = LABEL_BACKGROUND
         if mask[i, mask.shape[1]-1] == LABEL_UNKNOWN:
-            seeds.append((i, mask.shape[1]-1))
-            mask[seeds[-1]] = LABEL_BACKGROUND
+            mask[i, mask.shape[1]-1] = LABEL_BACKGROUND
     for j in range(mask.shape[1]):
         if mask[0, j] == LABEL_UNKNOWN:
-            seeds.append((0, j))
-            mask[seeds[-1]] = LABEL_BACKGROUND
+            mask[0, j] = LABEL_BACKGROUND
         if mask[mask.shape[0]-1, j] == LABEL_UNKNOWN:
-            seeds.append((mask.shape[0]-1, j))
-            mask[seeds[-1]] = LABEL_BACKGROUND
+            mask[mask.shape[0]-1, j] = LABEL_BACKGROUND
 
-    neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-
-    while len(seeds) > 0:
-        seed = seeds.pop()
-        for n in neighbors:
-            idx = (seed[0] + n[0], seed[1] + n[1])
-            if in_bounds(mask, idx) and mask[idx] == LABEL_UNKNOWN:
-                mask[idx] = LABEL_BACKGROUND
-                seeds.append(idx)
+    count = 1
+    while count > 0:
+        count = 0
+        for i in range(mask.shape[0]):
+            for j in range(mask.shape[1]):
+                if mask[i, j] == LABEL_UNKNOWN:
+                    if (mask[i-1, j] == LABEL_BACKGROUND or mask[i+1, j] == LABEL_BACKGROUND or
+                            mask[i, j-1] == LABEL_BACKGROUND or mask[i, j+1] == LABEL_BACKGROUND):
+                        mask[i, j] = LABEL_BACKGROUND
+                        count += 1
+        if count > 0:
+            for i in range(mask.shape[0]-1, -1, -1):
+                for j in range(mask.shape[1]-1, -1, -1):
+                    if mask[i, j] == LABEL_UNKNOWN:
+                        if (mask[i-1, j] == LABEL_BACKGROUND or mask[i+1, j] == LABEL_BACKGROUND or
+                                mask[i, j-1] == LABEL_BACKGROUND or mask[i, j+1] == LABEL_BACKGROUND):
+                            mask[i, j] = LABEL_BACKGROUND
 
 
 @jit(nopython=True)
@@ -308,6 +311,7 @@ def get_cells_info(seg, marker, resolution, noise_thresh, seg_thresh, large_nois
     seg = to_array(seg)
     if marker is not None:
         marker = to_array(marker, True)
+
     mask = create_posneg_mask(seg, seg_thresh)
     mark_background(mask)
     cellsinfo = compute_cell_mapping(mask, marker, noise_thresh, large_noise_thresh)

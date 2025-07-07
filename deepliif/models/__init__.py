@@ -39,7 +39,7 @@ from dask import delayed, compute
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
-from deepliif.postprocessing import compute_final_results, compute_cell_results
+from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
 from deepliif.options import Options, print_options
 
@@ -753,8 +753,13 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 )
                 del img
 
-                region_data = compute_cell_results(images['Seg'], images.get('Marker'), resolution, version=version)
+                seg = to_array(images['Seg'])
+                del images['Seg']
+                marker = to_array(images['Marker'], True) if 'Marker' in images else None
                 del images
+                region_data = compute_cell_results(seg, marker, resolution, version=version)
+                del seg
+                del marker
 
                 if start_x != 0 or start_y != 0:
                     for i in range(len(region_data['cells'])):
