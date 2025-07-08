@@ -617,8 +617,6 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
         with open(os.path.join(results_dir, f'{basename}.json'), 'w') as f:
             json.dump(scoring, f, indent=2)
 
-    javabridge.kill_vm()
-
 
 def get_wsi_resolution(filename):
     """
@@ -706,22 +704,21 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
 
     resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
 
-    size_x, size_y, size_z, size_c, size_t, pixel_type = get_information(filename)
-    rescale = (pixel_type != 'uint8')
-    print_info('Info:', size_x, size_y, size_z, size_c, size_t, pixel_type)
-
-    num_regions_x = math.ceil(size_x / region_size)
-    num_regions_y = math.ceil(size_y / region_size)
-    stride_x = math.ceil(size_x / num_regions_x)
-    stride_y = math.ceil(size_y / num_regions_y)
-    print_info('Strides:', stride_x, stride_y)
-
     data = None
     default_marker_thresh, count_marker_thresh = 0, 0
     default_size_thresh, count_size_thresh = 0, 0
 
-    init_javabridge_bioformats() # should not be needed due to get_information() call above
-    with bioformats.ImageReader(filename) as reader:
+    with WSIReader(filename) as reader:
+        size_x = reader.width
+        size_y = reader.height
+        print_info('Info:', size_x, size_y)
+
+        num_regions_x = math.ceil(size_x / region_size)
+        num_regions_y = math.ceil(size_y / region_size)
+        stride_x = math.ceil(size_x / num_regions_x)
+        stride_y = math.ceil(size_y / num_regions_y)
+        print_info('Strides:', stride_x, stride_y)
+
         start_x, start_y = 0, 0
 
         while start_y < size_y:
@@ -729,9 +726,9 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                 region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
                 print_info('Region:', region_XYWH)
 
-                region = reader.read(XYWH=region_XYWH, rescale=rescale)
+                region = reader.read(region_XYWH)
                 print_info(region.shape, region.dtype)
-                img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
+                img = Image.fromarray(region)
                 print_info(img.size, img.mode)
                 del region
 

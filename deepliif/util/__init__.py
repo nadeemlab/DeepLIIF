@@ -26,6 +26,9 @@ import javabridge
 import bioformats.omexml as ome
 import tifffile as tf
 
+from tifffile import TiffFile
+import zarr
+
 
 excluding_names = ['Hema', 'DAPI', 'DAPILap2', 'Ki67', 'Seg', 'Marked', 'SegRefined', 'SegOverlaid', 'Marker', 'Lap2']
 # Image extensions to consider
@@ -453,6 +456,76 @@ def get_information(filename):
                                                          omexml.image().Pixels.PixelType
     #print('SizeX:', size_x, ' SizeY:', size_y, ' SizeZ:', size_z, ' SizeC:', size_c, ' SizeT:', size_t, ' PixelType:', pixel_type)
     return size_x, size_y, size_z, size_c, size_t, pixel_type
+
+
+class WSIReader:
+    """
+    Assumes the file is a single image (e.g., not a stacked
+    OME TIFF) and will always return uint8 pixel type data.
+    """
+
+    def __init__(self, path):
+        init_javabridge_bioformats()
+        metadata = bioformats.get_omexml_metadata(path)
+        omexml = bioformats.OMEXML(metadata)
+
+        self._path = path
+        self._width = omexml.image().Pixels.SizeX
+        self._height = omexml.image().Pixels.SizeY
+        self._pixel_type = omexml.image().Pixels.PixelType
+
+        self._tif = None
+        if self._pixel_type == 'uint8':
+            try:
+                self._file = None
+                self._file = open(path, 'rb')
+                self._tif = TiffFile(self._file)
+                self._zarr = zarr.open(self._tif.pages[0].aszarr(), mode='r')
+            except Exception as e:
+                if self._tif is not None:
+                    self._tif.close()
+                    self._tif = None
+                if self._file is not None:
+                    self._file.close()
+
+        self._bfreader = None
+        if self._tif is None:
+            self._rescale = (self._pixel_type != 'uint8')
+            self._bfreader = bioformats.ImageReader(path)
+
+        if self._tif is None and self._bfreader is None:
+            raise Exception('Cannot read WSI file.')
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def close(self):
+        if self._tif is not None:
+            self._tif.close()
+            self._file.close()
+        if self._bfreader is not None:
+            self._bfreader.close()
+
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def height(self):
+        return self._height
+
+    def read(self, xywh):
+        if self._tif is not None:
+            x, y, w, h = xywh
+            return self._zarr[y:y+h, x:x+w]
+
+        px = self._bfreader.read(XYWH=xywh, rescale=self._rescale)
+        if self._rescale:
+            px = (px * 255).astype(np.uint8)
+        return px
 
 
 

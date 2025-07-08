@@ -31,6 +31,8 @@ setup(
         "dask==2021.11.2",
         "visdom>=0.1.8.3",
         "python-bioformats>=4.0.6",
+        "imagecodecs==2023.3.16",
+        "zarr==2.16.1",
     ],
     entry_points={
         'console_scripts': [
