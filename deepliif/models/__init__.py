@@ -350,9 +350,9 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
 def is_empty(tile):
     thresh = 15
     if isinstance(tile, list): # for pair of tiles, only mark it as empty / no need for prediction if ALL tiles are empty
-        return all([True if np.max(image_variance_rgb(t)) < thresh else False for t in tile])
+        return all([True if image_variance_gray(t) < thresh else False for t in tile])
     else:
-        return True if np.max(image_variance_rgb(tile)) < thresh else False
+        return True if image_variance_gray(tile) < thresh else False
 
 
 def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
