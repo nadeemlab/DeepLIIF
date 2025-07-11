@@ -219,13 +219,14 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
+def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, seg_weights=None, use_dask=True, output_tensor=False):
     """
     eager_mode: not used in this function; put in place to be consistent with run_dask
            so that run_wrapper() could call either this function or run_dask with
            same syntax
     opt: same as eager_mode
     seg_only: same as eager_mode
+    seg_weights: same as eager_mode
     nets: same as eager_mode
     """
     buffer = BytesIO()
@@ -245,7 +246,7 @@ def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, 
     return {k: tensor_to_pil(deserialize_tensor(v)) for k, v in res.json().items()}
 
 
-def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
+def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, seg_weights=None, use_dask=True, output_tensor=False):
     """
     Provide either the model path or the networks object.
     
@@ -280,13 +281,22 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
                 return model(input.to(next(model.parameters()).device))
     
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
-        weights = {
-            'G51': 0.25, # IHC
-            'G52': 0.25, # Hema
-            'G53': 0.25, # DAPI
-            'G54': 0.00, # Lap2
-            'G55': 0.25, # Marker
-        }
+        if seg_weights is None:
+            weights = {
+                'G51': 0.25, # IHC
+                'G52': 0.25, # Hema
+                'G53': 0.25, # DAPI
+                'G54': 0.00, # Lap2
+                'G55': 0.25, # Marker
+            }
+        else:
+            weights = {
+                'G51': seg_weights[0], # IHC
+                'G52': seg_weights[1], # Hema
+                'G53': seg_weights[2], # DAPI
+                'G54': seg_weights[3], # Lap2
+                'G55': seg_weights[4], # Marker
+            }
 
         seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
         if seg_only:
@@ -355,7 +365,7 @@ def is_empty(tile):
         return True if image_variance_gray(tile) < thresh else False
 
 
-def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, use_dask=True, output_tensor=False):
+def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, seg_weights=None, use_dask=True, output_tensor=False):
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
             if seg_only:
@@ -377,7 +387,7 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
                     'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 }
         else:
-            return run_fn(tile, model_path, None, eager_mode, opt, seg_only)
+            return run_fn(tile, model_path, None, eager_mode, opt, seg_only, seg_weights)
     elif opt.model in ['DeepLIIFExt', 'SDG']:
         if is_empty(tile):
             res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
@@ -398,7 +408,7 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
 
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
               eager_mode=False, color_dapi=False, color_marker=False, opt=None,
-              return_seg_intermediate=False, seg_only=False, opt_args={}):
+              return_seg_intermediate=False, seg_only=False, seg_weights=None, opt_args={}):
     """
     opt_args: a dictionary of key and values to add/overwrite to opt
     """
@@ -423,7 +433,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
     tiler = InferenceTiler(orig, tile_size, overlap_size)
     for tile in tiler:
-        tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only))
+        tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only, seg_weights))
         
     results = tiler.results()
 
@@ -508,7 +518,7 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='def
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
                      color_dapi=False, color_marker=False, opt=None,
-                     return_seg_intermediate=False, seg_only=False):
+                     return_seg_intermediate=False, seg_only=False, seg_weights=None):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -536,7 +546,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         color_marker=color_marker,
         opt=opt,
         return_seg_intermediate=return_seg_intermediate,
-        seg_only=seg_only
+        seg_only=seg_only,
+        seg_weights=seg_weights,
     )
 
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
@@ -551,7 +562,7 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         return images, None
 
 
-def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, color_dapi=False, color_marker=False, seg_intermediate=False, seg_only=False):
+def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size, region_size=20000, color_dapi=False, color_marker=False, seg_intermediate=False, seg_only=False, seg_weights=None):
     """
     This function infers modalities and segmentation mask for the given WSI image. It
 
@@ -585,7 +596,7 @@ def infer_results_for_wsi(input_dir, filename, output_dir, model_dir, tile_size,
                 region = reader.read(XYWH=region_XYWH, rescale=rescale)
                 img = Image.fromarray((region * 255).astype(np.uint8)) if rescale else Image.fromarray(region)
 
-                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, color_dapi=color_dapi, color_marker=color_marker, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
+                region_modalities, region_scoring = infer_modalities(img, tile_size, model_dir, color_dapi=color_dapi, color_marker=color_marker, return_seg_intermediate=seg_intermediate, seg_only=seg_only, seg_weights=seg_weights)
                 if region_scoring is not None:
                     if scoring is None:
                         scoring = {
@@ -673,7 +684,7 @@ def get_wsi_resolution(filename):
         return None, None
 
 
-def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False):
+def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False, seg_weights=None):
     """
     Perform inference on a slide and get the results individual cell data.
 
@@ -743,6 +754,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                     opt=None,
                     return_seg_intermediate=False,
                     seg_only=True,
+                    seg_weights=seg_weights,
                 )
                 del img
 
