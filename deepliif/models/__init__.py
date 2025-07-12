@@ -800,6 +800,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
     data['settings']['default_marker_thresh'] = round(default_marker_thresh / count_marker_thresh)
     data['settings']['default_size_thresh'] = round(default_size_thresh / count_size_thresh)
 
+    data['settings']['tile_size'] = tile_size
+    data['settings']['region_size'] = region_size
+    data['settings']['seg_weights'] = seg_weights
+
     try:
         data['deepliifVersion'] = importlib.metadata.version('deepliif')
     except Exception as e:
