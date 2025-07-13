@@ -702,6 +702,9 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
         Version of cell data to return (3 or 4).
     print_log : bool
         Whether or not to print updates while processing.
+    seg_weights : list | tuple
+        Optional five weights to use for creating the combined Seg image.
+        If None, then the default weights are used.
 
     Returns
     -------
