@@ -283,11 +283,11 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if seg_weights is None:
             weights = {
-                'G51': 0.25, # IHC
-                'G52': 0.25, # Hema
-                'G53': 0.25, # DAPI
-                'G54': 0.00, # Lap2
-                'G55': 0.25, # Marker
+                'G51': 0.5, # IHC
+                'G52': 0.0, # Hema
+                'G53': 0.0, # DAPI
+                'G54': 0.0, # Lap2
+                'G55': 0.5, # Marker
             }
         else:
             weights = {
