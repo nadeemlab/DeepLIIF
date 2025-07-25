@@ -1053,17 +1053,17 @@ def calculate_large_noise_thresh(large_noise_thresh, resolution):
     if large_noise_thresh != 'default':
         return large_noise_thresh
     if resolution == '10x':
-        return 250
-    elif resolution == '20x':
         return 1000
-    else: # 40x
+    elif resolution == '20x':
         return 4000
+    else: # 40x
+        return 16000
 
 
 def compute_cell_results(seg, marker, resolution, version=3,
                          seg_thresh=DEFAULT_SEG_THRESH,
                          noise_thresh=DEFAULT_NOISE_THRESH,
-                         large_noise_thresh='default'):
+                         large_noise_thresh=None):
     """
     Perform postprocessing to compute individual cell results.
 
@@ -1134,7 +1134,7 @@ def compute_final_results(orig, seg, marker, resolution,
                           size_thresh_upper=None,
                           seg_thresh=DEFAULT_SEG_THRESH,
                           noise_thresh=DEFAULT_NOISE_THRESH,
-                          large_noise_thresh='default'):
+                          large_noise_thresh=None):
     """
     Perform postprocessing to compute final count and image results.
 
