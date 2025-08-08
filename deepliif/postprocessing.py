@@ -938,16 +938,11 @@ def create_cell_classification(mask, cellsinfo,
                     idx = (seed[0] + n[0], seed[1] + n[1])
                     if in_bounds(mask, idx) and mask[idx] == LABEL_CELL:
                         seeds.append(idx)
-                        is_boundary = False
                         for n in border_neighbors:
                             idx2 = (idx[0] + n[0], idx[1] + n[1])
                             if in_bounds(mask, idx2) and mask[idx2] == LABEL_BACKGROUND:
-                                is_boundary = True
-                                break
-                        if is_boundary:
-                            mask[idx] = label_border
-                        else:
-                            mask[idx] = label
+                                mask[idx2] = label_border
+                        mask[idx] = label
 
     num_total = num_pos + num_neg
     return {
@@ -976,7 +971,7 @@ def enlarge_cell_boundaries(mask):
                 value = LABEL_BORDER_POS2 if mask[y, x] == LABEL_BORDER_POS else LABEL_BORDER_NEG2
                 for n in neighbors:
                     idx = (y + n[0], x + n[1])
-                    if in_bounds(mask, idx) and mask[idx] != LABEL_BORDER_POS and mask[idx] != LABEL_BORDER_NEG:
+                    if in_bounds(mask, idx) and mask[idx] == LABEL_BACKGROUND:
                         mask[idx] = value
 
     for y in range(mask.shape[0]):
@@ -1047,6 +1042,36 @@ def fill_cells(mask):
                     mask[y, x] = LABEL_POSITIVE
                 else:
                     mask[y, x] = LABEL_NEGATIVE
+
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == LABEL_BORDER_POS:
+                mask[y, x] = LABEL_POSITIVE
+            elif mask[y, x] == LABEL_BORDER_NEG:
+                mask[y, x] = LABEL_NEGATIVE
+
+
+@jit(nopython=True)
+def create_outer_boundary(mask):
+    """
+    For a mask with positive and negative cell labels,
+    set pixels neighboring the cells in-place to border labels.
+
+    Parameters
+    ----------
+    mask : ndarray
+        2D uint8 label map.
+    """
+
+    border_neighbors = [(0, -1), (-1, 0), (1, 0), (0, 1)]
+
+    for y in range(mask.shape[0]):
+        for x in range(mask.shape[1]):
+            if mask[y, x] == LABEL_POSITIVE or mask[y, x] == LABEL_NEGATIVE:
+                for n in border_neighbors:
+                    idx2 = (y + n[0], x + n[1])
+                    if in_bounds(mask, idx2) and mask[idx2] == LABEL_BACKGROUND:
+                        mask[idx2] = LABEL_BORDER_POS if mask[y, x] == LABEL_POSITIVE else LABEL_BORDER_NEG
 
 
 def calculate_large_noise_thresh(large_noise_thresh, resolution):
@@ -1184,6 +1209,7 @@ def compute_final_results(orig, seg, marker, resolution,
 
     counts = create_cell_classification(mask, cellsinfo, size_thresh, marker_thresh, size_thresh_upper)
     enlarge_cell_boundaries(mask)
+    enlarge_cell_boundaries(mask)
     overlay, refined = create_final_images(np.array(orig), mask)
 
     scoring = {
@@ -1260,6 +1286,8 @@ def cells_to_final_results(data, orig,
     mark_background(mask)
     fill_cells(mask)
 
+    create_outer_boundary(mask)
+    enlarge_cell_boundaries(mask)
     enlarge_cell_boundaries(mask)
     overlay, refined = create_final_images(np.array(orig), mask)
 
