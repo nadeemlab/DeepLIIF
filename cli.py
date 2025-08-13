@@ -12,7 +12,7 @@ from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
-from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
+from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, get_information, 
 from deepliif.util.util import mkdirs
 from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
@@ -324,19 +324,27 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     d_params['net_g'] = net_g
     d_params['net_gs'] = net_gs
     
+    def get_weights(model='DeepLIIF', modalities_no=4, default=[0.25,0.15,0.25,0.1,0.25]):
+        if model in ['DeepLIIF','DeepLIIFKD'] and modalities_no == 4:
+            return default
+        elif model in ['DeepLIIF','DeepLIIFKD']:
+            return [1 / (modalities_no + 1)] * (modalities_no + 1)
+        else:
+            return [1 / modalities_no] * modalities_no
+          
     # check seg weights and loss weights
     if len(d_params['seg_weights']) == 0:
-        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        seg_weights = get_weights(d_params['model'], modalities_no, default=[0.25,0.15,0.25,0.1,0.25])
     else:
         seg_weights = [float(x) for x in seg_weights.split(',')]
     
     if len(d_params['loss_weights_g']) == 0:
-        loss_weights_g = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        loss_weights_g = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_g = [float(x) for x in loss_weights_g.split(',')]
     
     if len(d_params['loss_weights_d']) == 0:
-        loss_weights_d = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        loss_weights_d = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_d = [float(x) for x in loss_weights_d.split(',')]
     
@@ -464,7 +472,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 
                 # calculate cell count metrics
                 if type(model).__name__ == 'DeepLIIFModel':
-                    l_seg_names = ['fake_B_5']
+                    l_seg_names = [f'fake_B_{modalities_no+1}']
                     assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
                     seg_mod_suffix = l_seg_names[0].split('_')[-1]
                     l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
