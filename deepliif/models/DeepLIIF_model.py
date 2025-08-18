@@ -152,7 +152,11 @@ class DeepLIIFModel(BaseModel):
         #                              torch.mul(self.fake_B_5_4, self.seg_weights[3]),
         #                              torch.mul(self.fake_B_5_5, self.seg_weights[4])]).sum(dim=0)
         for i in range(self.opt.modalities_no+1):
-            setattr(self,f'fake_B_{self.mod_id_seg}_{i+1}',getattr(self,f'netG{self.mod_id_seg}{i+1}')(self.real_A))
+            if i == 0:
+                setattr(self,f'fake_B_{self.mod_id_seg}_{i+1}',getattr(self,f'netG{self.mod_id_seg}{i+1}')(self.real_A))
+            else:
+                setattr(self,f'fake_B_{self.mod_id_seg}_{i+1}',getattr(self,f'netG{self.mod_id_seg}{i+1}')(getattr(self,f'fake_B_{i}')))
+            
         setattr(self,f'fake_B_{self.mod_id_seg}',torch.stack([torch.mul(getattr(self,f'fake_B_{self.mod_id_seg}_{i+1}'), self.seg_weights[i]) for i in range(self.opt.modalities_no+1)]).sum(dim=0))
 
     def backward_D(self):

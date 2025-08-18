@@ -300,7 +300,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': seg_weights[3], # Lap2
             #     'G55': seg_weights[4], # Marker
             # }
-            weights = {f'G{opt.modalities_no+1}{i+1}': seg_weights[i] for i in range(seg_weights)}
+            weights = {f'G{opt.modalities_no+1}{i+1}': seg_weight for i,seg_weight in enumerate(seg_weights)}
 
         # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
         seg_map = {f'G{i+1}': f'G{opt.modalities_no+1}{i+2}' for i in range(opt.modalities_no)}
