@@ -20,7 +20,10 @@ class DeepLIIFModel(BaseModel):
         self.seg_weights = opt.seg_weights
         self.loss_G_weights = opt.loss_G_weights
         self.loss_D_weights = opt.loss_D_weights
-        self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
+        if not hasattr(opt,'modalities_names'):
+            self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
+        else:
+            self.mod_id_seg = 'S' 
         
         if not opt.is_train:
             self.gpu_ids = [] # avoid the models being loaded as DP
@@ -30,9 +33,11 @@ class DeepLIIFModel(BaseModel):
         self.loss_names = []
         self.visual_names = ['real_A']
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        for i in range(1, self.opt.modalities_no + 1 + 1):
-            self.loss_names.extend(['G_GAN_' + str(i), 'G_L1_' + str(i), 'D_real_' + str(i), 'D_fake_' + str(i)])
-            self.visual_names.extend(['fake_B_' + str(i), f'fake_B_{self.mod_id_seg}{i}', 'real_B_' + str(i)])
+        for i in range(self.opt.modalities_no):
+            self.loss_names.extend([f'G_GAN_{i+1}', f'G_L1_{i+1}', f'D_real_{i+1}', f'D_fake_{i+1}'])
+            self.visual_names.extend([f'fake_B_{i+1}', f'fake_B_{self.mod_id_seg}{i+1}', f'real_B_{i+1}'])
+        self.loss_names.extend([f'G_GAN_{self.mod_id_seg}',f'G_L1_{self.mod_id_seg}',f'D_real_{self.mod_id_seg}',f'D_fake_{self.mod_id_seg}'])
+        self.visual_names.extend([f'fake_B_{self.mod_id_seg}', f'fake_B_{self.mod_id_seg}{self.opt.modalities_no+1}', f'real_B_{self.mod_id_seg}'])
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -126,8 +131,9 @@ class DeepLIIFModel(BaseModel):
         self.real_A = input['A'].to(self.device)
 
         self.real_B_array = input['B']
-        for i in range(self.opt.modalities_no+1):
+        for i in range(self.opt.modalities_no):
             setattr(self,f'real_B_{i+1}',self.real_B_array[i].to(self.device))
+        setattr(self,f'real_B_{self.mod_id_seg}',self.real_B_array[self.opt.modalities_no].to(self.device)) # the last one is seg
         
         self.image_paths = input['A_paths']
 
@@ -279,8 +285,9 @@ class DeepLIIFModel(BaseModel):
         #               (self.loss_D_fake_5 + self.loss_D_real_5) * 0.5 * self.loss_D_weights[4]
         
         self.loss_D = torch.tensor(0., device=self.device)
-        for i in range(self.opt.modalities_no+1):
+        for i in range(self.opt.modalities_no):
             self.loss_D += (getattr(self,f'loss_D_fake_{i+1}') + getattr(self,f'loss_D_real_{i+1}')) * 0.5 * self.loss_D_weights[i]
+        self.loss_D += (getattr(self,f'loss_D_fake_{self.mod_id_seg}') + getattr(self,f'loss_D_real_{self.mod_id_seg}')) * 0.5 * self.loss_D_weights[self.opt.modalities_no]
 
         self.loss_D.backward()
 
@@ -346,15 +353,17 @@ class DeepLIIFModel(BaseModel):
         # self.loss_G_L1_4 = self.criterionSmoothL1(self.fake_B_4, self.real_B_4) * self.opt.lambda_L1
         # self.loss_G_L1_5 = self.criterionSmoothL1(self.fake_B_5, self.real_B_5) * self.opt.lambda_L1
         
-        for i in range(self.opt.modalities_no+1):
+        for i in range(self.opt.modalities_no):
             setattr(self,f'loss_G_L1_{i+1}',self.criterionSmoothL1(getattr(self,f'fake_B_{i+1}'), getattr(self,f'real_B_{i+1}')) * self.opt.lambda_L1)
+        setattr(self,f'loss_G_L1_{self.mod_id_seg}',self.criterionSmoothL1(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_L1)
 
         # self.loss_G_VGG_1 = self.criterionVGG(self.fake_B_1, self.real_B_1) * self.opt.lambda_feat
         # self.loss_G_VGG_2 = self.criterionVGG(self.fake_B_2, self.real_B_2) * self.opt.lambda_feat
         # self.loss_G_VGG_3 = self.criterionVGG(self.fake_B_3, self.real_B_3) * self.opt.lambda_feat
         # self.loss_G_VGG_4 = self.criterionVGG(self.fake_B_4, self.real_B_4) * self.opt.lambda_feat
-        for i in range(self.opt.modalities_no+1):
+        for i in range(self.opt.modalities_no):
             setattr(self,f'loss_G_VGG_{i+1}',self.criterionVGG(getattr(self,f'fake_B_{i+1}'), getattr(self,f'real_B_{i+1}')) * self.opt.lambda_feat)
+        setattr(self,f'loss_G_VGG_{self.mod_id_seg}',self.criterionVGG(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_feat)
 
         # self.loss_G = (self.loss_G_GAN_1 + self.loss_G_L1_1 + self.loss_G_VGG_1) * self.loss_G_weights[0] + \
         #               (self.loss_G_GAN_2 + self.loss_G_L1_2 + self.loss_G_VGG_2) * self.loss_G_weights[1] + \
@@ -365,8 +374,7 @@ class DeepLIIFModel(BaseModel):
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(self.opt.modalities_no):
             self.loss_G += (getattr(self,f'loss_G_GAN_{i+1}') + getattr(self,f'loss_G_L1_{i+1}') + getattr(self,f'loss_G_VGG_{i+1}')) * self.loss_G_weights[i]
-        i += 1
-        self.loss_G += (getattr(self,f'loss_G_GAN_{i+1}') + getattr(self,f'loss_G_L1_{i+1}')) * self.loss_G_weights[i]
+        self.loss_G += (getattr(self,f'loss_G_GAN_{self.mod_id_seg}') + getattr(self,f'loss_G_L1_{self.mod_id_seg}')) * self.loss_G_weights[i]
 
         # combine loss and calculate gradients
         # self.loss_G = (self.loss_G_GAN_1 + self.loss_G_L1_1) * self.loss_G_weights[0] + \
@@ -462,3 +470,4 @@ class DeepLIIFModel(BaseModel):
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
             
+

@@ -83,6 +83,13 @@ class Options:
                 # and can be configured in the inference function
                 self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
             
+            if self.model in ['DeepLIIF','DeepLIIFKD']:
+                if hasattr(self,'modalities_names'):
+                    self.mod_id_seg = 'S'
+                else:
+                    self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
+                    self.mod_id_seg = 5
+            
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
             model_dir = Path(path_file).parent

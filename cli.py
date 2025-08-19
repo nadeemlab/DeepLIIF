@@ -12,7 +12,7 @@ from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
-from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, get_information, 
+from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, get_information
 from deepliif.util.util import mkdirs
 from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
@@ -77,6 +77,7 @@ def cli():
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
+@click.option('--modalities-names', default='', type=str, help='an optional note of the name of each modality (input mod(s) and the mod(s) to learn stain transfer from), separated by comma; this helps document the modalities using the train opt file and will also be used to name the inference output; example: --modalities-names IHC,Hematoxylin,DAPI,Lap2,Marker')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
@@ -197,7 +198,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, model_dir_teacher,
           seg_weights, loss_weights_g, loss_weights_d,
-          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
+          modalities_no, modalities_names, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -220,6 +221,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     else: # SDG, CycleGAN
         seg_no = 0
         seg_gen = False
+    
     
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
@@ -300,8 +302,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
         
         pool_size = 0
-        
+    
+    modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
+    assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
+    
     d_params['input_no'] = input_no
+    d_params['modalities_names'] = modalities_names
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
     d_params['lambda_identity'] = 0
@@ -471,8 +477,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 l_losses_val += [(k,v) for k,v in losses_val_batch.items()]
                 
                 # calculate cell count metrics
-                if type(model).__name__ == 'DeepLIIFModel':
-                    l_seg_names = [f'fake_B_{modalities_no+1}']
+                if type(model).__name__ in ['DeepLIIFModel','DeepLIIFKDModel']:
+                    mod_id_seg = 'S'
+                    l_seg_names = [f'fake_B_{mod_id_seg}']
                     assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
                     seg_mod_suffix = l_seg_names[0].split('_')[-1]
                     l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
