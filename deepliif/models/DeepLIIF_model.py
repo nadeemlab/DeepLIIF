@@ -20,10 +20,13 @@ class DeepLIIFModel(BaseModel):
         self.seg_weights = opt.seg_weights
         self.loss_G_weights = opt.loss_G_weights
         self.loss_D_weights = opt.loss_D_weights
-        if not hasattr(opt,'modalities_names'):
+        if not hasattr(self,'mod_id_seg') and hasattr(opt,'mod_id_seg'): # use mod id seg from train opt file if available
+            self.mod_id_seg = self.opt.mod_id_seg
+        elif not hasattr(self,'mod_id_seg') and not hasattr(opt,'modalities_names'): # backward compatible with models trained before this param was introduced
             self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
-        else:
-            self.mod_id_seg = 'S' 
+        elif not hasattr(self,'mod_id_seg'):
+            self.mod_id_seg = 'S'
+        print('Initializing DeepLIIF model with segmentation modality id:',self.mod_id_seg)
         
         if not opt.is_train:
             self.gpu_ids = [] # avoid the models being loaded as DP

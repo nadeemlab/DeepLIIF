@@ -87,8 +87,15 @@ class Options:
                 if hasattr(self,'modalities_names'):
                     self.mod_id_seg = 'S'
                 else:
-                    self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
-                    self.mod_id_seg = 5
+                    print('Determining modalities names and mod id seg for test-mode model...')
+                    if self.modalities_no == 4:
+                        self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
+                        self.mod_id_seg = 5
+                    else:
+                        self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+                        self.mod_id_seg = self.modalities_no+1
+                    print('modalities names:', self.modalities_names)
+                    print('mod id seg:', self.mod_id_seg)
             
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
