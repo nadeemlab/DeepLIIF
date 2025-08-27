@@ -122,38 +122,44 @@ def load_torchscript_model(model_pt_path, device):
 
 
 
-def load_eager_models(opt, devices=None):
+def load_eager_models(opt, l_devices=None):
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
 
     nets = {}
-    if devices:
-        model_names = list(devices.keys())
+    if l_devices:
+        l_model_names = [list(devices.keys()) for devices in l_devices]
     else:
-        model_names = model.model_names
+        l_model_names = [model.model_names]
     
-    for name in model_names:#model.model_names:
-        if isinstance(name, str):
-            if '_' in name:
-                net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
-            else:
-                net = getattr(model, 'net' + name)
-    
-            if opt.phase != 'train':
-                net.eval()
-                net = disable_batchnorm_tracking_stats(net)
+    for i,model_names in enumerate(l_model_names):
+        try:
+            for name in model_names:#model.model_names:
+                if isinstance(name, str):
+                    if '_' in name:
+                        net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                    else:
+                        net = getattr(model, 'net' + name)
             
-            # SDG models when loaded are still DP.. not sure why
-            if isinstance(net, torch.nn.DataParallel):
-                net = net.module
-
-            nets[name] = net
-            if devices:
-                nets[name].to(devices[name])
-            
-    return nets
+                    if opt.phase != 'train':
+                        net.eval()
+                        net = disable_batchnorm_tracking_stats(net)
+                    
+                    # SDG models when loaded are still DP.. not sure why
+                    if isinstance(net, torch.nn.DataParallel):
+                        net = net.module
+        
+                    nets[name] = net
+                    if l_devices:
+                        nets[name].to(l_devices[i][name])
+                    
+            return nets
+        except Exception as e:
+            #print(e)
+            pass
+    raise Exception(f'Failed to load eager models: None of the model names candidates ({l_model_names}) can be found in the initialized model ({model.model_names})')
 
 
 @lru_cache
@@ -169,6 +175,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         opt = get_opt(model_dir, mode=phase)
     opt.use_dp = False
     
+    # get l_net_groups: a list of lists, each sublist is a candidate, ordered by priority (try 1st, if fail try 2nd, etc.)
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         # net_groups = [
         #     ('G1', 'G52'),
@@ -178,20 +185,25 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         #     ('G51',)
         # ]
         if opt.modalities_no == 0:
-            net_groups = [(f'G{opt.mod_id_seg}1',)]
+            l_net_groups = [[(f'G{opt.mod_id_seg}1',)], [(f'G{opt.mod_id_seg}0',)]]
         else:
-            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{i+2}') for i in range(opt.modalities_no)]
-            net_groups += [(f'G{opt.mod_id_seg}1',)] # this is the generator for the input base mod
+            net_groups_1 = [(f'G{i+1}', f'G{opt.mod_id_seg}{i+2}') for i in range(opt.modalities_no)]
+            net_groups_1 += [(f'G{opt.mod_id_seg}1',)] # this is the generator for the input base mod
+            
+            net_groups_2 = [(f'G{i+1}', f'G{opt.mod_id_seg}{i+1}') for i in range(opt.modalities_no)]
+            net_groups_2 += [(f'G{opt.mod_id_seg}0',)] # this is the generator for the input base mod
+            
+            l_net_groups = [net_groups_1, net_groups_2]
     elif opt.model in ['DeepLIIFExt','SDG']:
         if opt.seg_gen:
-            net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
+            l_net_groups = [[(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]]
         else:
-            net_groups = [(f'G_{i+1}',) for i in range(opt.modalities_no)]
+            l_net_groups = [[(f'G_{i+1}',) for i in range(opt.modalities_no)]]
     elif opt.model == 'CycleGAN':
         if opt.BtoA:
-            net_groups = [(f'GB_{i+1}',) for i in range(opt.modalities_no)]
+            l_net_groups = [[(f'GB_{i+1}',) for i in range(opt.modalities_no)]]
         else:
-            net_groups = [(f'GA_{i+1}',) for i in range(opt.modalities_no)]
+            l_net_groups = [[(f'GA_{i+1}',) for i in range(opt.modalities_no)]]
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
@@ -200,20 +212,26 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
-        chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
+        l_chunks = [[itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)] for net_groups in l_net_groups]
         # chunks = chunks[1:]
-        devices = {n: torch.device(f'cuda:{mapping_gpu_ids[i]}') for i, g in enumerate(chunks) for n in g}
+        l_devices = [{n: torch.device(f'cuda:{mapping_gpu_ids[i]}') for i, g in enumerate(chunks) for n in g} for chunks in l_chunks]
         # devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
-        devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
+        l_devices = [{n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)} for net_groups in l_net_groups]
 
     if eager_mode:
-        return load_eager_models(opt, devices)
+        return load_eager_models(opt, l_devices)
 
-    return {
-        n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
-        for n, d in devices.items()
-    }
+    for devices in l_devices:
+        try:
+            return {
+                n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
+                for n, d in devices.items()
+            }
+        except:
+            pass
+    fns = [x for x in os.listdir(model_dir) if x.endswith('.pt')]
+    raise Exception(f'Failed to load serialized models: None of the model name candidates ({l_devices}) can be found in the directory ({fns})')
 
 
 def compute_overlap(img_size, tile_size):
@@ -262,6 +280,12 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
         nets = init_nets(model_dir, eager_mode, opt)
     
+    flag_seg_0 = None # whether the seg generator starts from 0 (e.g., GS0 for the base input) or 1 (e.g., GS1 for the base input)
+    if f'G{opt.mod_id_seg}0' in nets:
+        flag_seg_0 = True
+    elif opt.seg_gen:
+        flag_seg_0 = False
+        
     if use_dask: # check if use_dask should be overwritten
         use_dask = True if opt.norm != 'spectral' else False
     
@@ -274,13 +298,13 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         else:
             ts = transform(img.resize((opt.scale_size, opt.scale_size)))
     
-
+    
     if use_dask:
         @delayed
         def forward(input, model):
             with torch.no_grad():
                 return model(input.to(next(model.parameters()).device))
-    else: # some train settings like spectral norm some how in inference mode is not compatible with dask
+    else: # some train settings like spectral norm somehow in inference mode is not compatible with dask
         def forward(input, model):
             with torch.no_grad():
                 return model(input.to(next(model.parameters()).device))
@@ -294,7 +318,10 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': 0.0, # Lap2
             #     'G55': 0.5, # Marker
             # }
-            weights = {f'G{opt.mod_id_seg}{i+1}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
+            if flag_seg_0:
+                weights = {f'G{opt.mod_id_seg}{i}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
+            else:
+                weights = {f'G{opt.mod_id_seg}{i+1}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
         else:
             # weights = {
             #     'G51': seg_weights[0], # IHC
@@ -303,10 +330,18 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': seg_weights[3], # Lap2
             #     'G55': seg_weights[4], # Marker
             # }
-            weights = {f'G{opt.mod_id_seg}{i+1}': seg_weight for i,seg_weight in enumerate(seg_weights)}
-
-        # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
-        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{i+2}' for i in range(opt.modalities_no)}
+            if flag_seg_0:
+                weights = {f'G{opt.mod_id_seg}{i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
+            else:
+                weights = {f'G{opt.mod_id_seg}{i+1}': seg_weight for i,seg_weight in enumerate(seg_weights)}
+        
+            
+        if flag_seg_0:
+            # seg_map = {'G1': 'G51', 'G2': 'G52', 'G3': 'G53', 'G4': 'G54'}
+            seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{i+1}' for i in range(opt.modalities_no)}
+        else:
+            # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
+            seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{i+2}' for i in range(opt.modalities_no)}
         if seg_only:
             seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
         
@@ -315,13 +350,16 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             mod_id_marker = opt.modalities_names.index("Marker")
             if f'G{mod_id_marker}' not in seg_map:
                 lazy_gens[f'G{mod_id_marker}'] = forward(ts, nets[f'G{mod_id_marker}'])
-       
-            
+        
         gens = compute(lazy_gens)[0]
         
         lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
-        if not seg_only or weights[f'G{opt.mod_id_seg}1'] != 0:
-            lazy_segs[f'G{opt.mod_id_seg}1'] = forward(ts, nets[f'G{opt.mod_id_seg}1'])
+        # run seg generator for the base input
+        if not seg_only:
+            if flag_seg_0 and weights[f'G{opt.mod_id_seg}0'] != 0:
+                lazy_segs[f'G{opt.mod_id_seg}0'] = forward(ts, nets[f'G{opt.mod_id_seg}0'])
+            elif not flag_seg_0 and weights[f'G{opt.mod_id_seg}1'] != 0:
+                lazy_segs[f'G{opt.mod_id_seg}1'] = forward(ts, nets[f'G{opt.mod_id_seg}1'])
         segs = compute(lazy_segs)[0]
         
         model_name_first = list(nets.keys())[0]
@@ -329,13 +367,13 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         seg = torch.stack([torch.mul(segs[k].to(device), weights[k]) for k in segs.keys()]).sum(dim=0)
         
         if output_tensor:
-            if seg_only:
+            if seg_only and opt.modalities_no > 0:
                 res = {f'G{opt.modalities_no}': gens[f'G{opt.modalities_no}']} if f'G{opt.modalities_no}' in gens else {}
             else:
                 res = {**gens, **segs}
             res[f'G{opt.mod_id_seg}'] = seg
         else:
-            if seg_only:
+            if seg_only and opt.modalities_no > 0:
                 res = {f'G{opt.modalities_no}': tensor_to_pil(gens[f'G{opt.modalities_no}'].to(torch.device('cpu')))} if f'G{opt.modalities_no}' in gens else {}
             else:
                 res = {k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in gens.items()}
