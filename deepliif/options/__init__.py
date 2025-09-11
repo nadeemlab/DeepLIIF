@@ -83,6 +83,11 @@ class Options:
                 # and can be configured in the inference function
                 self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
             
+            # to account for old settings before modalities_no was introduced
+            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
+                self.modalities_no = self.targets_no - 1
+                del self.targets_no
+            
             if self.model in ['DeepLIIF','DeepLIIFKD']:
                 if hasattr(self,'modalities_names'):
                     self.mod_id_seg = 'S'
@@ -109,15 +114,11 @@ class Options:
             if isinstance(self.gpu_ids,int):
                 self.gpu_ids = (self.gpu_ids,)
             
-            # to account for old settings before modalities_no was introduced
-            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
-                self.modalities_no = self.targets_no - 1
-                del self.targets_no
-            
             # to account for old settings: same as in cli.py train
             if not hasattr(self,'seg_no'):
               if self.model == 'DeepLIIF':
                   self.seg_no = 1
+                  self.seg_gen = True
               elif self.model == 'DeepLIIFExt':
                   if self.seg_gen:
                       self.seg_no = self.modalities_no

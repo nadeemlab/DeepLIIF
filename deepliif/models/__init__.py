@@ -525,8 +525,14 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             #               'Lap2_s':results['G54'],
             #               'Marker_s':results['G55'],})
             
-            images.update({f'mod{i+1}_s':results[f'G{opt.modalities_no+1}{i+1}'] for i in range(opt.modalities_no+1)})
-            images.update({f'{mod_name}_s':results[f'G{opt.modalities_no+1}']})
+            #images.update({f'mod{i+1}_s':results[f'G{opt.modalities_no+1}{i+1}'] for i in range(opt.modalities_no+1)})
+            #images.update({f'{mod_name}_s':results[f'G{opt.modalities_no+1}']})
+            if f'G{opt.mod_id_seg}0' in results.keys():
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i}' for i,mod_name in enumerate(opt.modalities_names)}
+                images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
+            else:
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i+1}' for i,mod_name in enumerate(opt.modalities_names)}
+                images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
         
         # if color_dapi and not seg_only:
         #     matrix = (       0,        0,        0, 0,
