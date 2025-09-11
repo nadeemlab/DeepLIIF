@@ -262,8 +262,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # infer number of input images
-    
-    
     if dataset_mode == 'unaligned':
         dir_data_train = dataroot + '/trainA'
         fns = os.listdir(dir_data_train)
@@ -763,7 +761,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
             net = net.eval()
             net = disable_batchnorm_tracking_stats(net)
             net = net.cpu()
-            if name.startswith('GS'):
+            if opt.model in ['DeepLIIFExt']:
                 traced_net = torch.jit.trace(net, torch.cat([sample, sample, sample], 1))
             else:
                 traced_net = torch.jit.trace(net, sample)
@@ -783,7 +781,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
         print(name,':')
         model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
         model_serialized = models_serialized[name].cuda().eval() if device=='gpu' else models_serialized[name].cpu().eval()
-        if name.startswith('GS'):
+        if opt.model in ['DeepLIIFExt']:
             test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
         else:
             test_diff_original_serialized(model_original,model_serialized,sample,verbose)
