@@ -10,10 +10,10 @@ from .PostProcessSegmentationMask import positive_negative_masks
 
 
 @jit(nopython=True)
-def compute_metrics_gpu(mask_img, gt_img, image_size):
+def compute_metrics_gpu(mask_img, gt_img):#, image_size):
     TP, FP, FN, TN = 0, 0, 0, 0
-    for i in range(image_size[0]):
-        for j in range(image_size[1]):
+    for i in range(gt_img.shape[0]):#range(image_size[0]):
+        for j in range(gt_img.shape[1]):#range(image_size[1]):
             if mask_img[i, j] > 0 and gt_img[i, j] > 0:
                 TP += 1
             elif mask_img[i, j] > 0 and gt_img[i, j] == 0:
@@ -38,7 +38,7 @@ def compute_metrics_gpu(mask_img, gt_img, image_size):
         pixAcc = (TP + TN) / (TP + TN + FP + FN)
     return IOU, precision, recall, f1, Dice, pixAcc
 
-
+@jit(nopython=True)
 def compute_metrics(mask_img, gt_img):
     smooth = 0.0001
     intesection_TP = np.logical_and(gt_img, mask_img)
@@ -121,7 +121,7 @@ def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512,
             counter += 1
 
             mask_image = cv2.cvtColor(cv2.imread(os.path.join(model_dir, mask_name)), cv2.COLOR_BGR2RGB)
-            mask_image = cv2.resize(mask_image, (image_size, image_size))
+            #mask_image = cv2.resize(mask_image, (image_size, image_size))
             if not raw_segmentation:
                 positive_mask = mask_image[:, :, 0]
                 negative_mask = mask_image[:, :, 2]
@@ -132,17 +132,17 @@ def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512,
             negative_mask[negative_mask > 0] = 1
 
             gt_img = cv2.cvtColor(cv2.imread(os.path.join(gt_dir, mask_name)), cv2.COLOR_BGR2RGB)
-            gt_img = cv2.resize(gt_img, (image_size, image_size))
+            #gt_img = cv2.resize(gt_img, (image_size, image_size))
 
-            positive_gt = gt_img[:, :, 0]
-            negative_gt = gt_img[:, :, 2]
+            positive_gt = gt_img[:, :, 0] # red channel
+            negative_gt = gt_img[:, :, 2] # blue channel
 
             positive_gt[positive_gt > 0] = 1
             negative_gt[negative_gt > 0] = 1
 
             # AJI_positive = compute_aji(positive_gt, positive_mask)
             # start = time.time()
-            IOU_positive, precision_positive, recall_positive, f1_positive, Dice_positive, pixAcc_positive = compute_metrics_gpu(positive_mask, positive_gt, gt_img.shape)
+            IOU_positive, precision_positive, recall_positive, f1_positive, Dice_positive, pixAcc_positive = compute_metrics_gpu(positive_mask, positive_gt)#, gt_img.shape)
             # end = time.time()
             # print(end - start)
             # print('GPU: ', IOU_positive, precision_positive, recall_positive, f1_positive, Dice_positive, pixAcc_positive)
@@ -154,7 +154,7 @@ def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512,
 
             # AJI_negative = compute_aji(negative_gt, negative_mask)
             # start = time.time()
-            IOU_negative, precision_negative, recall_negative, f1_negative, Dice_negative, pixAcc_negative = compute_metrics_gpu(negative_mask, negative_gt, gt_img.shape)
+            IOU_negative, precision_negative, recall_negative, f1_negative, Dice_negative, pixAcc_negative = compute_metrics_gpu(negative_mask, negative_gt)#, gt_img.shape)
             # end = time.time()
             # print('GPU: ', IOU_negative, precision_negative, recall_negative, f1_negative, Dice_negative, pixAcc_negative)
             # start = time.time()
