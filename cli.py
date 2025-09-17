@@ -11,7 +11,7 @@ from PIL import Image
 from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
+from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, infer_cells_for_wsi, create_model, postprocess
 from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, get_information
 from deepliif.util.util import mkdirs
 from deepliif.util.checks import check_weights
@@ -816,7 +816,7 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
 
     if filename_pattern == '*':
         print('use all alowed files')
-        image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn)]
+        image_files = [fn for fn in os.listdir(input_dir) if allowed_file(fn) or fn.endswith('.svs')]
     else:
         import glob
         print('match files using filename pattern',filename_pattern)
@@ -855,21 +855,30 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
             item_show_func=lambda fn: fn
     ) as bar:
         for filename in bar:
-            img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-            images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
-
-            for name, i in images.items():
-                i.save(os.path.join(
-                    output_dir,
-                    filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
-                ))
-
-            if scoring is not None:
-                with open(os.path.join(
+            if filename.endswith('.svs'):
+                res = infer_cells_for_wsi(os.path.join(input_dir, filename), model_dir, tile_size, region_size=20000, version=4, print_log=False, seg_weights=opt.seg_weights)
+                if res is not None:
+                    with open(os.path.join(
+                            output_dir,
+                            filename.replace('.' + filename.split('.')[-1], f'.json')
+                    ), 'w') as f:
+                        json.dump(res, f, indent=2)
+            else:
+                img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
+    
+                for name, i in images.items():
+                    i.save(os.path.join(
                         output_dir,
-                        filename.replace('.' + filename.split('.')[-1], f'.json')
-                ), 'w') as f:
-                    json.dump(scoring, f, indent=2)
+                        filename.replace('.' + filename.split('.')[-1], f'_{name}.png')
+                    ))
+
+                if scoring is not None:
+                    with open(os.path.join(
+                            output_dir,
+                            filename.replace('.' + filename.split('.')[-1], f'.json')
+                    ), 'w') as f:
+                        json.dump(scoring, f, indent=2)
 
 
 @cli.command()

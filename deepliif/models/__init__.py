@@ -281,6 +281,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         nets = init_nets(model_dir, eager_mode, opt)
     
     flag_seg_0 = None # whether the seg generator starts from 0 (e.g., GS0 for the base input) or 1 (e.g., GS1 for the base input)
+    
     if f'G{opt.mod_id_seg}0' in nets:
         flag_seg_0 = True
     elif opt.seg_gen:
@@ -355,11 +356,10 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         
         lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
         # run seg generator for the base input
-        if not seg_only:
-            if flag_seg_0 and weights[f'G{opt.mod_id_seg}0'] != 0:
-                lazy_segs[f'G{opt.mod_id_seg}0'] = forward(ts, nets[f'G{opt.mod_id_seg}0'])
-            elif not flag_seg_0 and weights[f'G{opt.mod_id_seg}1'] != 0:
-                lazy_segs[f'G{opt.mod_id_seg}1'] = forward(ts, nets[f'G{opt.mod_id_seg}1'])
+        if flag_seg_0 and weights[f'G{opt.mod_id_seg}0'] != 0:
+            lazy_segs[f'G{opt.mod_id_seg}0'] = forward(ts, nets[f'G{opt.mod_id_seg}0'])
+        elif not flag_seg_0 and weights[f'G{opt.mod_id_seg}1'] != 0:
+            lazy_segs[f'G{opt.mod_id_seg}1'] = forward(ts, nets[f'G{opt.mod_id_seg}1'])
         segs = compute(lazy_segs)[0]
         
         model_name_first = list(nets.keys())[0]
