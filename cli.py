@@ -12,7 +12,7 @@ from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, infer_cells_for_wsi, create_model, postprocess
-from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, get_information
+from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, infer_background_colors, get_information
 from deepliif.util.util import mkdirs
 from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
@@ -304,12 +304,18 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
     assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
     
+    
     d_params['input_no'] = input_no
     d_params['modalities_names'] = modalities_names
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
     d_params['lambda_identity'] = 0
     d_params['pool_size'] = pool_size
+    
+    if seg_gen:
+        # estimate background color for output modalities
+        background_colors = infer_background_colors(os.path.join(dataroot,'train'), sample_size=10, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=32, return_list=True)
+        d_params['background_colors'] = background_colors
     
     
     # update generator arch

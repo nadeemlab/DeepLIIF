@@ -419,9 +419,11 @@ def is_empty(tile):
 def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, seg_weights=None, use_dask=True, output_tensor=False):
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
+            print(opt.background_colors)
             if seg_only:
                 res = {
-                    f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                    #f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                    f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[-1]),
                     f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 }
                 
@@ -438,9 +440,13 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
                 #     'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 #     'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 # }
-                res = {**{f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)) for i in range(opt.modalities_no)},
+                # res = {**{f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)) for i in range(opt.modalities_no)},
+                #        **{f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10))},
+                #         **{f'G{opt.mod_id_seg}{i+1}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
+                res = {**{f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[i]) for i in range(opt.modalities_no)},
                        **{f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10))},
                         **{f'G{opt.mod_id_seg}{i+1}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
+
             # when modalities_no = 0... we do not need to generate G0 - output should be just a seg image
             if 'G0' in res:
                 del res['G0']

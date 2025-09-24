@@ -377,6 +377,92 @@ def adjust_background_tile(img):
     return image
 
 
+def infer_background_colors(dir_data, sample_size=5, input_no=1, modalities_no=4,
+                                    seg_no=1, tile_size=32, return_list=False):
+    fns = [x for x in os.listdir(dir_data) if x.endswith('.png')]
+    sample_size = min(sample_size, len(fns))
+    w, h, num_img = None, None, None
+
+    background_colors = {}
+
+    for fn in fns[:sample_size]:
+        img = Image.open(f"{dir_data}/{fn}")
+        
+        if w is None:
+            num_img = img.size[0] / img.size[1]
+            num_img = int(num_img)
+            w, h = img.size
+        
+        background_colors_img = infer_background_colors_for_img(img, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=tile_size, w=w, h=h, num_img=num_img)
+        
+        for mod_id, rgb_avg in background_colors_img.items():
+            try:
+                background_colors[mod_id].append(rgb_avg)
+            except:
+                background_colors[mod_id] = [rgb_avg]
+    
+    background_colors = {k:np.mean(v,axis=0).astype(np.uint8) for k,v in background_colors.items()}
+    
+    if return_list:
+        return [tuple(e) for e in background_colors.values()]
+    else:
+        return background_colors
+
+
+def infer_background_colors_for_img(img, input_no=1, modalities_no=4, seg_no=1, tile_size=32,
+                                    w=None, h=None, num_img=None):
+    """
+    Estimate background colors for a given RGB image.
+    The empty tiles are determined by applying is_empty() function on segmentation modalities.
+    If multiple segmentation modalities present, only common empty tiles are used for background
+    color calculation.
+    """
+    from ..models import is_empty
+    
+    if w is None:
+        num_img = img.size[0] / img.size[1]
+        num_img = int(num_img)
+        w, h = img.size
+            
+    empty_tiles = {}
+    l_box = []
+    background_colors = {}
+    
+    for i in range(num_img-seg_no, num_img):
+        img_mod = img.crop((h*i,0,h*(i+1),h))
+        l_box_mod = []
+        for x in range(0, h, tile_size):
+            for y in range(0, h, tile_size):
+                box = (x, y, x+tile_size, y+tile_size)
+                tile = img_mod.crop(box)
+                if is_empty(tile):
+                    l_box_mod.append(box)
+        l_box.append(l_box_mod)
+
+    l_box_final = set()
+    if len(l_box) > 1:
+        # only keep overlapped boxes
+        for l in l_box:
+            l_box_final = l_box_final & set(l)
+        l_box_final = list(l_box_final)
+    else:
+        l_box_final = l_box[0]
+    #print(f'{len(l_box_final)} tiles are considered empty using segmentation modalities')
+
+    for i in range(input_no, modalities_no+input_no):
+        empty_tiles[i] = []
+        img_mod = img.crop((h*i,0,h*(i+1),h))
+        for box in l_box_final:
+            tile = img_mod.crop(box)
+            empty_tiles[i].append(tile)
+
+        img_avg = np.mean(np.stack(empty_tiles[i], axis=0), axis=0) # take an average across all empty images
+        rgb_avg = np.mean(img_avg,axis=(0,1)).astype(np.uint8)
+        background_colors[i] = rgb_avg
+
+    return background_colors
+
+
 def image_variance_gray(img):
     px = np.asarray(img) if img.mode == 'L' else np.asarray(img.convert('L'))
     idx = np.logical_and(px != 255, px != 0)
@@ -397,6 +483,7 @@ def image_variance_rgb(img):
         return [0, 0, 0]
     var = np.var(val, axis=0)
     return var
+
 
 
 def init_javabridge_bioformats():
@@ -526,8 +613,6 @@ class WSIReader:
         if self._rescale:
             px = (px * 255).astype(np.uint8)
         return px
-
-
 
 
 def write_results_to_pickle_file(output_addr, results):

@@ -102,6 +102,12 @@ class Options:
                     print('modalities names:', self.modalities_names)
                     print('mod id seg:', self.mod_id_seg)
             
+            if not hasattr(self, 'background_colors'):
+                if self.model in ['DeepLIIF','DeepLIIFKD']:
+                    self.background_colors = [(201, 211, 208),(10, 10, 10), (0, 0, 0), (10, 10, 10)]
+                else:
+                    self.background_colors = [(10, 10, 10)] * self.modalities_no
+            
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
             model_dir = Path(path_file).parent
