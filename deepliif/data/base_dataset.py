@@ -99,7 +99,9 @@ def get_transform(preprocess, load_size, crop_size, no_flip, params=None, graysc
 
     if not no_flip:
         if params is None:
+            # default p=0.5
             transform_list.append(transforms.RandomHorizontalFlip())
+            transform_list.append(transforms.RandomVerticalFlip())
         elif params['flip']:
             transform_list.append(transforms.Lambda(lambda img: __flip(img, params['flip'])))
 
