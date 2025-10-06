@@ -3,6 +3,7 @@ from .base_model import BaseModel
 from . import networks
 from .networks import get_optimizer
 import os
+from ..util.util import get_mod_id_seg, get_input_id
 
 
 class DeepLIIFModel(BaseModel):
@@ -21,12 +22,22 @@ class DeepLIIFModel(BaseModel):
         self.seg_weights = opt.seg_weights
         self.loss_G_weights = opt.loss_G_weights
         self.loss_D_weights = opt.loss_D_weights
-        if not hasattr(self,'mod_id_seg') and hasattr(opt,'mod_id_seg'): # use mod id seg from train opt file if available
-            self.mod_id_seg = self.opt.mod_id_seg
-        elif not hasattr(self,'mod_id_seg') and not hasattr(opt,'modalities_names'): # backward compatible with models trained before this param was introduced
-            self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
-        elif not hasattr(self,'mod_id_seg'):
-            self.mod_id_seg = 'S'
+        if not opt.continue_train:
+            if not hasattr(self,'mod_id_seg') and hasattr(opt,'mod_id_seg'): # use mod id seg from train opt file if available
+                self.mod_id_seg = self.opt.mod_id_seg
+            elif not hasattr(self,'mod_id_seg') and not hasattr(opt,'modalities_names'): # backward compatible with models trained before this param was introduced
+                self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
+            elif not hasattr(self,'mod_id_seg'):
+                self.mod_id_seg = 'S'
+            self.input_id = 0
+        else: 
+            if hasattr(opt, 'mod_id_seg'):
+                self.mod_id_seg = self.opt.mod_id_seg
+            else:
+                # for contiue-training, extract mod id seg from existing files if not available
+                self.mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+            self.input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+            
         print('Initializing DeepLIIF model with segmentation modality id:',self.mod_id_seg)
         
         if not opt.is_train:
@@ -57,16 +68,21 @@ class DeepLIIFModel(BaseModel):
                 self.model_names_g.append(f'G{i}')
 
             for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
-                self.model_names.extend([f'G{self.mod_id_seg}{i}', f'D{self.mod_id_seg}{i}'])
-                self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
+                if self.input_id == '0':
+                    self.model_names.extend([f'G{self.mod_id_seg}{i}', f'D{self.mod_id_seg}{i}'])
+                    self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
+                else:
+                    self.model_names.extend([f'G{self.mod_id_seg}{i+1}', f'D{self.mod_id_seg}{i+1}'])
+                    self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
+                    
         else:  # during test time, only load G
             self.model_names = []
             for i in range(1, self.opt.modalities_no + 1):
                 self.model_names.extend([f'G{i}'])
                 self.model_names_g.append(f'G{i}')
 
-            fns = [x for x in os.listdir(os.path.join(opt.checkpoints_dir, opt.name))]
-            if f'latest_net_G{self.mod_id_seg}0.pth' in fns:
+            input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+            if input_id == '0':
                 for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
                     self.model_names.extend([f'G{self.mod_id_seg}{i}'])
                     self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
@@ -93,7 +109,10 @@ class DeepLIIFModel(BaseModel):
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.model_names_d = [f'D{i+1}' for i in range(self.opt.modalities_no)]
-            self.model_names_ds = [f'D{self.mod_id_seg}{i}' for i in range(self.opt.modalities_no+1)]
+            if self.input_id == '0':
+                self.model_names_ds = [f'D{self.mod_id_seg}{i}' for i in range(self.opt.modalities_no+1)]
+            else:
+                self.model_names_ds = [f'D{self.mod_id_seg}{i+1}' for i in range(self.opt.modalities_no+1)]
             for model_name in self.model_names_d:
                 setattr(self,f'net{model_name}',networks.define_D(opt.input_nc+opt.output_nc , opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids))
