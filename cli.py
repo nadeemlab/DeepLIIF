@@ -431,7 +431,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             if total_iters % display_freq == 0:
                 save_result = total_iters % update_html_freq == 0
                 model.compute_visuals()
-                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result)
+                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=data['A_paths'][0])
 
             # print training losses and save logging information to the disk
             if total_iters % print_freq == 0:
