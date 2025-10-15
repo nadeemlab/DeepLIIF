@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import os
-from ..util.util import mkdirs
+from ..util.util import mkdirs, get_mod_id_seg, get_input_id
 import re
 
 def read_model_params(file_addr):
@@ -88,19 +88,16 @@ class Options:
                 self.modalities_no = self.targets_no - 1
                 del self.targets_no
             
+            self.mod_id_seg = get_mod_id_seg(os.path.dirname(path_file))
+            print('mod id seg:', self.mod_id_seg)
+            
             if self.model in ['DeepLIIF','DeepLIIFKD']:
-                if hasattr(self,'modalities_names'):
-                    self.mod_id_seg = 'S'
+                print('Determining modalities names for test-mode model...')
+                if self.modalities_no == 4:
+                    self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
                 else:
-                    print('Determining modalities names and mod id seg for test-mode model...')
-                    if self.modalities_no == 4:
-                        self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
-                        self.mod_id_seg = 5
-                    else:
-                        self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
-                        self.mod_id_seg = self.modalities_no+1
-                    print('modalities names:', self.modalities_names)
-                    print('mod id seg:', self.mod_id_seg)
+                    self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+            print('modalities names:', self.modalities_names)
             
             if not hasattr(self, 'background_colors'):
                 if self.model in ['DeepLIIF','DeepLIIFKD']:
