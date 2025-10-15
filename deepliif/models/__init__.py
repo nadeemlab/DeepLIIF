@@ -37,7 +37,7 @@ import numpy as np
 from dask import delayed, compute
 
 from deepliif.util import *
-from deepliif.util.util import tensor_to_pil
+from deepliif.util.util import tensor_to_pil, get_input_id
 from deepliif.data import transform
 from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
@@ -122,45 +122,38 @@ def load_torchscript_model(model_pt_path, device):
 
 
 
-def load_eager_models(opt, l_devices=None):
+def load_eager_models(opt, devices=None):
     # create a model given model and other options
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
 
     nets = {}
-    if l_devices:
-        l_model_names = [list(devices.keys()) for devices in l_devices]
+    if devices:
+        model_names = list(devices.keys())
     else:
-        l_model_names = [model.model_names]
-    
-    for i,model_names in enumerate(l_model_names):
-        try:
-            for name in model_names:#model.model_names:
-                if isinstance(name, str):
-                    if '_' in name:
-                        net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
-                    else:
-                        net = getattr(model, 'net' + name)
-            
-                    if opt.phase != 'train':
-                        net.eval()
-                        net = disable_batchnorm_tracking_stats(net)
-                    
-                    # SDG models when loaded are still DP.. not sure why
-                    if isinstance(net, torch.nn.DataParallel):
-                        net = net.module
-        
-                    nets[name] = net
-                    if l_devices:
-                        nets[name].to(l_devices[i][name])
-                    
-            return nets
-        except Exception as e:
-            #print(e)
-            pass
-    raise Exception(f'Failed to load eager models: None of the model names candidates ({l_model_names}) can be found in the initialized model ({model.model_names})')
+        model_names = model.model_names
 
+    for name in model_names:#model.model_names:
+        if isinstance(name, str):
+            if '_' in name:
+                net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+            else:
+                net = getattr(model, 'net' + name)
+    
+            if opt.phase != 'train':
+                net.eval()
+                net = disable_batchnorm_tracking_stats(net)
+            
+            # SDG models when loaded are still DP.. not sure why
+            if isinstance(net, torch.nn.DataParallel):
+                net = net.module
+
+            nets[name] = net
+            if devices:
+                nets[name].to(devices[name])
+            
+    return nets
 
 @lru_cache
 def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
@@ -184,26 +177,23 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         #     ('G4', 'G55'),
         #     ('G51',)
         # ]
+        input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+        input_id = int(input_id)
         if opt.modalities_no == 0:
-            l_net_groups = [[(f'G{opt.mod_id_seg}1',)], [(f'G{opt.mod_id_seg}0',)]]
+            net_groups = [(f'G{opt.mod_id_seg}1',)], [(f'G{opt.mod_id_seg}0',)]
         else:
-            net_groups_1 = [(f'G{i+1}', f'G{opt.mod_id_seg}{i+2}') for i in range(opt.modalities_no)]
-            net_groups_1 += [(f'G{opt.mod_id_seg}1',)] # this is the generator for the input base mod
-            
-            net_groups_2 = [(f'G{i+1}', f'G{opt.mod_id_seg}{i+1}') for i in range(opt.modalities_no)]
-            net_groups_2 += [(f'G{opt.mod_id_seg}0',)] # this is the generator for the input base mod
-            
-            l_net_groups = [net_groups_1, net_groups_2]
+            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{input_id+1}') for i in range(opt.modalities_no)]
+            net_groups += [(f'G{opt.mod_id_seg}{input_id}',)] # this is the generator for the input base mod
     elif opt.model in ['DeepLIIFExt','SDG']:
         if opt.seg_gen:
-            l_net_groups = [[(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]]
+            net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
         else:
-            l_net_groups = [[(f'G_{i+1}',) for i in range(opt.modalities_no)]]
+            net_groups = [(f'G_{i+1}',) for i in range(opt.modalities_no)]
     elif opt.model == 'CycleGAN':
         if opt.BtoA:
-            l_net_groups = [[(f'GB_{i+1}',) for i in range(opt.modalities_no)]]
+            net_groups = [(f'GB_{i+1}',) for i in range(opt.modalities_no)]
         else:
-            l_net_groups = [[(f'GA_{i+1}',) for i in range(opt.modalities_no)]]
+            net_groups = [(f'GA_{i+1}',) for i in range(opt.modalities_no)]
     else:
         raise Exception(f'init_nets() not implemented for model {opt.model}')
 
@@ -212,26 +202,20 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
 
     if number_of_gpus > 0:
         mapping_gpu_ids = {i:idx for i,idx in enumerate(opt.gpu_ids)}
-        l_chunks = [[itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)] for net_groups in l_net_groups]
+        chunks = [itertools.chain.from_iterable(c) for c in chunker(net_groups, number_of_gpus)]
         # chunks = chunks[1:]
-        l_devices = [{n: torch.device(f'cuda:{mapping_gpu_ids[i]}') for i, g in enumerate(chunks) for n in g} for chunks in l_chunks]
-        # devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
+        #l_devices = [{n: torch.device(f'cuda:{mapping_gpu_ids[i]}') for i, g in enumerate(chunks) for n in g} for chunks in l_chunks]
+        devices = {n: torch.device(f'cuda:{i}') for i, g in enumerate(chunks) for n in g}
     else:
-        l_devices = [{n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)} for net_groups in l_net_groups]
+        devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
     if eager_mode:
-        return load_eager_models(opt, l_devices)
+        return load_eager_models(opt, devices)
 
-    for devices in l_devices:
-        try:
-            return {
-                n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
-                for n, d in devices.items()
-            }
-        except:
-            pass
-    fns = [x for x in os.listdir(model_dir) if x.endswith('.pt')]
-    raise Exception(f'Failed to load serialized models: None of the model name candidates ({l_devices}) can be found in the directory ({fns})')
+    return {
+        n: load_torchscript_model(os.path.join(model_dir, f'{n}.pt'), device=d)
+        for n, d in devices.items()
+    }
 
 
 def compute_overlap(img_size, tile_size):
@@ -282,13 +266,9 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
         nets = init_nets(model_dir, eager_mode, opt)
     
-    flag_seg_0 = None # whether the seg generator starts from 0 (e.g., GS0 for the base input) or 1 (e.g., GS1 for the base input)
+    input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name)) # whether the seg generator starts from 0 (e.g., GS0 for the base input) or 1 (e.g., GS1 for the base input)
+    input_id = int(input_id)
     
-    if f'G{opt.mod_id_seg}0' in nets:
-        flag_seg_0 = True
-    elif opt.seg_gen:
-        flag_seg_0 = False
-        
     if use_dask: # check if use_dask should be overwritten
         use_dask = True if opt.norm != 'spectral' else False
     
@@ -321,10 +301,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': 0.0, # Lap2
             #     'G55': 0.5, # Marker
             # }
-            if flag_seg_0:
-                weights = {f'G{opt.mod_id_seg}{i}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
-            else:
-                weights = {f'G{opt.mod_id_seg}{i+1}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
+            weights = {f'G{opt.mod_id_seg}{input_id+i}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
         else:
             # weights = {
             #     'G51': seg_weights[0], # IHC
@@ -333,18 +310,10 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': seg_weights[3], # Lap2
             #     'G55': seg_weights[4], # Marker
             # }
-            if flag_seg_0:
-                weights = {f'G{opt.mod_id_seg}{i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
-            else:
-                weights = {f'G{opt.mod_id_seg}{i+1}': seg_weight for i,seg_weight in enumerate(seg_weights)}
+            weights = {f'G{opt.mod_id_seg}{input_id+i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
         
-            
-        if flag_seg_0:
-            # seg_map = {'G1': 'G51', 'G2': 'G52', 'G3': 'G53', 'G4': 'G54'}
-            seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{i+1}' for i in range(opt.modalities_no)}
-        else:
-            # seg_map = {'G1': 'G52', 'G2': 'G53', 'G3': 'G54', 'G4': 'G55'}
-            seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{i+2}' for i in range(opt.modalities_no)}
+        
+        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{input_id+1}' for i in range(opt.modalities_no)}
         if seg_only:
             seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
         
