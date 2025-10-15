@@ -35,12 +35,14 @@ params:
 """
 
 class Statistics:
-    def __init__(self, gt_path, model_path, output_path, model_name='', mode='Segmentation',
+    def __init__(self, gt_path, model_path, output_path, fns_evaluate=None,
+                 model_name='', mode='Segmentation',
                  raw_segmentation=False, device='cuda', batch_size=50, num_workers=8, 
                  image_types='Hema,DAPI,Lap2,Marker', seg_type='Seg'):
         self.gt_path = gt_path
         self.model_path = model_path
         self.output_path = output_path
+        self.fns_evaluate = fns_evaluate
         self.model_name = model_name
         self.mode = mode
         self.raw_segmentation = raw_segmentation
@@ -79,6 +81,8 @@ class Statistics:
     def compute_mse_ssim_scores(self):
         for img_type in self.image_types:
             images = os.listdir(self.model_path)
+            if self.fns_evaluate is not None:
+                images = [fn for fn in images if fn in self.fns_evaluate]
             mse_arr = []
             ssim_arr = []
             # mse_info = []
@@ -109,6 +113,8 @@ class Statistics:
         """
         for img_type in self.image_types:
             images = os.listdir(self.model_path)
+            if self.fns_evaluate is not None:
+                images = [fn for fn in images if fn in self.fns_evaluate]
             mse_arr = []
             score_arr = []
             # mse_info = []
@@ -126,6 +132,8 @@ class Statistics:
     def compute_inception_score(self):
         for img_type in self.image_types:
             images = os.listdir(self.model_path)
+            if self.fns_evaluate is not None:
+                images = [fn for fn in images if fn in self.fns_evaluate]
             real_images_array = []
             for img in images:
                 if img_type in img:
@@ -150,6 +158,8 @@ class Statistics:
             orig_images = []
             mask_images = []
             images = os.listdir(self.model_path)
+            if self.fns_evaluate is not None:
+                images = [fn for fn in images if fn in self.fns_evaluate]
             for img_name in images:
                 if img_type in img_name:
                     orig_img = cv2.cvtColor(cv2.imread(os.path.join(self.gt_path, img_name)), cv2.COLOR_BGR2RGB)
@@ -181,6 +191,8 @@ class Statistics:
 
     def compute_IHC_scoring(self):
         images = os.listdir(self.gt_path)
+        if self.fns_evaluate is not None:
+                images = [fn for fn in images if fn in self.fns_evaluate]
         IHC_info = []
         for img in images:
             gt_image = cv2.cvtColor(cv2.imread(os.path.join(self.gt_path, img)), cv2.COLOR_BGR2RGB)
@@ -217,7 +229,7 @@ class Statistics:
         boundary_thresh = 100
         noise_size = 50
         
-        self.segmentation_info, self.segmentation_metrics = compute_segmentation_metrics(self.gt_path, self.model_path, self.model_name, image_size=512, thresh=thresh, boundary_thresh=boundary_thresh, small_object_size=noise_size, raw_segmentation=self.raw_segmentation, suffix_seg=self.seg_type)
+        self.segmentation_info, self.segmentation_metrics = compute_segmentation_metrics(self.gt_path, self.model_path, self.model_name, self.fns_evaluate, image_size=512, thresh=thresh, boundary_thresh=boundary_thresh, small_object_size=noise_size, raw_segmentation=self.raw_segmentation, suffix_seg=self.seg_type)
         assert len(self.segmentation_info) > 0, 'No segmentation results returned; one typical cause is a wrong --seg-type and/or --image-types that cannot be found in any image filename'
         self.write_list_to_csv(self.segmentation_info, self.segmentation_info[0].keys(),
                                filename='segmentation_info_' + self.mode + '_' + self.model_name + '_' + str(thresh) + '_' + str(noise_size) + '.csv')

@@ -102,12 +102,15 @@ def compute_aji(gt_image, mask_image):
     return aji
 
 
-def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512, 
+def compute_segmentation_metrics(gt_dir, model_dir, model_name, fns_evaluate=None, image_size=512, 
                                  thresh=100, boundary_thresh=100, small_object_size=20, 
                                  raw_segmentation=True, suffix_seg=None):
     info_dict = []
     metrics = collections.defaultdict(float)
     images = os.listdir(model_dir)
+    if fns_evaluate is not None:
+        images = [fn for fn in images if fn in fns_evaluate]
+    print(f'Calculating segmentation metrics on {len(images)} images')
 
     counter = 0
     if suffix_seg is not None:
@@ -131,7 +134,8 @@ def compute_segmentation_metrics(gt_dir, model_dir, model_name, image_size=512,
             positive_mask[positive_mask > 0] = 1
             negative_mask[negative_mask > 0] = 1
 
-            gt_img = cv2.cvtColor(cv2.imread(os.path.join(gt_dir, mask_name)), cv2.COLOR_BGR2RGB)
+            mask_name_gt = mask_name.replace(postfix,'.png')
+            gt_img = cv2.cvtColor(cv2.imread(os.path.join(gt_dir, mask_name_gt)), cv2.COLOR_BGR2RGB)
             #gt_img = cv2.resize(gt_img, (image_size, image_size))
 
             positive_gt = gt_img[:, :, 0] # red channel

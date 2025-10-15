@@ -404,7 +404,7 @@ def evaluate(model_dir, input_dir, output_dir, seg_model_dir=None, phase='val', 
     return {**d_stat, **d_res}
 
 
-def evaluate_output(pred_dir, gt_dir, output_dir=None, image_types='B_1,B_2,B_3,B_4', seg_type='B_5', 
+def evaluate_output(pred_dir, gt_dir, output_dir=None, fns_evaluate=None, image_types='B_1,B_2,B_3,B_4', seg_type='B_5', 
          mode='Segmentation', batch_size=None, gpu_ids=(-1,),overwrite=False, verbose=False):
     """
     params:
@@ -436,6 +436,7 @@ def evaluate_output(pred_dir, gt_dir, output_dir=None, image_types='B_1,B_2,B_3,
         # gt_dir = os.path.join(output_dir, subfolder, 'gt_seg')
         # pred_dir = os.path.join(output_dir, subfolder, 'pred_seg')
         stats = Statistics(gt_path=gt_dir, model_path=pred_dir, output_path=output_dir,
+                           fns_evaluate=fns_evaluate,
                            image_types=image_types, seg_type=seg_type, mode='Segmentation')
         d_stat = stats.run()
 
