@@ -208,14 +208,14 @@ class HardwareStatus():
 def get_mod_id_seg(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
-    model_names = [fn[:-4].split('_')[2][1:] for fn in fns]
+    model_names = [fn[:-4].split('_')[2][1:] for fn in fns] # [1:] drop "G"
     model_name_seg = max(model_names, key=len)
     return model_name_seg[0]
 
 def get_input_id(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
-    model_names_seg = [fn[:-4].split('_')[2][1:] for fn in fns]
+    model_names_seg = [fn[:-4].split('_')[2][2:] for fn in fns] # [2:] drop "GS"/"G5"
     if '0' in model_names_seg:
         return '0'
     else:

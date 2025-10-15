@@ -180,7 +180,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
         input_id = int(input_id)
         if opt.modalities_no == 0:
-            net_groups = [(f'G{opt.mod_id_seg}1',)], [(f'G{opt.mod_id_seg}0',)]
+            net_groups = [(f'G{opt.mod_id_seg}{input_id}',)]
         else:
             net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{input_id+1}') for i in range(opt.modalities_no)]
             net_groups += [(f'G{opt.mod_id_seg}{input_id}',)] # this is the generator for the input base mod
@@ -328,10 +328,8 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         if not mod_only:
             lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
             # run seg generator for the base input
-            if flag_seg_0 and weights[f'G{opt.mod_id_seg}0'] != 0:
-                lazy_segs[f'G{opt.mod_id_seg}0'] = forward(ts, nets[f'G{opt.mod_id_seg}0'])
-            elif not flag_seg_0 and weights[f'G{opt.mod_id_seg}1'] != 0:
-                lazy_segs[f'G{opt.mod_id_seg}1'] = forward(ts, nets[f'G{opt.mod_id_seg}1'])
+            if weights[f'G{opt.mod_id_seg}{input_id}'] != 0:
+                lazy_segs[f'G{opt.mod_id_seg}{input_id}'] = forward(ts, nets[f'G{opt.mod_id_seg}{input_id}'])
             segs = compute(lazy_segs)[0]
         
             model_name_first = list(nets.keys())[0]
