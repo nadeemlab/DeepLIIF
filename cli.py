@@ -190,6 +190,8 @@ def cli():
 @click.option('--debug', is_flag=True,
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+@click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
+
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, upsample, label_smoothing, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
@@ -198,7 +200,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, model_dir_teacher,
           seg_weights, loss_weights_g, loss_weights_d,
-          modalities_no, modalities_names, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
+          modalities_no, modalities_names, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size, monitor_image):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -396,6 +398,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     visualizer = Visualizer(opt)
     # the total number of training iterations
     total_iters = 0
+    
+    # infer base epoch number, used for checkpoint filename
+    if not continue_train:
+        epoch_base = 0
+    else:
+        try:
+            epoch_base = int(epoch)
+        except:
+            epoch_base = 0
 
     # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
     for epoch in range(epoch_count, n_epochs + n_epochs_decay + 1):
@@ -428,10 +439,16 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             model.optimize_parameters()
 
             # display images on visdom and save images to a HTML file
-            if total_iters % display_freq == 0:
-                save_result = total_iters % update_html_freq == 0
-                model.compute_visuals()
-                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=data['A_paths'][0])
+            if monitor_image is not None:
+                if data['A_paths'][0].endswith(monitor_image):
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=monitor_image)
+            else:
+                if total_iters % display_freq == 0:
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=data['A_paths'][0])
 
             # print training losses and save logging information to the disk
             if total_iters % print_freq == 0:
@@ -455,9 +472,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 
         # cache our model every <save_epoch_freq> epochs
         if epoch % save_epoch_freq == 0:
-            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-            model.save_networks('latest')
-            model.save_networks(epoch)
+            if continue_train and epoch == 0: # to not overwrite the loaded epoch
+                pass
+            else:
+                print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
+                model.save_networks('latest')
+                model.save_networks(epoch+epoch_base)
 
         
         
