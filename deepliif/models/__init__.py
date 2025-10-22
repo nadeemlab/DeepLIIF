@@ -182,7 +182,7 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         if opt.modalities_no == 0:
             net_groups = [(f'G{opt.mod_id_seg}{input_id}',)]
         else:
-            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{input_id+1}') for i in range(opt.modalities_no)]
+            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{input_id+i+1}') for i in range(opt.modalities_no)]
             net_groups += [(f'G{opt.mod_id_seg}{input_id}',)] # this is the generator for the input base mod
     elif opt.model in ['DeepLIIFExt','SDG']:
         if opt.seg_gen:
@@ -313,7 +313,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             weights = {f'G{opt.mod_id_seg}{input_id+i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
         
         
-        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{input_id+1}' for i in range(opt.modalities_no)}
+        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{input_id+i+1}' for i in range(opt.modalities_no)}
         if seg_only:
             seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
         
