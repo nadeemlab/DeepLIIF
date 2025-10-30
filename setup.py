@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "opencv-python==4.8.1.78",
         "torch==2.8.0",
-        "torchvision==0.14.1",
+        "torchvision>=0.14.1",
         "scikit-image==0.18.3",
         "dominate==2.6.0",
         "numba==0.57.1",
