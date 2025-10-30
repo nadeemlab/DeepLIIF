@@ -489,9 +489,8 @@ class WSIReader:
                     self._file.close()
 
         self._bfreader = None
-        if self._tif is None:
-            self._rescale = (self._pixel_type != 'uint8')
-            self._bfreader = bioformats.ImageReader(path)
+        self._rescale = (self._pixel_type != 'uint8')
+        self._bfreader = bioformats.ImageReader(path)
 
         if self._tif is None and self._bfreader is None:
             raise Exception('Cannot read WSI file.')
@@ -520,7 +519,10 @@ class WSIReader:
     def read(self, xywh):
         if self._tif is not None:
             x, y, w, h = xywh
-            return self._zarr[y:y+h, x:x+w]
+            try:
+                return self._zarr[y:y+h, x:x+w]
+            except Exception as e:
+                pass
 
         px = self._bfreader.read(XYWH=xywh, rescale=self._rescale)
         if self._rescale:
