@@ -13,7 +13,7 @@ from torchvision.transforms import ToPILImage
 from deepliif.data import create_dataset, transform
 from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, infer_cells_for_wsi, create_model, postprocess
 from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, infer_background_colors, get_information
-from deepliif.util.util import mkdirs
+from deepliif.util.util import mkdirs, get_mod_id_seg
 from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
 from deepliif.options import Options, print_options
@@ -502,7 +502,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 
                 # calculate cell count metrics
                 if type(model).__name__ in ['DeepLIIFModel','DeepLIIFKDModel']:
-                    mod_id_seg = 'S'
+                    if continue_train:
+                        mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+                    else:
+                        mod_id_seg = 'S'
                     l_seg_names = [f'fake_B_{mod_id_seg}']
                     assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
                     seg_mod_suffix = l_seg_names[0].split('_')[-1]
@@ -860,6 +863,8 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
     opt.BtoA = btoa
     opt.epoch = epoch
     
+    seg_weights = opt.seg_weights if hasattr(opt,'seg_weights') else None
+    
     number_of_gpus_all = torch.cuda.device_count()
     if number_of_gpus_all < len(gpu_ids) and -1 not in gpu_ids:
         number_of_gpus = 0
@@ -895,7 +900,7 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
                         json.dump(res, f, indent=2)
             else:
                 img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only, mod_only=mod_only)
+                images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only, mod_only=mod_only, seg_weights=seg_weights)
     
                 for name, i in images.items():
                     i.save(os.path.join(
