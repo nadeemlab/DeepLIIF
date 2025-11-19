@@ -317,7 +317,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     if seg_gen:
         # estimate background color for output modalities
         background_colors = infer_background_colors(os.path.join(dataroot,'train'), sample_size=10, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=32, return_list=True)
-        d_params['background_colors'] = background_colors
+        if background_colors is not None:
+            d_params['background_colors'] = background_colors
     
     
     # update generator arch

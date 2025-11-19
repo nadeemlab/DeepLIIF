@@ -385,7 +385,9 @@ def infer_background_colors(dir_data, sample_size=5, input_no=1, modalities_no=4
 
     background_colors = {}
 
-    for fn in fns[:sample_size]:
+    count = 0
+    while count < sample_size and len(fns) > 0: 
+        fn = fns.pop(0)
         img = Image.open(f"{dir_data}/{fn}")
         
         if w is None:
@@ -395,18 +397,25 @@ def infer_background_colors(dir_data, sample_size=5, input_no=1, modalities_no=4
         
         background_colors_img = infer_background_colors_for_img(img, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=tile_size, w=w, h=h, num_img=num_img)
         
-        for mod_id, rgb_avg in background_colors_img.items():
-            try:
-                background_colors[mod_id].append(rgb_avg)
-            except:
-                background_colors[mod_id] = [rgb_avg]
+        if background_colors_img is not None:
+            count += 1
+            for mod_id, rgb_avg in background_colors_img.items():
+                try:
+                    background_colors[mod_id].append(rgb_avg)
+                except:
+                    background_colors[mod_id] = [rgb_avg]
     
-    background_colors = {k:np.mean(v,axis=0).astype(np.uint8) for k,v in background_colors.items()}
-    
-    if return_list:
-        return [tuple(e) for e in background_colors.values()]
+    if count > 0:
+        print(f'Calculating average color for empty tiles from {count} images..')
+        background_colors = {k:np.mean(v,axis=0).astype(np.uint8) for k,v in background_colors.items()}
+        
+        if return_list:
+            return [tuple(e) for e in background_colors.values()]
+        else:
+            return background_colors
     else:
-        return background_colors
+        print('None of the images have empty tiles for estimating averge background color. Try with a proper tile size.')
+        return None
 
 
 def infer_background_colors_for_img(img, input_no=1, modalities_no=4, seg_no=1, tile_size=32,
@@ -448,6 +457,9 @@ def infer_background_colors_for_img(img, input_no=1, modalities_no=4, seg_no=1, 
     else:
         l_box_final = l_box[0]
     #print(f'{len(l_box_final)} tiles are considered empty using segmentation modalities')
+    
+    if len(l_box_final) == 0: # this can happen for images with dense cells
+        return None
 
     for i in range(input_no, modalities_no+input_no):
         empty_tiles[i] = []
@@ -483,7 +495,6 @@ def image_variance_rgb(img):
         return [0, 0, 0]
     var = np.var(val, axis=0)
     return var
-
 
 
 def init_javabridge_bioformats():
@@ -613,6 +624,7 @@ class WSIReader:
         if self._rescale:
             px = (px * 255).astype(np.uint8)
         return px
+
 
 
 def write_results_to_pickle_file(output_addr, results):
