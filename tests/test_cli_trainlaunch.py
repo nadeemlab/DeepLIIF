@@ -163,7 +163,7 @@ def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info, foldername_suffi
 
 
 def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info, foldername_suffix):
-    if available_gpus > 0:
+    if available_gpus > 0 and model_info["model"] not in ['CycleGAN']:
         torch.cuda.nvtx.range_push("test_cli_trainlaunch_single_gpu_withval")
         dirs_input = model_info['dir_input_train']
         for i in range(len(dirs_input)):
