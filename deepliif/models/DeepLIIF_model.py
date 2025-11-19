@@ -29,7 +29,7 @@ class DeepLIIFModel(BaseModel):
                 self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
             elif not hasattr(self,'mod_id_seg'):
                 self.mod_id_seg = 'S'
-            self.input_id = 0
+            self.input_id = '0'
         else: 
             if hasattr(opt, 'mod_id_seg'):
                 self.mod_id_seg = self.opt.mod_id_seg
@@ -74,7 +74,6 @@ class DeepLIIFModel(BaseModel):
                 else:
                     self.model_names.extend([f'G{self.mod_id_seg}{i+1}', f'D{self.mod_id_seg}{i+1}'])
                     self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
-                    
         else:  # during test time, only load G
             self.model_names = []
             for i in range(1, self.opt.modalities_no + 1):
