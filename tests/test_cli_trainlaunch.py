@@ -17,6 +17,7 @@ import pytest
 available_gpus = torch.cuda.device_count()
 DDP_PARAM = '--use-torchrun "-t 3 --log_dir ../log/ --nproc_per_node 1"'
 CMD_BASIC = 'python cli.py trainlaunch --model {model} --dataroot {dataroot} --name test_local --modalities-no {modalities_no} --seg-gen {seg_gen} --batch-size 1 --num-threads 0 --checkpoints-dir {dir_save} --remote True --n-epochs 1 --n-epochs-decay 1'
+CMD_KD = ' --model-dir-teacher {model_dir_teacher}'
 
 print('Building and installing deepliif locally to test trainlaunch..')
 res = subprocess.run('pip install -e . --no-dependencies',shell=True)
@@ -43,6 +44,8 @@ def test_cli_trainlaunch_single_gpu(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -70,6 +73,8 @@ def test_cli_trainlaunch_single_gpu_optimizer(tmp_path, model_info, foldername_s
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -96,6 +101,8 @@ def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info, foldername_suffix
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -105,6 +112,8 @@ def test_cli_trainlaunch_single_gpu_netg(tmp_path, model_info, foldername_suffix
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -131,6 +140,8 @@ def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info, foldername_suffi
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -140,6 +151,8 @@ def test_cli_trainlaunch_single_gpu_netgs(tmp_path, model_info, foldername_suffi
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -166,6 +179,8 @@ def test_cli_trainlaunch_single_gpu_withval(tmp_path, model_info, foldername_suf
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
@@ -194,6 +209,8 @@ def test_cli_trainlaunch_multi_gpu_dp(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             cmd += f' {DDP_PARAM}'
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0

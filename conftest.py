@@ -38,6 +38,15 @@ MODEL_INFO = {'latest':{'model':'DeepLIIF', # cli.py train looks for subfolder "
                      'dir_model':['../checkpoints/pasto3mods_test'],
                      'modalities_no': [1],
                      'seg_gen':[False],
+                     'tile_size':512},
+              'kd':{'model':'DeepLIIFKD',
+                     'dir_input_train':['Datasets/Sample_Dataset'],
+                     'dir_input_testpy':['Datasets/Sample_Dataset'],
+                     'dir_input_inference':['Datasets/Sample_Dataset/test_cli'],
+                     'dir_model':['../checkpoints/deepliifkd_unet7unet7'],
+                     'model_dir_teacher': ['../checkpoints/DeepLIIF_Latest_Model'],
+                     'modalities_no': [4],
+                     'seg_gen':[True],
                      'tile_size':512}}
 
 def pytest_addoption(parser):

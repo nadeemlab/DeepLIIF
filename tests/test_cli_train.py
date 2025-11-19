@@ -16,7 +16,7 @@ import pytest
 
 available_gpus = torch.cuda.device_count()
 CMD_BASIC = 'python cli.py train --model {model} --dataroot {dataroot} --name test_local --modalities-no {modalities_no} --seg-gen {seg_gen} --batch-size 1 --num-threads 0 --checkpoints-dir {dir_save} --remote True --n-epochs 1 --n-epochs-decay 1'
-
+CMD_KD = ' --model-dir-teacher {model_dir_teacher}'
 #----------------------
 #---- cpu-based -------
 #----------------------
@@ -34,6 +34,8 @@ def test_cli_train(tmp_path, model_info, foldername_suffix):
         cmd = CMD_BASIC.format(model=model_info["model"], dataroot=dirs_input[i], 
                                modalities_no=model_info["modalities_no"][i], 
                                seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
+        if model_info["model"] in ['DeepLIIFKD']:
+            cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
         res = subprocess.run(cmd,shell=True)
         assert res.returncode == 0
         torch.cuda.nvtx.range_pop()
@@ -61,6 +63,8 @@ def test_cli_train_single_gpu(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
@@ -86,6 +90,8 @@ def test_cli_train_single_gpu_optimizer(tmp_path, model_info, foldername_suffix)
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
@@ -111,6 +117,8 @@ def test_cli_train_single_gpu_netg(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             
@@ -119,6 +127,8 @@ def test_cli_train_single_gpu_netg(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
@@ -144,6 +154,8 @@ def test_cli_train_single_gpu_netgs(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             
@@ -152,6 +164,8 @@ def test_cli_train_single_gpu_netgs(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
@@ -177,6 +191,8 @@ def test_cli_train_single_gpu_withval(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
@@ -204,6 +220,8 @@ def test_cli_train_multi_gpu_dp(tmp_path, model_info, foldername_suffix):
                                    modalities_no=model_info["modalities_no"][i], 
                                    seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
             cmd += f' {test_param}'
+            if model_info["model"] in ['DeepLIIFKD']:
+                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
             res = subprocess.run(cmd,shell=True)
             assert res.returncode == 0
             torch.cuda.nvtx.range_pop()
