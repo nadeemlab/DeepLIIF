@@ -99,6 +99,9 @@ class Options:
                         self.seg_weights = [0.5,0,0,0,0.5]
                 else:
                     self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+            else:
+                self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+
             print('modalities names:', self.modalities_names)
             
             if not hasattr(self, 'background_colors'):
