@@ -88,10 +88,10 @@ class Options:
                 self.modalities_no = self.targets_no - 1
                 del self.targets_no
             
-            self.mod_id_seg = get_mod_id_seg(os.path.dirname(path_file))
-            print('mod id seg:', self.mod_id_seg)
-            
             if self.model in ['DeepLIIF','DeepLIIFKD']:
+                self.mod_id_seg = get_mod_id_seg(os.path.dirname(path_file))
+                print('mod id seg:', self.mod_id_seg)
+            
                 print('Determining modalities names for test-mode model...')
                 if self.modalities_no == 4:
                     if not hasattr(self,'modalities_names'):
