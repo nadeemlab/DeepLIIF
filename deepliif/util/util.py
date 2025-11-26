@@ -208,14 +208,32 @@ class HardwareStatus():
 def get_mod_id_seg(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
-    model_names = [fn[:-4].split('_')[2][1:] for fn in fns] # [1:] drop "G"
+    
+    if len(fns) == 0: # typically this means the directory only contains serialized models
+        fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pt') and fn.startswith('G')]
+        model_names = [fn[1:-3] for fn in fns] # 1[:-3] drop ".pt" and the starting G
+    else:
+        model_names = [fn[:-4].split('_')[2][1:] for fn in fns] # [1:] drop "G"
+    
+    if len(fns) == 0:
+        raise Exception('Cannot find any model file ending with .pt or .pth in directory',dir_model)
+    
     model_name_seg = max(model_names, key=len)
     return model_name_seg[0]
 
 def get_input_id(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
-    model_names_seg = [fn[:-4].split('_')[2][2:] for fn in fns] # [2:] drop "GS"/"G5"
+    
+    if len(fns) == 0: # typically this means the directory only contains serialized models
+        fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pt') and fn.startswith('G')]
+        model_names_seg = [fn[2:-3] for fn in fns] # [2:] drop "GS"/"G5"
+    else:
+        model_names_seg = [fn[:-4].split('_')[2][2:] for fn in fns] # [2:] drop "GS"/"G5"
+    
+    if len(fns) == 0:
+        raise Exception('Cannot find any model file ending with .pt or .pth in directory',dir_model)
+      
     if '0' in model_names_seg:
         return '0'
     else:
