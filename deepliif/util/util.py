@@ -239,3 +239,31 @@ def get_input_id(dir_model):
     else:
         return '1'
     
+def init_input_and_mod_id(opt):
+    """
+    Used by model classes to initialize input id and mod id under different situations.
+    """
+    mod_id_seg = None
+    input_id = None
+    
+    if not opt.continue_train and opt.is_train:
+        if hasattr(opt,'mod_id_seg'): # use mod id seg from train opt file if available
+            mod_id_seg = opt.mod_id_seg
+        elif not hasattr(opt,'modalities_names'): # backward compatible with models trained before this param was introduced
+            mod_id_seg = opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
+        else:
+            mod_id_seg = 'S'
+        
+        if opt.model in ['DeepLIIF','DeepLIIFKD']:
+            input_id = '0'
+    else: # for both continue train and test, we load existing models, so need to obtain seg mod id and input id from filenames
+        if hasattr(opt, 'mod_id_seg'):
+            mod_id_seg = opt.mod_id_seg
+        else:
+            # for contiue-training, extract mod id seg from existing files if not available
+            mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+        
+        if opt.model in ['DeepLIIF','DeepLIIFKD']:
+            input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+        
+    return mod_id_seg, input_id

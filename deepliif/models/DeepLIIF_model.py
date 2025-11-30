@@ -3,8 +3,7 @@ from .base_model import BaseModel
 from . import networks
 from .networks import get_optimizer
 import os
-from ..util.util import get_mod_id_seg, get_input_id
-
+from ..util.util import get_input_id, init_input_and_mod_id
 
 class DeepLIIFModel(BaseModel):
     """ This class implements the DeepLIIF model, for learning a mapping from input images to modalities given paired data."""
@@ -22,23 +21,8 @@ class DeepLIIFModel(BaseModel):
         self.seg_weights = opt.seg_weights
         self.loss_G_weights = opt.loss_G_weights
         self.loss_D_weights = opt.loss_D_weights
-        if not opt.continue_train:
-            if not hasattr(self,'mod_id_seg') and hasattr(opt,'mod_id_seg'): # use mod id seg from train opt file if available
-                self.mod_id_seg = self.opt.mod_id_seg
-            elif not hasattr(self,'mod_id_seg') and not hasattr(opt,'modalities_names'): # backward compatible with models trained before this param was introduced
-                self.mod_id_seg = self.opt.modalities_no + 1 # for original DeepLIIF, modalities_no is 4 and the seg mod id is 5
-            elif not hasattr(self,'mod_id_seg'):
-                self.mod_id_seg = 'S'
-            self.input_id = '0'
-        else: 
-            if hasattr(opt, 'mod_id_seg'):
-                self.mod_id_seg = self.opt.mod_id_seg
-            else:
-                # for contiue-training, extract mod id seg from existing files if not available
-                self.mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
-            self.input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
-            
-        print('Initializing DeepLIIF model with segmentation modality id:',self.mod_id_seg)
+        self.mod_id_seg, self.input_id = init_input_and_mod_id(opt) # creates self.input_id, self.mod_id_seg
+        print(f'Initializing model with segmentation modality id {self.mod_id_seg}, input id {self.input_id}')
         
         if not opt.is_train:
             self.gpu_ids = [] # avoid the models being loaded as DP
@@ -80,8 +64,8 @@ class DeepLIIFModel(BaseModel):
                 self.model_names.extend([f'G{i}'])
                 self.model_names_g.append(f'G{i}')
 
-            input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
-            if input_id == '0':
+            #input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+            if self.input_id == '0':
                 for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
                     self.model_names.extend([f'G{self.mod_id_seg}{i}'])
                     self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
@@ -190,6 +174,7 @@ class DeepLIIFModel(BaseModel):
         #                              torch.mul(self.fake_B_5_3, self.seg_weights[2]),
         #                              torch.mul(self.fake_B_5_4, self.seg_weights[3]),
         #                              torch.mul(self.fake_B_5_5, self.seg_weights[4])]).sum(dim=0)
+        
         for i,model_name in enumerate(self.model_names_gs):
             if i == 0:
                 setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(self.real_A))
