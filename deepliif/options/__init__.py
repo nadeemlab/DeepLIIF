@@ -32,7 +32,7 @@ def read_model_params(file_addr):
             
             # if isinstance(param_dict[key],list):
             #     param_dict[key] = param_dict[key][0]
-            
+    
     return param_dict
 
 class Options:
@@ -43,7 +43,7 @@ class Options:
         
         if path_file:
             d_params = read_model_params(path_file)
-     
+        
         for k,v in d_params.items():
             try:
                 if k not in ['phase']: # e.g., k = 'phase', v = 'train', eval(v) is a function rather than a string
@@ -98,7 +98,7 @@ class Options:
                     if not hasattr(self,'modalities_names'):
                         self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
                         self.seg_weights = [0.5,0,0,0,0.5]
-                else:
+                elif not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
                     self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
             else:
                 self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]

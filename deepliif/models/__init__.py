@@ -484,9 +484,17 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
     results = tiler.results()
 
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
-        d_modname2id = {mod_name:f'G{i+1}' for i,mod_name in enumerate(opt.modalities_names[1:])}
+        # check if both the elements and the order are exactly the same
+        if [f'mod{i+1}' for i in range(opt.modalities_no)] != opt.modalities_names[1:]: 
+            # if not, append modalities_names to mod names
+            d_modname2id = {f'mod{i+1}_{mod_name}':f'G{i+1}' for i,mod_name in enumerate(opt.modalities_names[1:])}
+        else:
+            d_modname2id = {f'mod{i+1}':f'G{i+1}' for i in range(opt.modalities_no)}
+        
         if not mod_only:
             d_modname2id['Seg'] = f'G{opt.mod_id_seg}'
+        
+        #print('d_modname2id:',d_modname2id)
             
         if seg_only:
             images = {'Seg': results[d_modname2id['Seg']]}
