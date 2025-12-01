@@ -9,8 +9,12 @@ from deepliif.options.train_options import TrainOptions
 from deepliif.data import create_dataset
 from deepliif.models import create_model, postprocess
 from deepliif.options import read_model_params, Options, print_options
+from deepliif.util import infer_background_colors
 from deepliif.util.visualizer import Visualizer
+from deepliif.util.checks import check_weights
+from deepliif.util.util import get_mod_id_seg
 from PIL import Image
+import cv2
 import os
 
 import numpy as np
@@ -21,6 +25,7 @@ import torch.distributed as dist
 from torchvision.transforms import ToPILImage
 
 import click
+
 
 def set_seed(seed=0,rank=None):
     """
@@ -61,8 +66,10 @@ def set_seed(seed=0,rank=None):
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
+@click.option('--modalities-names', default='', type=str, help='an optional note of the name of each modality (input mod(s) and the mod(s) to learn stain transfer from), separated by comma; this helps document the modalities using the train opt file and will also be used to name the inference output; example: --modalities-names IHC,Hematoxylin,DAPI,Lap2,Marker')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
+@click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
 @click.option('--seg-weights', default='', type=str, help='weights used to aggregate modality images for the final segmentation image; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.25,0.15,0.25,0.1,0.25')
 @click.option('--loss-weights-g', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
 @click.option('--loss-weights-d', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
@@ -172,14 +179,16 @@ def set_seed(seed=0,rank=None):
 @click.option('--debug', is_flag=True,
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+@click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, upsample, label_smoothing, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
           verbose, lambda_l1, is_train, display_freq, display_ncols, display_id, display_server, display_env,
           display_port, update_html_freq, print_freq, no_html, save_latest_freq, save_epoch_freq, save_by_iter,
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
-          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, seg_weights, loss_weights_g, loss_weights_d,
-          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
+          remote, remote_transfer_cmd, seed, dataset_mode, padding, model, model_dir_teacher,
+          seg_weights, loss_weights_g, loss_weights_d,
+          modalities_no, modalities_names, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size, monitor_image):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -191,8 +200,8 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     plot, and save models.The script supports continue/resume training.
     Use '--continue_train' to resume your previous training.
     """
-    assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN'], f'model class {model} is not implemented'
-    if model == 'DeepLIIF':
+    assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN','DeepLIIFKD'], f'model class {model} is not implemented'
+    if model in ['DeepLIIF','DeepLIIFKD']:
         seg_no = 1
     elif model == 'DeepLIIFExt':
         if seg_gen:
@@ -203,8 +212,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         seg_no = 0
         seg_gen = False
     
+    
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
+    
+    if model == 'DeepLIIFKD':
+        assert len(model_dir_teacher) > 0 and os.path.isdir(model_dir_teacher), f'Teacher model directory {model_dir_teacher} is not valid.'
     
     if optimizer != 'adam':
         print(f'Optimizer torch.optim.{optimizer} is not tested. Be careful about the parameters of the optimizer.')
@@ -239,8 +252,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # infer number of input images
-    
-    
     if dataset_mode == 'unaligned':
         dir_data_train = dataroot + '/trainA'
         fns = os.listdir(dir_data_train)
@@ -279,12 +290,23 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
         
         pool_size = 0
-        
+    
+    modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
+    assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
+    
+    
     d_params['input_no'] = input_no
+    d_params['modalities_names'] = modalities_names
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
     d_params['lambda_identity'] = 0
     d_params['pool_size'] = pool_size
+    
+    if seg_gen:
+        # estimate background color for output modalities
+        background_colors = infer_background_colors(os.path.join(dataroot,'train'), sample_size=10, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=32, return_list=True)
+        if background_colors is not None:
+            d_params['background_colors'] = background_colors
     
     
     # update generator arch
@@ -295,7 +317,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     
     net_gs = net_gs.split(',')
     assert len(net_gs) in [1,seg_no], f'net_gs should contain either 1 architecture for all segmentation generators or the same number of architectures as the number of segmentation generators ({seg_no})'
-    if len(net_gs) == 1 and model == 'DeepLIIF':
+    if len(net_gs) == 1 and model in ['DeepLIIF','DeepLIIFKD']:
         net_gs = net_gs*(modalities_no + seg_no)
     elif len(net_gs) == 1:
         net_gs = net_gs*seg_no
@@ -303,36 +325,31 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     d_params['net_g'] = net_g
     d_params['net_gs'] = net_gs
     
+    def get_weights(model='DeepLIIF', modalities_no=4, default=[0.25,0.15,0.25,0.1,0.25]):
+        if model in ['DeepLIIF','DeepLIIFKD'] and modalities_no == 4:
+            return default
+        elif model in ['DeepLIIF','DeepLIIFKD']:
+            return [1 / (modalities_no + 1)] * (modalities_no + 1)
+        else:
+            return [1 / modalities_no] * modalities_no
+          
     # check seg weights and loss weights
     if len(d_params['seg_weights']) == 0:
-        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        seg_weights = get_weights(d_params['model'], modalities_no, default=[0.25,0.15,0.25,0.1,0.25])
     else:
         seg_weights = [float(x) for x in seg_weights.split(',')]
     
     if len(d_params['loss_weights_g']) == 0:
-        loss_weights_g = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        loss_weights_g = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_g = [float(x) for x in loss_weights_g.split(',')]
     
     if len(d_params['loss_weights_d']) == 0:
-        loss_weights_d = [0.2]*5 if d_params['model'] == 'DeepLIIF' else [1 / modalities_no] * modalities_no
+        loss_weights_d = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_d = [float(x) for x in loss_weights_d.split(',')]
     
-    assert sum(seg_weights) == 1, 'seg weights should add up to 1'
-    assert sum(loss_weights_g) == 1, 'loss weights g should add up to 1'
-    assert sum(loss_weights_d) == 1, 'loss weights d should add up to 1'
-    
-    if model == 'DeepLIIF':
-        # +1 because input becomes an additional modality used in generating the final segmentation
-        assert len(seg_weights) == modalities_no+1, 'seg weights should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_g) == modalities_no+1, 'loss weights g should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_d) == modalities_no+1, 'loss weights d should have the same number of elements as number of modalities to be generated'
-
-    else:
-        assert len(seg_weights) == modalities_no, 'seg weights should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_g) == modalities_no, 'loss weights g should have the same number of elements as number of modalities to be generated'
-        assert len(loss_weights_d) == modalities_no, 'loss weights d should have the same number of elements as number of modalities to be generated'
+    check_weights(model, modalities_no, seg_weights, loss_weights_g, loss_weights_d)
 
     d_params['seg_weights'] = seg_weights
     d_params['loss_G_weights'] = loss_weights_g
@@ -358,7 +375,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         data_val = [batch for batch in dataset_val]
         click.echo('The number of validation images = %d' % len(dataset_val))
         
-        if model in ['DeepLIIF']: 
+        if model in ['DeepLIIF', 'DeepLIIFKD']: 
             metrics_val = json.load(open(os.path.join(dataset_val.dataset.dir_AB,'metrics.json')))
 
     # create a model given model and other options
@@ -370,6 +387,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     visualizer = Visualizer(opt)
     # the total number of training iterations
     total_iters = 0
+    
+    # infer base epoch number, used for checkpoint filename
+    if not continue_train:
+        epoch_base = 0
+    else:
+        try:
+            epoch_base = int(epoch)
+        except:
+            epoch_base = 0
 
     # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
     for epoch in range(epoch_count, n_epochs + n_epochs_decay + 1):
@@ -402,10 +428,16 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             model.optimize_parameters()
 
             # display images on visdom and save images to a HTML file
-            if total_iters % display_freq == 0:
-                save_result = total_iters % update_html_freq == 0
-                model.compute_visuals()
-                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result)
+            if monitor_image is not None:
+                if data['A_paths'][0].endswith(monitor_image):
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=monitor_image)
+            else:
+                if total_iters % display_freq == 0:
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=data['A_paths'][0])
 
             # print training losses and save logging information to the disk
             if total_iters % print_freq == 0:
@@ -429,9 +461,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 
         # cache our model every <save_epoch_freq> epochs
         if epoch % save_epoch_freq == 0:
-            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-            model.save_networks('latest')
-            model.save_networks(epoch)
+            if continue_train and epoch == 0: # to not overwrite the loaded epoch
+                pass
+            else:
+                print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
+                model.save_networks('latest')
+                model.save_networks(epoch+epoch_base)
 
         
         
@@ -455,8 +490,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 l_losses_val += [(k,v) for k,v in losses_val_batch.items()]
                 
                 # calculate cell count metrics
-                if type(model).__name__ == 'DeepLIIFModel':
-                    l_seg_names = ['fake_B_5']
+                if type(model).__name__ in ['DeepLIIFModel','DeepLIIFKDModel']:
+                    if continue_train:
+                        mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+                    else:
+                        mod_id_seg = 'S'
+                    l_seg_names = [f'fake_B_{mod_id_seg}']
                     assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
                     seg_mod_suffix = l_seg_names[0].split('_')[-1]
                     l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]

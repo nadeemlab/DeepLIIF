@@ -4,7 +4,7 @@ from . import networks
 from .networks import get_optimizer
 from . import init_nets, run_dask, get_opt
 from torch import nn
-from ..util.util import get_input_id, init_input_and_mod_id
+from ..util.util import get_input_id, init_input_and_mod_id, map_model_names
 
 class DeepLIIFKDModel(BaseModel):
     """ This class implements the DeepLIIF model, for learning a mapping from input images to modalities given paired data."""
@@ -38,12 +38,10 @@ class DeepLIIFKDModel(BaseModel):
             self.visual_names.extend([f'fake_B_{i+1}', f'fake_B_{i+1}_teacher', f'real_B_{i+1}'])
         self.loss_names.extend([f'G_GAN_{self.mod_id_seg}',f'G_L1_{self.mod_id_seg}',f'D_real_{self.mod_id_seg}',f'D_fake_{self.mod_id_seg}',
                                 f'G_KLDiv_{self.mod_id_seg}',f'G_KLDiv_{self.mod_id_seg}{self.opt.modalities_no}'])
-        print('self.loss_names',self.loss_names)
         
         for i in range(self.opt.modalities_no+1):
             self.visual_names.extend([f'fake_B_{self.mod_id_seg}{i}', f'fake_B_{self.mod_id_seg}{i}_teacher']) # 0 is used for the base input mod
         self.visual_names.extend([f'fake_B_{self.mod_id_seg}', f'fake_B_{self.mod_id_seg}_teacher', f'real_B_{self.mod_id_seg}',])
-        print('self.visual_names',self.visual_names)
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -77,7 +75,6 @@ class DeepLIIFKDModel(BaseModel):
                 for i in range(self.opt.modalities_no + 1):  # old setting, 1 is used for the base input mod
                     self.model_names.extend([f'G{self.mod_id_seg}{i+1}'])
                     self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
-        print('self.model_names',self.model_names)
         
         # define networks (both generator and discriminator)
         if isinstance(opt.netG, str):
@@ -114,10 +111,18 @@ class DeepLIIFKDModel(BaseModel):
             self.opt_teacher.gpu_ids = opt.gpu_ids # use student's gpu_ids
             self.nets_teacher = init_nets(opt.model_dir_teacher, eager_mode=True, opt=self.opt_teacher, phase='test')
             
-            # TODO: modify model names to be consistent with the current deepliifkd model names
+            # modify model names to be consistent with the current deepliifkd model names
             # otherwise it may be tricky to pair the loss terms?
             self.opt_teacher.mod_id_seg, self.opt_teacher.input_id = init_input_and_mod_id(self.opt_teacher)
-            
+            d_mapping_model_name = map_model_names(list(self.nets_teacher.keys()),self.opt_teacher.mod_id_seg,self.opt_teacher.input_id,
+                                        self.mod_id_seg,self.input_id)
+            self.d_mapping_model_name = d_mapping_model_name
+            print('Model name mapping, teacher model to student model:',self.d_mapping_model_name)
+        else:
+            # remove all model names for the teacher model
+            self.model_names = [name for name in self.model_names if not name.endswith('_teacher')]
+            self.loss_names = [name for name in self.loss_names if not name.endswith('_teacher')]
+            self.visual_names = [name for name in self.visual_names if not name.endswith('_teacher')]
             
 
         if self.is_train:
@@ -203,18 +208,19 @@ class DeepLIIFKDModel(BaseModel):
             
         setattr(self,f'fake_B_{self.mod_id_seg}',torch.stack([torch.mul(getattr(self,f'fake_B_{self.mod_id_seg}_{i}'), self.seg_weights[i]) for i in range(self.opt.modalities_no+1)]).sum(dim=0))
 
-        fakes_teacher = run_dask(img=self.real_A, nets=self.nets_teacher, opt=self.opt_teacher, use_dask=False, output_tensor=True)
-        #print(f'Checking seg mod id for teacher model: current id is {self.opt_teacher.mod_id_seg}, id to map to is {self.mod_id_seg}')
-        for k,v in fakes_teacher.items():
-            suffix = k[1:] # starts with G
-            l_suffix = list(suffix)
-            if l_suffix[0] == str(self.opt_teacher.mod_id_seg): # mod_id_seg might be integer
-                if l_suffix[0] != str(self.mod_id_seg):
-                    l_suffix[0] = str(self.mod_id_seg)
-            #suffix = '_'.join(list(suffix)) # 51 -> 5_1
-            suffix = '_'.join(l_suffix) # 51 -> 5_1
-            #print(f'Loaded teacher model: fake_B_{suffix}_teacher')
-            setattr(self,f'fake_B_{suffix}_teacher',v.to(self.device))
+        if self.is_train:
+            fakes_teacher = run_dask(img=self.real_A, nets=self.nets_teacher, opt=self.opt_teacher, use_dask=False, output_tensor=True)
+            #print(f'Checking seg mod id for teacher model: current id is {self.opt_teacher.mod_id_seg}, id to map to is {self.mod_id_seg}')
+            for k,v in fakes_teacher.items():
+                suffix = self.d_mapping_model_name[k][1:] # starts with G
+                l_suffix = list(suffix)
+                if l_suffix[0] == str(self.opt_teacher.mod_id_seg): # mod_id_seg might be integer
+                    if l_suffix[0] != str(self.mod_id_seg):
+                        l_suffix[0] = str(self.mod_id_seg)
+                #suffix = '_'.join(list(suffix)) # 51 -> 5_1
+                suffix = '_'.join(l_suffix) # 51 -> 5_1
+                #print(f'Loaded teacher model: fake_B_{suffix}_teacher')
+                setattr(self,f'fake_B_{suffix}_teacher',v.to(self.device))
 
     def backward_D(self):
         """Calculate GAN loss for the discriminators"""

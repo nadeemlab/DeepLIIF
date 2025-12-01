@@ -14,9 +14,9 @@ def match_suffix(l_suffix_cli, model='DeepLIIF'):
     """
     Given a list of suffix found in cli output folder, derive a list of suffix used by testpy output
     """
-    assert model in ['DeepLIIF', 'DeepLIIFExt', 'SDG', 'CycleGAN'], f'Cannot derive suffix of output images for model {model}'
+    assert model in ['DeepLIIF', 'DeepLIIFExt', 'SDG', 'CycleGAN', 'DeepLIIFKD'], f'Cannot derive suffix of output images for model {model}'
     
-    if model == 'DeepLIIF':
+    if model in ['DeepLIIF','DeepLIIFKD']:
         d_cli2testpy = {'Hema':'fake_B_1', 'DAPI':'fake_B_2', 'Lap2':'fake_B_3',
                         'Marker':'fake_B_4', 'Seg':'fake_B_5'}
     elif model in ['DeepLIIFExt', 'SDG', 'CycleGAN']:
@@ -26,7 +26,7 @@ def match_suffix(l_suffix_cli, model='DeepLIIF'):
     res_cli = []
     res_testpy = []
     for suffix_cli in l_suffix_cli:
-        if model == 'DeepLIIF':
+        if model in ['DeepLIIF','DeepLIIFKD']:
             try: 
                 res_testpy.append(d_cli2testpy[suffix_cli])
                 res_cli.append(suffix_cli)

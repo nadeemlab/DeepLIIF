@@ -267,3 +267,26 @@ def init_input_and_mod_id(opt):
             input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
         
     return mod_id_seg, input_id
+
+
+import copy
+def map_model_names(model_names,mod_id_seg_source,input_id_source,mod_id_seg_target,input_id_target):
+    """
+    Used for DeepLIIFKD to map model/image names from teacher model to student model,
+    when mod_id_seg and/or input_id is different.
+    """
+    d_res = {}
+    for model_name in model_names:
+        model_name_new = copy.deepcopy(model_name)
+        if len(model_name) > 2 and model_name[1] == mod_id_seg_source:
+            model_name_new = model_name[0]+mod_id_seg_target+model_name[2:] # replace mod id seg
+            if input_id_source != input_id_target: # currently only support 0 or 1 as input_id
+                if int(input_id_target) == 0:
+                    model_name_new = model_name_new[:2] + str(int(model_name_new[2:])-1)
+                else:
+                    model_name_new = model_name_new[:2] + str(int(model_name_new[2:])+1)
+        d_res[model_name] = model_name_new
+    # this is not a model name but the final aggregated segmentation image name
+    # so it cannot be obtained from model names
+    d_res['G'+mod_id_seg_source] = 'G'+mod_id_seg_target
+    return d_res

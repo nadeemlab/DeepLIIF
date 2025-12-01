@@ -191,7 +191,6 @@ def cli():
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
 @click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
-
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, upsample, label_smoothing, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
@@ -569,8 +568,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
+@click.option('--modalities-names', default='', type=str, help='an optional note of the name of each modality (input mod(s) and the mod(s) to learn stain transfer from), separated by comma; this helps document the modalities using the train opt file and will also be used to name the inference output; example: --modalities-names IHC,Hematoxylin,DAPI,Lap2,Marker')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
+@click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
 @click.option('--seg-weights', default='', type=str, help='weights used to aggregate modality images for the final segmentation image; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.25,0.15,0.25,0.1,0.25')
 @click.option('--loss-weights-g', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
 @click.option('--loss-weights-d', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
@@ -680,6 +681,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--debug', is_flag=True,
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+@click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
 # trainlaunch DDP related arguments
 @click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
 def trainlaunch(**kwargs):

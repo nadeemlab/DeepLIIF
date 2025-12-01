@@ -69,6 +69,7 @@ class Options:
         else:
             self.phase = 'test'
             self.is_train = False
+            self.continue_train = False
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
