@@ -6,7 +6,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='deepliif',
-    version='1.2.1',
+    version='1.2.3',
     packages=['deepliif', 'deepliif.data', 'deepliif.models', 'deepliif.util', 'deepliif.options'],
 
     description='DeepLIIF: Deep-Learning Inferred Multiplex Immunofluorescence for Immunohistochemical Image Quantification',
@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "opencv-python==4.8.1.78",
         "torch==2.8.0",
-        "torchvision==0.14.1",
+        "torchvision>=0.14.1",
         "scikit-image==0.18.3",
         "dominate==2.6.0",
         "numba==0.57.1",
