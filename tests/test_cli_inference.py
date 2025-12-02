@@ -17,8 +17,8 @@ def match_suffix(l_suffix_cli, model='DeepLIIF'):
     assert model in ['DeepLIIF', 'DeepLIIFExt', 'SDG', 'CycleGAN', 'DeepLIIFKD'], f'Cannot derive suffix of output images for model {model}'
     
     if model in ['DeepLIIF','DeepLIIFKD']:
-        d_cli2testpy = {'Hema':'fake_B_1', 'DAPI':'fake_B_2', 'Lap2':'fake_B_3',
-                        'Marker':'fake_B_4', 'Seg':'fake_B_5'}
+        d_cli2testpy = {'mod1-Hema':'fake_B_1', 'mod2-DAPI':'fake_B_2', 'mod3-Lap2':'fake_B_3',
+                        'mod4-Marker':'fake_B_4', 'Seg':'fake_B_5'}
     elif model in ['DeepLIIFExt', 'SDG', 'CycleGAN']:
         d_cli2testpy = {'mod':'fake_B_', 'Seg':'fake_BS_'}
     
