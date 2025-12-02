@@ -11,7 +11,7 @@ from PIL import Image
 from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
+from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess, get_opt
 from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, infer_background_colors, get_information
 from deepliif.util.util import mkdirs, get_mod_id_seg
 from deepliif.util.checks import check_weights
@@ -305,6 +305,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
     assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
     
+    if len(modalities_names) == 0 and model == 'DeepLIIFKD':
+        # inherit this property from teacher model
+        opt_teacher = get_opt(model_dir_teacher, mode='test')
+        modalities_names = opt_teacher.modalities_names
     
     d_params['input_no'] = input_no
     d_params['modalities_names'] = modalities_names

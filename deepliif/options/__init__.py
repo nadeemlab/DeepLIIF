@@ -99,6 +99,13 @@ class Options:
                         self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
                         self.seg_weights = [0.5,0,0,0,0.5]
                 elif not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
+                    # if self.model == 'DeepLIIFKD':
+                    #     # try find the modalities names from the teacher model
+                    #     d_params_teacher = read_model_params(os.path.join(self.model_dir_teacher,'train_opt.txt'))
+                    #     if 'modalities_names' in d_params_teacher:
+                    #         self.modalities_names = d_params_teacher['modalities_names']
+                    # # check again
+                    # if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
                     self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
             else:
                 self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
