@@ -487,7 +487,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
         # check if both the elements and the order are exactly the same
         if [f'mod{i+1}' for i in range(opt.modalities_no)] != opt.modalities_names[1:]: 
             # if not, append modalities_names to mod names
-            d_modname2id = {f'mod{i+1}_{mod_name}':f'G{i+1}' for i,mod_name in enumerate(opt.modalities_names[1:])}
+            d_modname2id = {f'mod{i+1}-{mod_name}':f'G{i+1}' for i,mod_name in enumerate(opt.modalities_names[1:])}
         else:
             d_modname2id = {f'mod{i+1}':f'G{i+1}' for i in range(opt.modalities_no)}
         
