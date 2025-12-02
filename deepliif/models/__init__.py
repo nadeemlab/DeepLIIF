@@ -485,12 +485,12 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         # check if both the elements and the order are exactly the same
-        if [f'mod{i+1}' for i in range(opt.modalities_no)] != opt.modalities_names[1:]: 
+        l_modname = [f'mod{i+1}' for i in range(opt.modalities_no)]
+        if l_modname != opt.modalities_names[1:]: 
             # if not, append modalities_names to mod names
-            d_modname2id = {f'mod{i+1}-{mod_name}':f'G{i+1}' for i,mod_name in enumerate(opt.modalities_names[1:])}
-        else:
-            d_modname2id = {f'mod{i+1}':f'G{i+1}' for i in range(opt.modalities_no)}
-        
+            l_modname = [f'mod{i+1}-{mod_name}' for i,mod_name in enumerate(opt.modalities_names[1:])]
+        d_modname2id = {mod_name:f'G{i+1}' for i,mod_name in enumerate(l_modname)}
+
         if not mod_only:
             d_modname2id['Seg'] = f'G{opt.mod_id_seg}'
         
@@ -524,10 +524,10 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             #images.update({f'mod{i+1}_s':results[f'G{opt.modalities_no+1}{i+1}'] for i in range(opt.modalities_no+1)})
             #images.update({f'{mod_name}_s':results[f'G{opt.modalities_no+1}']})
             if f'G{opt.mod_id_seg}0' in results.keys():
-                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i}' for i,mod_name in enumerate(opt.modalities_names)}
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i}' for i,mod_name in enumerate(l_modname)}
                 images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
             else:
-                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i+1}' for i,mod_name in enumerate(opt.modalities_names)}
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i+1}' for i,mod_name in enumerate(l_modname)}
                 images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
         
         # if color_dapi and not seg_only:
