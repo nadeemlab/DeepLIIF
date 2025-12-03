@@ -797,7 +797,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
             net = net.eval()
             net = disable_batchnorm_tracking_stats(net)
             net = net.cpu()
-            if opt.model in ['DeepLIIFExt']:
+            if opt.model in ['DeepLIIFExt'] and name[1]=='S':
                 traced_net = torch.jit.trace(net, torch.cat([sample, sample, sample], 1))
             else:
                 traced_net = torch.jit.trace(net, sample)
@@ -817,7 +817,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
         print(name,':')
         model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
         model_serialized = models_serialized[name].cuda().eval() if device=='gpu' else models_serialized[name].cpu().eval()
-        if opt.model in ['DeepLIIFExt']:
+        if opt.model in ['DeepLIIFExt'] and name[1]=='S':
             test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
         else:
             test_diff_original_serialized(model_original,model_serialized,sample,verbose)
