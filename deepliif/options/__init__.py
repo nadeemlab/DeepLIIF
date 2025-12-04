@@ -90,7 +90,7 @@ class Options:
                 del self.targets_no
             
             if self.model in ['DeepLIIF','DeepLIIFKD']:
-                self.mod_id_seg, self.input_id = init_input_and_mod_id(self)
+                self.mod_id_seg, self.input_id = init_input_and_mod_id(self, os.path.dirname(path_file))
                 self.input_id = int(self.input_id)
                 print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
             

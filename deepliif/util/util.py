@@ -239,7 +239,7 @@ def get_input_id(dir_model):
     else:
         return '1'
     
-def init_input_and_mod_id(opt):
+def init_input_and_mod_id(opt, dir_model=None):
     """
     Used by model classes to initialize input id and mod id under different situations.
     """
@@ -261,10 +261,10 @@ def init_input_and_mod_id(opt):
             mod_id_seg = opt.mod_id_seg
         else:
             # for contiue-training, extract mod id seg from existing files if not available
-            mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+            mod_id_seg = get_mod_id_seg(dir_model if dir_model is not None else os.path.join(opt.checkpoints_dir, opt.name))
         
         if opt.model in ['DeepLIIF','DeepLIIFKD']:
-            input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+            input_id = get_input_id(dir_model if dir_model is not None else os.path.join(opt.checkpoints_dir, opt.name))
         
     return mod_id_seg, input_id
 
