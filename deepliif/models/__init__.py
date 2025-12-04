@@ -37,7 +37,7 @@ import numpy as np
 from dask import delayed, compute
 
 from deepliif.util import *
-from deepliif.util.util import tensor_to_pil, get_input_id
+from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
@@ -177,13 +177,11 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
         #     ('G4', 'G55'),
         #     ('G51',)
         # ]
-        input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
-        input_id = int(input_id)
         if opt.modalities_no == 0:
-            net_groups = [(f'G{opt.mod_id_seg}{input_id}',)]
+            net_groups = [(f'G{opt.mod_id_seg}{opt.input_id}',)]
         else:
-            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{input_id+i+1}') for i in range(opt.modalities_no)]
-            net_groups += [(f'G{opt.mod_id_seg}{input_id}',)] # this is the generator for the input base mod
+            net_groups = [(f'G{i+1}', f'G{opt.mod_id_seg}{int(opt.input_id)+i+1}') for i in range(opt.modalities_no)]
+            net_groups += [(f'G{opt.mod_id_seg}{opt.input_id}',)] # this is the generator for the input base mod
     elif opt.model in ['DeepLIIFExt','SDG']:
         if opt.seg_gen:
             net_groups = [(f'G_{i+1}',f'GS_{i+1}') for i in range(opt.modalities_no)]
@@ -266,9 +264,6 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
         nets = init_nets(model_dir, eager_mode, opt)
     
-    input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name)) # whether the seg generator starts from 0 (e.g., GS0 for the base input) or 1 (e.g., GS1 for the base input)
-    input_id = int(input_id)
-    
     if use_dask: # check if use_dask should be overwritten
         use_dask = True if opt.norm != 'spectral' else False
     
@@ -301,7 +296,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': 0.0, # Lap2
             #     'G55': 0.5, # Marker
             # }
-            weights = {f'G{opt.mod_id_seg}{input_id+i}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
+            weights = {f'G{opt.mod_id_seg}{int(opt.input_id)+i}': 1/(opt.modalities_no+1) for i in range(opt.modalities_no+1)}
         else:
             # weights = {
             #     'G51': seg_weights[0], # IHC
@@ -310,10 +305,10 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             #     'G54': seg_weights[3], # Lap2
             #     'G55': seg_weights[4], # Marker
             # }
-            weights = {f'G{opt.mod_id_seg}{input_id+i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
+            weights = {f'G{opt.mod_id_seg}{int(opt.input_id)+i}': seg_weight for i,seg_weight in enumerate(seg_weights)}
         
         
-        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{input_id+i+1}' for i in range(opt.modalities_no)}
+        seg_map = {f'G{i+1}': f'G{opt.mod_id_seg}{int(opt.input_id)+i+1}' for i in range(opt.modalities_no)}
         if seg_only:
             seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
         
@@ -328,8 +323,8 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         if not mod_only:
             lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
             # run seg generator for the base input
-            if weights[f'G{opt.mod_id_seg}{input_id}'] != 0:
-                lazy_segs[f'G{opt.mod_id_seg}{input_id}'] = forward(ts, nets[f'G{opt.mod_id_seg}{input_id}'])
+            if weights[f'G{opt.mod_id_seg}{opt.input_id}'] != 0:
+                lazy_segs[f'G{opt.mod_id_seg}{opt.input_id}'] = forward(ts, nets[f'G{opt.mod_id_seg}{opt.input_id}'])
             segs = compute(lazy_segs)[0]
         
             model_name_first = list(nets.keys())[0]
@@ -398,7 +393,7 @@ def is_empty(tile):
 def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False, seg_weights=None, use_dask=True, output_tensor=False):
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
-            if seg_only:
+            if seg_only: # return seg image and the last translated modality
                 res = {
                     #f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
                     f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[-1]),
@@ -420,12 +415,16 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
                 #     'G54': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 #     'G55': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
                 # }
-                # res = {**{f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)) for i in range(opt.modalities_no)},
-                #        **{f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10))},
-                #         **{f'G{opt.mod_id_seg}{i+1}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
                 res = {**{f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[i]) for i in range(opt.modalities_no)},
-                       **{f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10))},
-                        **{f'G{opt.mod_id_seg}{i+1}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
+                       **{f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0))}}
+                
+                # assign mod-wise seg output to corresponding keys, again currently input_id only supports 0 or 1
+                if opt.input_id == 1:
+                    res = {**res,
+                           **{f'G{opt.mod_id_seg}{i+1}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
+                else:
+                    res = {**res,
+                           **{f'G{opt.mod_id_seg}{i}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)) for i in range(opt.modalities_no+1)}}
 
             # when modalities_no = 0... we do not need to generate G0 - output should be just a seg image
             if 'G0' in res:
@@ -482,7 +481,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
         tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only, mod_only, seg_weights))
         
     results = tiler.results()
-
+    
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         # check if both the elements and the order are exactly the same
         l_modname = [f'mod{i+1}' for i in range(opt.modalities_no)]
@@ -490,7 +489,17 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             # if not, append modalities_names to mod names
             l_modname = [f'mod{i+1}-{mod_name}' for i,mod_name in enumerate(opt.modalities_names[1:])]
         d_modname2id = {mod_name:f'G{i+1}' for i,mod_name in enumerate(l_modname)}
-
+        
+        if opt.seg_gen:
+            l_modname_seg = [f'mod{i}' for i in range(opt.modalities_no+1)]
+            if l_modname_seg != opt.modalities_names: 
+                # if not, append modalities_names to mod names
+                l_modname_seg = [f'mod{i}-{mod_name}' for i,mod_name in enumerate(opt.modalities_names)]
+            if f'G{opt.mod_id_seg}0' in results.keys():
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i}' for i,mod_name in enumerate(l_modname_seg)}
+            else:
+                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i+1}' for i,mod_name in enumerate(l_modname_seg)}
+        
         if not mod_only:
             d_modname2id['Seg'] = f'G{opt.mod_id_seg}'
         
@@ -500,8 +509,8 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             images = {'Seg': results[d_modname2id['Seg']]}
             # if f'G{opt.modalities_no}' in results:
             #     images.update({'Marker': results['G{opt.modalities_no}']})
-            if 'Marker' in d_modname2id:
-                images.update({'Marker': results[d_modname2id['Marker']]})
+            # if 'Marker' in d_modname2id:
+            #     images.update({'Marker': results[d_modname2id['Marker']]})
         else:
             # images = {
             #     'Hema': results['G1'],
@@ -523,12 +532,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             
             #images.update({f'mod{i+1}_s':results[f'G{opt.modalities_no+1}{i+1}'] for i in range(opt.modalities_no+1)})
             #images.update({f'{mod_name}_s':results[f'G{opt.modalities_no+1}']})
-            if f'G{opt.mod_id_seg}0' in results.keys():
-                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i}' for i,mod_name in enumerate(l_modname)}
-                images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
-            else:
-                d_modname2id_seg = {mod_name:f'G{opt.mod_id_seg}{i+1}' for i,mod_name in enumerate(l_modname)}
-                images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
+            images.update({f'{mod_name}_s':results[d_modname2id_seg[mod_name]] for mod_name in d_modname2id_seg.keys()})
         
         # if color_dapi and not seg_only:
         #     matrix = (       0,        0,        0, 0,

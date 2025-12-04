@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import os
-from ..util.util import mkdirs, get_mod_id_seg, get_input_id
+from ..util.util import mkdirs, init_input_and_mod_id
 import re
 
 def read_model_params(file_addr):
@@ -90,8 +90,9 @@ class Options:
                 del self.targets_no
             
             if self.model in ['DeepLIIF','DeepLIIFKD']:
-                self.mod_id_seg = get_mod_id_seg(os.path.dirname(path_file))
-                print('mod id seg:', self.mod_id_seg)
+                self.mod_id_seg, self.input_id = init_input_and_mod_id(self)
+                self.input_id = int(self.input_id)
+                print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
             
                 print('Determining modalities names for test-mode model...')
                 if self.modalities_no == 4:
