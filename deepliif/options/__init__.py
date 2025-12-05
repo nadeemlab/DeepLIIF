@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import os
-from ..util.util import mkdirs
+from ..util.util import mkdirs, init_input_and_mod_id
 import re
 
 def read_model_params(file_addr):
@@ -32,7 +32,7 @@ def read_model_params(file_addr):
             
             # if isinstance(param_dict[key],list):
             #     param_dict[key] = param_dict[key][0]
-            
+    
     return param_dict
 
 class Options:
@@ -43,7 +43,7 @@ class Options:
         
         if path_file:
             d_params = read_model_params(path_file)
-     
+        
         for k,v in d_params.items():
             try:
                 if k not in ['phase']: # e.g., k = 'phase', v = 'train', eval(v) is a function rather than a string
@@ -69,6 +69,7 @@ class Options:
         else:
             self.phase = 'test'
             self.is_train = False
+            self.continue_train = False
             self.input_nc = 3
             self.output_nc = 3
             self.ngf = 64
@@ -83,6 +84,41 @@ class Options:
                 # and can be configured in the inference function
                 self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
             
+            # to account for old settings before modalities_no was introduced
+            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
+                self.modalities_no = self.targets_no - 1
+                del self.targets_no
+            
+            if self.model in ['DeepLIIF','DeepLIIFKD']:
+                self.mod_id_seg, self.input_id = init_input_and_mod_id(self, os.path.dirname(path_file))
+                self.input_id = int(self.input_id)
+                print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
+            
+                print('Determining modalities names for test-mode model...')
+                if self.modalities_no == 4:
+                    if not hasattr(self,'modalities_names'):
+                        self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
+                        self.seg_weights = [0.5,0,0,0,0.5]
+                elif not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
+                    # if self.model == 'DeepLIIFKD':
+                    #     # try find the modalities names from the teacher model
+                    #     d_params_teacher = read_model_params(os.path.join(self.model_dir_teacher,'train_opt.txt'))
+                    #     if 'modalities_names' in d_params_teacher:
+                    #         self.modalities_names = d_params_teacher['modalities_names']
+                    # # check again
+                    # if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
+                    self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+            else:
+                self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+
+            print('modalities names:', self.modalities_names)
+            
+            if not hasattr(self, 'background_colors'):
+                if self.model in ['DeepLIIF','DeepLIIFKD']:
+                    self.background_colors = [(201, 211, 208),(10, 10, 10), (0, 0, 0), (10, 10, 10)]
+                else:
+                    self.background_colors = [(10, 10, 10)] * self.modalities_no
+            
             # reset checkpoints_dir and name based on the model directory
             # when base model is initialized: self.save_dir = os.path.join(opt.checkpoints_dir, opt.name) 
             model_dir = Path(path_file).parent
@@ -95,15 +131,11 @@ class Options:
             if isinstance(self.gpu_ids,int):
                 self.gpu_ids = (self.gpu_ids,)
             
-            # to account for old settings before modalities_no was introduced
-            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
-                self.modalities_no = self.targets_no - 1
-                del self.targets_no
-            
             # to account for old settings: same as in cli.py train
             if not hasattr(self,'seg_no'):
               if self.model == 'DeepLIIF':
                   self.seg_no = 1
+                  self.seg_gen = True
               elif self.model == 'DeepLIIFExt':
                   if self.seg_gen:
                       self.seg_no = self.modalities_no

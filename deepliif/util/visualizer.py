@@ -138,7 +138,7 @@ class Visualizer():
         print('Command: %s' % cmd)
         Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
 
-    def display_current_results(self, visuals, epoch, save_result, **kwargs):
+    def display_current_results(self, visuals, epoch, save_result, filename=None, **kwargs):
         """Display current results on visdom; save current results to an HTML file.
 
         Parameters:
@@ -171,7 +171,7 @@ class Visualizer():
                             table td {width: % dpx; height: % dpx; padding: 4px; outline: 4px solid black}
                             </style>""" % (w, h)  # create a table css
                     # create a table of images.
-                    title = self.name
+                    title = self.name if filename is None else filename
                     label_html = ''
                     label_html_row = ''
                     images = []

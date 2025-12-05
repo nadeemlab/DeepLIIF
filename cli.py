@@ -11,9 +11,9 @@ from PIL import Image
 from torchvision.transforms import ToPILImage
 
 from deepliif.data import create_dataset, transform
-from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess
-from deepliif.util import allowed_file, Visualizer, get_information, test_diff_original_serialized, disable_batchnorm_tracking_stats
-from deepliif.util.util import mkdirs
+from deepliif.models import init_nets, infer_modalities, infer_results_for_wsi, create_model, postprocess, get_opt
+from deepliif.util import allowed_file, Visualizer, test_diff_original_serialized, disable_batchnorm_tracking_stats, infer_background_colors, get_information
+from deepliif.util.util import mkdirs, get_mod_id_seg
 from deepliif.util.checks import check_weights
 # from deepliif.util import infer_results_for_wsi
 from deepliif.options import Options, print_options
@@ -77,6 +77,7 @@ def cli():
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
+@click.option('--modalities-names', default='', type=str, help='an optional note of the name of each modality (input mod(s) and the mod(s) to learn stain transfer from), separated by comma; this helps document the modalities using the train opt file and will also be used to name the inference output; example: --modalities-names IHC,Hematoxylin,DAPI,Lap2,Marker')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
 @click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
@@ -189,6 +190,7 @@ def cli():
 @click.option('--debug', is_flag=True,
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+@click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
 def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, ndf, net_d, net_g,
           n_layers_d, norm, init_type, init_gain, no_dropout, upsample, label_smoothing, direction, serial_batches, num_threads,
           batch_size, load_size, crop_size, max_dataset_size, preprocess, no_flip, display_winsize, epoch, load_iter,
@@ -197,7 +199,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
           continue_train, epoch_count, phase, lr_policy, n_epochs, n_epochs_decay, optimizer, beta1, lr_g, lr_d, lr_decay_iters,
           remote, remote_transfer_cmd, seed, dataset_mode, padding, model, model_dir_teacher,
           seg_weights, loss_weights_g, loss_weights_d,
-          modalities_no, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size):
+          modalities_no, modalities_names, seg_gen, net_ds, net_gs, gan_mode, gan_mode_s, local_rank, with_val, debug, debug_data_size, monitor_image):
     """General-purpose training script for multi-task image-to-image translation.
 
     This script works for various models (with option '--model': e.g., DeepLIIF) and
@@ -220,6 +222,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     else: # SDG, CycleGAN
         seg_no = 0
         seg_gen = False
+    
     
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
@@ -260,8 +263,6 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         print('padding type is forced to zero padding, because neither refection pad2d or replication pad2d has a deterministic implementation')
 
     # infer number of input images
-    
-    
     if dataset_mode == 'unaligned':
         dir_data_train = dataroot + '/trainA'
         fns = os.listdir(dir_data_train)
@@ -300,12 +301,27 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         assert input_no > 0, f'inferred number of input images is {input_no} (modalities_no {modalities_no}, seg_no {seg_no}); should be greater than 0'
         
         pool_size = 0
-        
+    
+    modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
+    assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
+    
+    if len(modalities_names) == 0 and model == 'DeepLIIFKD':
+        # inherit this property from teacher model
+        opt_teacher = get_opt(model_dir_teacher, mode='test')
+        modalities_names = opt_teacher.modalities_names
+    
     d_params['input_no'] = input_no
+    d_params['modalities_names'] = modalities_names
     d_params['scale_size'] = img.size[1]
     d_params['gpu_ids'] = gpu_ids
     d_params['lambda_identity'] = 0
     d_params['pool_size'] = pool_size
+    
+    if seg_gen:
+        # estimate background color for output modalities
+        background_colors = infer_background_colors(os.path.join(dataroot,'train'), sample_size=10, input_no=input_no, modalities_no=modalities_no, seg_no=seg_no, tile_size=32, return_list=True)
+        if background_colors is not None:
+            d_params['background_colors'] = background_colors
     
     
     # update generator arch
@@ -324,19 +340,27 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     d_params['net_g'] = net_g
     d_params['net_gs'] = net_gs
     
+    def get_weights(model='DeepLIIF', modalities_no=4, default=[0.25,0.15,0.25,0.1,0.25]):
+        if model in ['DeepLIIF','DeepLIIFKD'] and modalities_no == 4:
+            return default
+        elif model in ['DeepLIIF','DeepLIIFKD']:
+            return [1 / (modalities_no + 1)] * (modalities_no + 1)
+        else:
+            return [1 / modalities_no] * modalities_no
+          
     # check seg weights and loss weights
     if len(d_params['seg_weights']) == 0:
-        seg_weights = [0.25,0.15,0.25,0.1,0.25] if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        seg_weights = get_weights(d_params['model'], modalities_no, default=[0.25,0.15,0.25,0.1,0.25])
     else:
         seg_weights = [float(x) for x in seg_weights.split(',')]
     
     if len(d_params['loss_weights_g']) == 0:
-        loss_weights_g = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        loss_weights_g = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_g = [float(x) for x in loss_weights_g.split(',')]
     
     if len(d_params['loss_weights_d']) == 0:
-        loss_weights_d = [0.2]*5 if d_params['model'] in ['DeepLIIF','DeepLIIFKD'] else [1 / modalities_no] * modalities_no
+        loss_weights_d = get_weights(d_params['model'], modalities_no, default=[0.2]*5)
     else:
         loss_weights_d = [float(x) for x in loss_weights_d.split(',')]
     
@@ -378,6 +402,15 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     visualizer = Visualizer(opt)
     # the total number of training iterations
     total_iters = 0
+    
+    # infer base epoch number, used for checkpoint filename
+    if not continue_train:
+        epoch_base = 0
+    else:
+        try:
+            epoch_base = int(epoch)
+        except:
+            epoch_base = 0
 
     # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
     for epoch in range(epoch_count, n_epochs + n_epochs_decay + 1):
@@ -410,10 +443,16 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
             model.optimize_parameters()
 
             # display images on visdom and save images to a HTML file
-            if total_iters % display_freq == 0:
-                save_result = total_iters % update_html_freq == 0
-                model.compute_visuals()
-                visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result)
+            if monitor_image is not None:
+                if data['A_paths'][0].endswith(monitor_image):
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=monitor_image)
+            else:
+                if total_iters % display_freq == 0:
+                    save_result = total_iters % update_html_freq == 0
+                    model.compute_visuals()
+                    visualizer.display_current_results({**model.get_current_visuals()}, epoch, save_result, filename=data['A_paths'][0])
 
             # print training losses and save logging information to the disk
             if total_iters % print_freq == 0:
@@ -437,9 +476,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 
         # cache our model every <save_epoch_freq> epochs
         if epoch % save_epoch_freq == 0:
-            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-            model.save_networks('latest')
-            model.save_networks(epoch)
+            if continue_train and epoch == 0: # to not overwrite the loaded epoch
+                pass
+            else:
+                print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
+                model.save_networks('latest')
+                model.save_networks(epoch+epoch_base)
 
         
         
@@ -463,8 +505,12 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
                 l_losses_val += [(k,v) for k,v in losses_val_batch.items()]
                 
                 # calculate cell count metrics
-                if type(model).__name__ == 'DeepLIIFModel':
-                    l_seg_names = ['fake_B_5']
+                if type(model).__name__ in ['DeepLIIFModel','DeepLIIFKDModel']:
+                    if continue_train:
+                        mod_id_seg = get_mod_id_seg(os.path.join(opt.checkpoints_dir, opt.name))
+                    else:
+                        mod_id_seg = 'S'
+                    l_seg_names = [f'fake_B_{mod_id_seg}']
                     assert l_seg_names[0] in visuals.keys(), f'Cannot find {l_seg_names[0]} in generated image names ({list(visuals.keys())})'
                     seg_mod_suffix = l_seg_names[0].split('_')[-1]
                     l_seg_names += [x for x in visuals.keys() if x.startswith('fake') and x.split('_')[-1].startswith(seg_mod_suffix) and x != l_seg_names[0]]
@@ -526,8 +572,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--gpu-ids', type=int, multiple=True, help='gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--checkpoints-dir', default='./checkpoints', help='models are saved here')
 @click.option('--modalities-no', default=4, type=int, help='number of targets')
+@click.option('--modalities-names', default='', type=str, help='an optional note of the name of each modality (input mod(s) and the mod(s) to learn stain transfer from), separated by comma; this helps document the modalities using the train opt file and will also be used to name the inference output; example: --modalities-names IHC,Hematoxylin,DAPI,Lap2,Marker')
 # model parameters
 @click.option('--model', default='DeepLIIF', help='name of model class')
+@click.option('--model-dir-teacher', default='', help='the directory of the teacher model, only applicable if model is DeepLIIFKD')
 @click.option('--seg-weights', default='', type=str, help='weights used to aggregate modality images for the final segmentation image; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.25,0.15,0.25,0.1,0.25')
 @click.option('--loss-weights-g', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
 @click.option('--loss-weights-d', default='', type=str, help='weights used to aggregate modality-wise losses for the final loss; numbers should add up to 1, and each number corresponds to the modality in order; example: 0.2,0.2,0.2,0.2,0.2')
@@ -637,6 +685,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
 @click.option('--debug', is_flag=True,
               help='debug mode, limits the number of data points per epoch to a small value')
 @click.option('--debug-data-size', default=10, type=int, help='data size per epoch used in debug mode; due to batch size, the epoch will be passed once the completed no. data points is greater than this value (e.g., for batch size 3, debug data size 10, the effective size used in training will be 12)')
+@click.option('--monitor-image', default=None, help='a filename in the training dataset, if set, used for the visualization of model results; this overwrites --display-freq because we now focus on viewing the training progress on one fixed image')
 # trainlaunch DDP related arguments
 @click.option('--use-torchrun', type=str, default=None, help='provide torchrun options, all in one string, for example "-t3 --log_dir ~/log/ --nproc_per_node 1"; if your pytorch version is older than 1.10, torch.distributed.launch will be called instead of torchrun')
 def trainlaunch(**kwargs):
@@ -748,7 +797,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
             net = net.eval()
             net = disable_batchnorm_tracking_stats(net)
             net = net.cpu()
-            if name.startswith('GS'):
+            if opt.model in ['DeepLIIFExt'] and name[1]=='S':
                 traced_net = torch.jit.trace(net, torch.cat([sample, sample, sample], 1))
             else:
                 traced_net = torch.jit.trace(net, sample)
@@ -768,7 +817,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
         print(name,':')
         model_original = models_original[name].cuda().eval() if device=='gpu' else models_original[name].cpu().eval()
         model_serialized = models_serialized[name].cuda().eval() if device=='gpu' else models_serialized[name].cpu().eval()
-        if name.startswith('GS'):
+        if opt.model in ['DeepLIIFExt'] and name[1]=='S':
             test_diff_original_serialized(model_original,model_serialized,torch.cat([sample, sample, sample], 1),verbose)
         else:
             test_diff_original_serialized(model_original,model_serialized,sample,verbose)
@@ -787,18 +836,22 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
               help='for eager mode, which epoch to load? set to latest to use latest cached model')
 @click.option('--seg-intermediate', is_flag=True, help='also save intermediate segmentation images (currently only applies to DeepLIIF model)')
 @click.option('--seg-only', is_flag=True, help='save only the final segmentation image (currently only applies to DeepLIIF model); overwrites --seg-intermediate')
+@click.option('--mod-only', is_flag=True, help='save only the translated modality image; overwrites --seg-only and --seg-intermediate')
 @click.option('--color-dapi', is_flag=True, help='color dapi image to produce the same coloring as in the paper')
 @click.option('--color-marker', is_flag=True, help='color marker image to produce the same coloring as in the paper')
 @click.option('--BtoA', is_flag=True, help='for models trained with unaligned dataset, this flag instructs to load generatorB instead of generatorA')
 def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids, eager_mode, epoch,
-         seg_intermediate, seg_only, color_dapi, color_marker, btoa):
+         seg_intermediate, seg_only, mod_only, color_dapi, color_marker, btoa):
     
     """Test trained models
     """
     output_dir = output_dir or input_dir
     ensure_exists(output_dir)
     
-    if seg_intermediate and seg_only:
+    if mod_only:
+        seg_only = False
+        seg_intermediate = False
+    elif seg_intermediate and seg_only:
         seg_intermediate = False
 
     if filename_pattern == '*':
@@ -816,6 +869,8 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
     opt.use_dp = False
     opt.BtoA = btoa
     opt.epoch = epoch
+    
+    seg_weights = opt.seg_weights if hasattr(opt,'seg_weights') else None
     
     number_of_gpus_all = torch.cuda.device_count()
     if number_of_gpus_all < len(gpu_ids) and -1 not in gpu_ids:
@@ -843,7 +898,7 @@ def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids,
     ) as bar:
         for filename in bar:
             img = Image.open(os.path.join(input_dir, filename)).convert('RGB')
-            images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only)
+            images, scoring = infer_modalities(img, tile_size, model_dir, eager_mode, color_dapi, color_marker, opt, return_seg_intermediate=seg_intermediate, seg_only=seg_only, mod_only=mod_only, seg_weights=seg_weights)
 
             for name, i in images.items():
                 i.save(os.path.join(

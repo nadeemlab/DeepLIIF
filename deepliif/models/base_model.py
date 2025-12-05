@@ -148,8 +148,13 @@ class BaseModel(ABC):
                 if not hasattr(self, name):
                     if len(name.split('_')) != 2:
                         if self.opt.model in ['DeepLIIF','DeepLIIFKD']:
-                            img_name = name[:-1] + '_' + name[-1]
-                            visual_ret[name] = getattr(self, img_name)
+                            if name.endswith('_teacher'):
+                                suffix = '_teacher'
+                                name = name[:-8]
+                            else:
+                                suffix = ''
+                            img_name = name[:-1] + '_' + name[-1] + suffix
+                            visual_ret[name+suffix] = getattr(self, img_name)
                         else:
                             if self.opt.model == 'CycleGAN':
                                 l_output = getattr(self, name.split('_')[0] + '_' + name.split('_')[1])

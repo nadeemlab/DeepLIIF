@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from skimage.color import rgb2hed, hed2rgb
 
-from Augmentation import Augmentation
+from .Augmentation import Augmentation
 
 from PIL import Image
 import javabridge
@@ -122,6 +122,7 @@ def augment_set(input_dir, output_dir, aug_no=9, modality_types=['hematoxylin', 
             new_images = images.copy()
             aug = Augmentation(new_images, tile_size)
             aug.pipeline()
+            
             cv2.imwrite(os.path.join(output_dir, img.replace('.png', '_' + str(augmented) + '.png')),
                         np.concatenate(list(new_images.values()), 1))
             augmented += 1
