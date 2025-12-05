@@ -507,6 +507,9 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
             
         if seg_only:
             images = {'Seg': results[d_modname2id['Seg']]}
+            marker_key = find_marker_key(d_modname2id)
+            if marker_key is not None:
+                images[marker_key] = results[d_modname2id[marker_key]]
             # if f'G{opt.modalities_no}' in results:
             #     images.update({'Marker': results['G{opt.modalities_no}']})
             # if 'Marker' in d_modname2id:
@@ -565,7 +568,7 @@ def postprocess(orig, images, tile_size, model, seg_thresh=150, size_thresh='def
     if model in ['DeepLIIF','DeepLIIFKD']:
         resolution = '40x' if tile_size > 384 else ('20x' if tile_size > 192 else '10x')
         overlay, refined, scoring = compute_final_results(
-            orig, images['Seg'], images.get('Marker'), resolution,
+            orig, images['Seg'], images.get(find_marker_key(images)), resolution,
             size_thresh, marker_thresh, size_thresh_upper, seg_thresh)
         processed_images = {}
         processed_images['SegOverlaid'] = Image.fromarray(overlay)
@@ -843,7 +846,8 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
 
                 seg = to_array(images['Seg'])
                 del images['Seg']
-                marker = to_array(images['Marker'], True) if 'Marker' in images else None
+                marker_key = find_marker_key(images)
+                marker = to_array(images[marker_key], True) if marker_key is not None else None
                 del images
                 region_data = compute_cell_results(seg, marker, resolution, version=version)
                 del seg
@@ -898,3 +902,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
         data['modelVersion'] = 'unknown'
 
     return data
+
+
+def find_marker_key(dictionary):
+    for key in dictionary:
+        if key.endswith('Marker'):
+            return key
+    return None
