@@ -80,7 +80,7 @@ def adjust_marker(inferred_tile, orig_tile):
 
 
 # Default postprocessing values
-DEFAULT_SEG_THRESH = 150
+DEFAULT_SEG_THRESH = 120
 DEFAULT_NOISE_THRESH = 4
 
 # Values for uint8 label masks
