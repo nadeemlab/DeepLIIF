@@ -558,8 +558,8 @@ def get_information(filename):
 
 class WSIReader:
     """
-    Assumes the file is a single image (e.g., not a stacked
-    OME TIFF) and will always return uint8 pixel type data.
+    Assumes the file is a single RGB image (e.g., not a stacked OME TIFF).
+    This reader will always return the data with pixel type of uint8.
     """
 
     def __init__(self, path):
@@ -568,6 +568,7 @@ class WSIReader:
         omexml = bioformats.OMEXML(metadata)
 
         self._path = path
+        self._metadata = metadata
         self._width = omexml.image().Pixels.SizeX
         self._height = omexml.image().Pixels.SizeY
         self._pixel_type = omexml.image().Pixels.PixelType
@@ -614,17 +615,79 @@ class WSIReader:
     def height(self):
         return self._height
 
-    def read(self, xywh):
+    def read(self, xywh, zeros_on_error=False):
+        x, y, w, h = xywh
+
         if self._tif is not None:
-            x, y, w, h = xywh
             try:
                 return self._zarr[y:y+h, x:x+w]
             except Exception as e:
                 pass
 
-        px = self._bfreader.read(XYWH=xywh, rescale=self._rescale)
-        if self._rescale:
-            px = (px * 255).astype(np.uint8)
+        try:
+            px = self._bfreader.read(XYWH=xywh, rescale=self._rescale)
+            if self._rescale:
+                px = (px * 255).astype(np.uint8)
+            return px
+        except Exception as e:
+            if not zeros_on_error:
+                return self._read_region_by_tiles(xywh)
+
+        return np.zeros((h, w, 3), dtype=np.uint8)
+
+    def _read_region_by_tiles(self, xywh):
+        tile_width, tile_height = None, None
+
+        try:
+            if self._tif is not None and self._tif.pages[0].is_tiled:
+                tile_width = self._tif.pages[0].tilewidth
+                tile_height = self._tif.pages[0].tilelength
+            else:
+                root = et.fromstring(self._metadata.encode('utf-8'))
+                for origmeta in root.findall('.//{http://www.openmicroscopy.org/Schemas/OME/2016-06}OriginalMetadata'):
+                    key, value = None, None
+                    for om in origmeta:
+                        if 'Key' in om.tag:
+                            key = om.text
+                        elif 'Value' in om.tag:
+                            value = om.text
+                    if key == 'TileWidth' and value is not None:
+                        tile_width = int(value)
+                    elif key == 'TileLength' and value is not None:
+                        tile_height = int(value)
+        except Exception as e:
+            pass
+
+        if tile_width is None or tile_height is None:
+            tile_width, tile_height = 512, 512
+
+        x0, y0, w, h = xywh
+        w0 = x0 % tile_width
+        h0 = y0 % tile_height
+        x1 = x0 + w0
+        y1 = y0 + h0
+
+        px = np.zeros((h, w, 3), dtype=np.uint8)
+        tile = self.read((x0, y0, w0, h0), True)
+        px[0:h0, 0:w0] = tile
+
+        for x in range(x1, x0+w, tile_width):
+            tw = min(tile_width, x0+w-x)
+            tile = self.read((x, y0, tw, h0), True)
+            px[0:h0, x-x0:x-x0+tw] = tile
+
+        for y in range(y1, y0+h, tile_height):
+            th = min(tile_height, y0+h-y)
+            tile = self.read((x0, y, w0, th), True)
+            px[y-y0:y-y0+th, 0:w0] = tile
+
+        for y in range(y1, y0+h, tile_height):
+            for x in range(x1, x0+w, tile_width):
+                tw = min(tile_width, x0+w-x)
+                th = min(tile_height, y0+h-y)
+                tile = self.read((x, y, tw, th), True)
+                px[y-y0:y-y0+th, x-x0:x-x0+tw] = tile
+
         return px
 
 
