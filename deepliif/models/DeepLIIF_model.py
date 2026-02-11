@@ -83,12 +83,12 @@ class DeepLIIFModel(BaseModel):
         
         for i,model_name in enumerate(self.model_names_g):
             setattr(self,f'net{model_name}',networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG[i], opt.norm,
-                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding))
+                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
 
         # DeepLIIF model currently uses one gs arch because there is only one explicit seg mod output
         for i,model_name in enumerate(self.model_names_gs):
             setattr(self,f'net{model_name}',networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.net_gs[i], opt.norm,
-                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids))
+                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.model_names_d = [f'D{i+1}' for i in range(self.opt.modalities_no)]
