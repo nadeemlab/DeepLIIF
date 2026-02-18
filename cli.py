@@ -213,7 +213,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     """
     assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN','DeepLIIFKD'], f'model class {model} is not implemented'
     if model in ['DeepLIIF','DeepLIIFKD']:
-        seg_no = 1
+        if seg_gen == True:
+            seg_no = 1
+        else:
+            seg_no = 0
     elif model == 'DeepLIIFExt':
         if seg_gen:
             seg_no = modalities_no

@@ -18,6 +18,7 @@ class DeepLIIFModel(BaseModel):
         if not hasattr(opt,'net_gs'):
             opt.net_gs = 'unet_512'
         
+        self.seg_gen = opt.seg_gen
         self.seg_weights = opt.seg_weights
         self.loss_G_weights = opt.loss_G_weights
         self.loss_D_weights = opt.loss_D_weights
@@ -35,11 +36,13 @@ class DeepLIIFModel(BaseModel):
         for i in range(self.opt.modalities_no):
             self.loss_names.extend([f'G_GAN_{i+1}', f'G_L1_{i+1}', f'D_real_{i+1}', f'D_fake_{i+1}'])
             self.visual_names.extend([f'fake_B_{i+1}', f'real_B_{i+1}'])
-        self.loss_names.extend([f'G_GAN_{self.mod_id_seg}',f'G_L1_{self.mod_id_seg}',f'D_real_{self.mod_id_seg}',f'D_fake_{self.mod_id_seg}'])
+        if self.seg_gen:
+            self.loss_names.extend([f'G_GAN_{self.mod_id_seg}',f'G_L1_{self.mod_id_seg}',f'D_real_{self.mod_id_seg}',f'D_fake_{self.mod_id_seg}'])
         
-        for i in range(self.opt.modalities_no+1):
-            self.visual_names.extend([f'fake_B_{self.mod_id_seg}{i}']) # 0 is used for the base input mod
-        self.visual_names.extend([f'fake_B_{self.mod_id_seg}', f'real_B_{self.mod_id_seg}'])
+        if self.seg_gen:
+            for i in range(self.opt.modalities_no+1):
+                self.visual_names.extend([f'fake_B_{self.mod_id_seg}{i}']) # 0 is used for the base input mod
+                self.visual_names.extend([f'fake_B_{self.mod_id_seg}', f'real_B_{self.mod_id_seg}'])
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -51,28 +54,30 @@ class DeepLIIFModel(BaseModel):
                 self.model_names.extend([f'G{i}', f'D{i}'])
                 self.model_names_g.append(f'G{i}')
 
-            for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
-                if self.input_id == '0':
-                    self.model_names.extend([f'G{self.mod_id_seg}{i}', f'D{self.mod_id_seg}{i}'])
-                    self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
-                else:
-                    self.model_names.extend([f'G{self.mod_id_seg}{i+1}', f'D{self.mod_id_seg}{i+1}'])
-                    self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
+            if self.seg_gen:
+                for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
+                    if self.input_id == '0':
+                        self.model_names.extend([f'G{self.mod_id_seg}{i}', f'D{self.mod_id_seg}{i}'])
+                        self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
+                    else:
+                        self.model_names.extend([f'G{self.mod_id_seg}{i+1}', f'D{self.mod_id_seg}{i+1}'])
+                        self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
         else:  # during test time, only load G
             self.model_names = []
             for i in range(1, self.opt.modalities_no + 1):
                 self.model_names.extend([f'G{i}'])
                 self.model_names_g.append(f'G{i}')
 
-            #input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
-            if self.input_id == '0':
-                for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
-                    self.model_names.extend([f'G{self.mod_id_seg}{i}'])
-                    self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
-            else:
-                for i in range(self.opt.modalities_no + 1):  # old setting, 1 is used for the base input mod
-                    self.model_names.extend([f'G{self.mod_id_seg}{i+1}'])
-                    self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
+            if self.seg_gen:
+                #input_id = get_input_id(os.path.join(opt.checkpoints_dir, opt.name))
+                if self.input_id == '0':
+                    for i in range(self.opt.modalities_no + 1):  # 0 is used for the base input mod
+                        self.model_names.extend([f'G{self.mod_id_seg}{i}'])
+                        self.model_names_gs.append(f'G{self.mod_id_seg}{i}')
+                else:
+                    for i in range(self.opt.modalities_no + 1):  # old setting, 1 is used for the base input mod
+                        self.model_names.extend([f'G{self.mod_id_seg}{i+1}'])
+                        self.model_names_gs.append(f'G{self.mod_id_seg}{i+1}')
 
         # define networks (both generator and discriminator)
         if isinstance(opt.netG, str):
@@ -82,33 +87,39 @@ class DeepLIIFModel(BaseModel):
 
         
         for i,model_name in enumerate(self.model_names_g):
-            setattr(self,f'net{model_name}',networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG[i], opt.norm,
+            setattr(self,f'net{model_name}',networks.define_G(self.opt.input_nc * self.opt.input_no, opt.output_nc, opt.ngf, opt.netG[i], opt.norm,
                                       not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
 
-        # DeepLIIF model currently uses one gs arch because there is only one explicit seg mod output
-        for i,model_name in enumerate(self.model_names_gs):
-            setattr(self,f'net{model_name}',networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.net_gs[i], opt.norm,
-                                      not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
+        if self.seg_gen:
+            # DeepLIIF model currently uses one gs arch because there is only one explicit seg mod output
+            for i,model_name in enumerate(self.model_names_gs):
+                setattr(self,f'net{model_name}',networks.define_G(self.opt.input_nc * self.opt.input_no, opt.output_nc, opt.ngf, opt.net_gs[i], opt.norm,
+                                          not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.model_names_d = [f'D{i+1}' for i in range(self.opt.modalities_no)]
-            if self.input_id == '0':
-                self.model_names_ds = [f'D{self.mod_id_seg}{i}' for i in range(self.opt.modalities_no+1)]
-            else:
-                self.model_names_ds = [f'D{self.mod_id_seg}{i+1}' for i in range(self.opt.modalities_no+1)]
             for model_name in self.model_names_d:
-                setattr(self,f'net{model_name}',networks.define_D(opt.input_nc+opt.output_nc , opt.ndf, opt.netD,
+                setattr(self,f'net{model_name}',networks.define_D(self.opt.input_nc * self.opt.input_no + opt.output_nc , opt.ndf, opt.netD,
                                           opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids))
 
-            for model_name in self.model_names_ds:
-                setattr(self,f'net{model_name}',networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
-                                          opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids))
+            self.model_names_ds = []
+            if self.seg_gen:
+                if self.input_id == '0':
+                    self.model_names_ds = [f'D{self.mod_id_seg}{i}' for i in range(self.opt.modalities_no+1)]
+                else:
+                    self.model_names_ds = [f'D{self.mod_id_seg}{i+1}' for i in range(self.opt.modalities_no+1)]
+                for model_name in self.model_names_ds:
+                    setattr(self,f'net{model_name}',networks.define_D(self.opt.input_nc * self.opt.input_no + opt.output_nc, opt.ndf, opt.netD,
+                                              opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids))
 
         if self.is_train:
             # define loss functions
-            self.criterionGAN_BCE = networks.GANLoss('vanilla').to(self.device)
-            self.criterionGAN_lsgan = networks.GANLoss('lsgan').to(self.device)
+            # self.criterionGAN_BCE = networks.GANLoss('vanilla').to(self.device)
+            # self.criterionGAN_lsgan = networks.GANLoss('lsgan').to(self.device)
+            self.criterionGAN_mod = networks.GANLoss(self.opt.gan_mode).to(self.device)
+            self.criterionGAN_seg = networks.GANLoss(self.opt.gan_mode_s).to(self.device)
             self.criterionSmoothL1 = torch.nn.SmoothL1Loss()
+            self.criterionVGG = networks.VGGLoss().to(self.device)
 
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             #params = list(self.netG1.parameters()) + list(self.netG2.parameters()) + list(self.netG3.parameters()) + list(self.netG4.parameters()) + list(self.netG51.parameters()) + list(self.netG52.parameters()) + list(self.netG53.parameters()) + list(self.netG54.parameters()) + list(self.netG55.parameters())
@@ -136,7 +147,6 @@ class DeepLIIFModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
 
-            self.criterionVGG = networks.VGGLoss().to(self.device)
 
     def set_input(self, input):
         """
@@ -145,12 +155,18 @@ class DeepLIIFModel(BaseModel):
         :param input (dict): include the input image and the output modalities
         """
 
-        self.real_A = input['A'].to(self.device)
+        self.real_A = input['A']
+        if isinstance(self.real_A, list): # from previous SDG setup where multiple input modalities are allowed
+            As = [A.to(self.device) for A in self.real_A]
+            self.real_A = torch.cat(As, dim=1) # shape: 1, (3 x input_no), 512, 512
+        else:
+            self.real_A = self.real_A.to(self.device)
 
         self.real_B_array = input['B']
         for i in range(self.opt.modalities_no):
             setattr(self,f'real_B_{i+1}',self.real_B_array[i].to(self.device))
-        setattr(self,f'real_B_{self.mod_id_seg}',self.real_B_array[self.opt.modalities_no].to(self.device)) # the last one is seg
+        if self.opt.seg_gen:
+            setattr(self,f'real_B_{self.mod_id_seg}',self.real_B_array[self.opt.modalities_no].to(self.device)) # the last one is seg
         
         self.image_paths = input['A_paths']
 
@@ -175,13 +191,14 @@ class DeepLIIFModel(BaseModel):
         #                              torch.mul(self.fake_B_5_4, self.seg_weights[3]),
         #                              torch.mul(self.fake_B_5_5, self.seg_weights[4])]).sum(dim=0)
         
-        for i,model_name in enumerate(self.model_names_gs):
-            if i == 0:
-                setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(self.real_A))
-            else:
-                setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(getattr(self,f'fake_B_{i}')))
-            
-        setattr(self,f'fake_B_{self.mod_id_seg}',torch.stack([torch.mul(getattr(self,f'fake_B_{self.mod_id_seg}_{i}'), self.seg_weights[i]) for i in range(self.opt.modalities_no+1)]).sum(dim=0))
+        if self.seg_gen:
+            for i,model_name in enumerate(self.model_names_gs):
+                if i == 0:
+                    setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(self.real_A))
+                else:
+                    setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(getattr(self,f'fake_B_{i}')))
+                
+            setattr(self,f'fake_B_{self.mod_id_seg}',torch.stack([torch.mul(getattr(self,f'fake_B_{self.mod_id_seg}_{i}'), self.seg_weights[i]) for i in range(self.opt.modalities_no+1)]).sum(dim=0))
 
     def backward_D(self):
         """Calculate GAN loss for the discriminators"""
@@ -203,7 +220,7 @@ class DeepLIIFModel(BaseModel):
         for i,model_name in enumerate(self.model_names_d):
             fake_AB = torch.cat((self.real_A, getattr(self,f'fake_B_{i+1}')), 1)
             pred_fake = getattr(self,f'net{model_name}')(fake_AB.detach())
-            setattr(self,f'loss_D_fake_{i+1}',self.criterionGAN_BCE(pred_fake, False))
+            setattr(self,f'loss_D_fake_{i+1}',self.criterionGAN_mod(pred_fake, False))
             #setattr(self,f'fake_AB_{i+1}',torch.cat((self.real_A, getattr(self,f'fake_B_{i+1}')), 1))
             #setattr(self,f'pred_fake_{i+1}',getattr(self,f'netD{i+1}')(getattr))
 
@@ -227,19 +244,20 @@ class DeepLIIFModel(BaseModel):
         #      torch.mul(pred_fake_5_4, self.seg_weights[3]),
         #      torch.mul(pred_fake_5_5, self.seg_weights[4])]).sum(dim=0)
         
-        l_pred_fake_seg = []
-        for i,model_name in enumerate(self.model_names_ds):
-            if i == 0:
-                fake_AB_seg_i = torch.cat((self.real_A, getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
-            else:
-                fake_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
-            
-            pred_fake_seg_i = getattr(self,f'net{model_name}')(fake_AB_seg_i.detach())
-            l_pred_fake_seg.append(torch.mul(pred_fake_seg_i, self.seg_weights[i]))
-        pred_fake_seg = torch.stack(l_pred_fake_seg).sum(dim=0)
-
-        #self.loss_D_fake_5 = self.criterionGAN_lsgan(pred_fake_5, False)
-        setattr(self,f'loss_D_fake_{self.mod_id_seg}',self.criterionGAN_lsgan(pred_fake_seg, False))
+        if self.seg_gen:
+            l_pred_fake_seg = []
+            for i,model_name in enumerate(self.model_names_ds):
+                if i == 0:
+                    fake_AB_seg_i = torch.cat((self.real_A, getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
+                else:
+                    fake_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
+                
+                pred_fake_seg_i = getattr(self,f'net{model_name}')(fake_AB_seg_i.detach())
+                l_pred_fake_seg.append(torch.mul(pred_fake_seg_i, self.seg_weights[i]))
+            pred_fake_seg = torch.stack(l_pred_fake_seg).sum(dim=0)
+    
+            #self.loss_D_fake_5 = self.criterionGAN_lsgan(pred_fake_5, False)
+            setattr(self,f'loss_D_fake_{self.mod_id_seg}',self.criterionGAN_seg(pred_fake_seg, False))
 
 
         # real_AB_1 = torch.cat((self.real_A, self.real_B_1), 1)
@@ -260,7 +278,7 @@ class DeepLIIFModel(BaseModel):
         for i,model_name in enumerate(self.model_names_d):
             real_AB = torch.cat((self.real_A, getattr(self,f'real_B_{i+1}')), 1)
             pred_real = getattr(self,f'net{model_name}')(real_AB)
-            setattr(self,f'loss_D_real_{i+1}',self.criterionGAN_BCE(pred_real, True))
+            setattr(self,f'loss_D_real_{i+1}',self.criterionGAN_mod(pred_real, True))
 
         # real_AB_5_1 = torch.cat((self.real_A, self.real_B_5), 1)
         # real_AB_5_2 = torch.cat((self.real_B_1, self.real_B_5), 1)
@@ -281,19 +299,20 @@ class DeepLIIFModel(BaseModel):
         #      torch.mul(pred_real_5_4, self.seg_weights[3]),
         #      torch.mul(pred_real_5_5, self.seg_weights[4])]).sum(dim=0)
 
-        l_pred_real_seg = []
-        for i,model_name in enumerate(self.model_names_ds):
-            if i == 0:
-                real_AB_seg_i = torch.cat((self.real_A, getattr(self,f'real_B_{self.mod_id_seg}')), 1)
-            else:
-                real_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'real_B_{self.mod_id_seg}')), 1)
-            
-            pred_real_seg_i = getattr(self,f'net{model_name}')(real_AB_seg_i)
-            l_pred_real_seg.append(torch.mul(pred_real_seg_i, self.seg_weights[i]))
-        pred_real_seg = torch.stack(l_pred_real_seg).sum(dim=0)
-
-        #self.loss_D_real_5 = self.criterionGAN_lsgan(pred_real_5, True)
-        setattr(self,f'loss_D_real_{self.mod_id_seg}',self.criterionGAN_lsgan(pred_real_seg, True))
+        if self.seg_gen:
+            l_pred_real_seg = []
+            for i,model_name in enumerate(self.model_names_ds):
+                if i == 0:
+                    real_AB_seg_i = torch.cat((self.real_A, getattr(self,f'real_B_{self.mod_id_seg}')), 1)
+                else:
+                    real_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'real_B_{self.mod_id_seg}')), 1)
+                
+                pred_real_seg_i = getattr(self,f'net{model_name}')(real_AB_seg_i)
+                l_pred_real_seg.append(torch.mul(pred_real_seg_i, self.seg_weights[i]))
+            pred_real_seg = torch.stack(l_pred_real_seg).sum(dim=0)
+    
+            #self.loss_D_real_5 = self.criterionGAN_lsgan(pred_real_5, True)
+            setattr(self,f'loss_D_real_{self.mod_id_seg}',self.criterionGAN_seg(pred_real_seg, True))
 
         # combine losses and calculate gradients
         # self.loss_D = (self.loss_D_fake_1 + self.loss_D_real_1) * 0.5 * self.loss_D_weights[0] + \
@@ -305,7 +324,8 @@ class DeepLIIFModel(BaseModel):
         self.loss_D = torch.tensor(0., device=self.device)
         for i in range(self.opt.modalities_no):
             self.loss_D += (getattr(self,f'loss_D_fake_{i+1}') + getattr(self,f'loss_D_real_{i+1}')) * 0.5 * self.loss_D_weights[i]
-        self.loss_D += (getattr(self,f'loss_D_fake_{self.mod_id_seg}') + getattr(self,f'loss_D_real_{self.mod_id_seg}')) * 0.5 * self.loss_D_weights[self.opt.modalities_no]
+        if self.seg_gen:
+              self.loss_D += (getattr(self,f'loss_D_fake_{self.mod_id_seg}') + getattr(self,f'loss_D_real_{self.mod_id_seg}')) * 0.5 * self.loss_D_weights[self.opt.modalities_no]
 
         self.loss_D.backward()
 
@@ -330,7 +350,7 @@ class DeepLIIFModel(BaseModel):
         for i,model_name in enumerate(self.model_names_d):
             fake_AB = torch.cat((self.real_A, getattr(self,f'fake_B_{i+1}')), 1)
             pred_fake = getattr(self,f'net{model_name}')(fake_AB)
-            setattr(self,f'loss_G_GAN_{i+1}',self.criterionGAN_BCE(pred_fake, True))
+            setattr(self,f'loss_G_GAN_{i+1}',self.criterionGAN_mod(pred_fake, True))
 
         # fake_AB_5_1 = torch.cat((self.real_A, self.fake_B_5), 1)
         # fake_AB_5_2 = torch.cat((self.real_B_1, self.fake_B_5), 1)
@@ -350,19 +370,20 @@ class DeepLIIFModel(BaseModel):
         #      torch.mul(pred_fake_5_4, self.seg_weights[3]),
         #      torch.mul(pred_fake_5_5, self.seg_weights[4])]).sum(dim=0)
 
-        l_pred_fake_seg = []
-        for i,model_name in enumerate(self.model_names_ds):
-            if i == 0:
-                fake_AB_seg_i = torch.cat((self.real_A, getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
-            else:
-                fake_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
-            
-            pred_fake_seg_i = getattr(self,f'net{model_name}')(fake_AB_seg_i)
-            l_pred_fake_seg.append(torch.mul(pred_fake_seg_i, self.seg_weights[i]))
-        pred_fake_seg = torch.stack(l_pred_fake_seg).sum(dim=0)
-
-        # self.loss_G_GAN_5 = self.criterionGAN_lsgan(pred_fake_5, True)
-        setattr(self,f'loss_G_GAN_{self.mod_id_seg}',self.criterionGAN_lsgan(pred_fake_seg, True))
+        if self.seg_gen:
+            l_pred_fake_seg = []
+            for i,model_name in enumerate(self.model_names_ds):
+                if i == 0:
+                    fake_AB_seg_i = torch.cat((self.real_A, getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
+                else:
+                    fake_AB_seg_i = torch.cat((getattr(self,f'real_B_{i}'), getattr(self,f'fake_B_{self.mod_id_seg}')), 1)
+                
+                pred_fake_seg_i = getattr(self,f'net{model_name}')(fake_AB_seg_i)
+                l_pred_fake_seg.append(torch.mul(pred_fake_seg_i, self.seg_weights[i]))
+            pred_fake_seg = torch.stack(l_pred_fake_seg).sum(dim=0)
+    
+            # self.loss_G_GAN_5 = self.criterionGAN_lsgan(pred_fake_5, True)
+            setattr(self,f'loss_G_GAN_{self.mod_id_seg}',self.criterionGAN_seg(pred_fake_seg, True))
 
         # Second, G(A) = B
         # self.loss_G_L1_1 = self.criterionSmoothL1(self.fake_B_1, self.real_B_1) * self.opt.lambda_L1
@@ -373,7 +394,8 @@ class DeepLIIFModel(BaseModel):
         
         for i in range(self.opt.modalities_no):
             setattr(self,f'loss_G_L1_{i+1}',self.criterionSmoothL1(getattr(self,f'fake_B_{i+1}'), getattr(self,f'real_B_{i+1}')) * self.opt.lambda_L1)
-        setattr(self,f'loss_G_L1_{self.mod_id_seg}',self.criterionSmoothL1(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_L1)
+        if self.seg_gen:
+            setattr(self,f'loss_G_L1_{self.mod_id_seg}',self.criterionSmoothL1(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_L1)
 
         # self.loss_G_VGG_1 = self.criterionVGG(self.fake_B_1, self.real_B_1) * self.opt.lambda_feat
         # self.loss_G_VGG_2 = self.criterionVGG(self.fake_B_2, self.real_B_2) * self.opt.lambda_feat
@@ -381,7 +403,8 @@ class DeepLIIFModel(BaseModel):
         # self.loss_G_VGG_4 = self.criterionVGG(self.fake_B_4, self.real_B_4) * self.opt.lambda_feat
         for i in range(self.opt.modalities_no):
             setattr(self,f'loss_G_VGG_{i+1}',self.criterionVGG(getattr(self,f'fake_B_{i+1}'), getattr(self,f'real_B_{i+1}')) * self.opt.lambda_feat)
-        setattr(self,f'loss_G_VGG_{self.mod_id_seg}',self.criterionVGG(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_feat)
+        if self.seg_gen:
+            setattr(self,f'loss_G_VGG_{self.mod_id_seg}',self.criterionVGG(getattr(self,f'fake_B_{self.mod_id_seg}'), getattr(self,f'real_B_{self.mod_id_seg}')) * self.opt.lambda_feat)
 
         # self.loss_G = (self.loss_G_GAN_1 + self.loss_G_L1_1 + self.loss_G_VGG_1) * self.loss_G_weights[0] + \
         #               (self.loss_G_GAN_2 + self.loss_G_L1_2 + self.loss_G_VGG_2) * self.loss_G_weights[1] + \
@@ -392,7 +415,8 @@ class DeepLIIFModel(BaseModel):
         self.loss_G = torch.tensor(0., device=self.device)
         for i in range(self.opt.modalities_no):
             self.loss_G += (getattr(self,f'loss_G_GAN_{i+1}') + getattr(self,f'loss_G_L1_{i+1}') + getattr(self,f'loss_G_VGG_{i+1}')) * self.loss_G_weights[i]
-        self.loss_G += (getattr(self,f'loss_G_GAN_{self.mod_id_seg}') + getattr(self,f'loss_G_L1_{self.mod_id_seg}')) * self.loss_G_weights[i]
+        if self.seg_gen:
+            self.loss_G += (getattr(self,f'loss_G_GAN_{self.mod_id_seg}') + getattr(self,f'loss_G_L1_{self.mod_id_seg}')) * self.loss_G_weights[i]
 
         # combine loss and calculate gradients
         # self.loss_G = (self.loss_G_GAN_1 + self.loss_G_L1_1) * self.loss_G_weights[0] + \

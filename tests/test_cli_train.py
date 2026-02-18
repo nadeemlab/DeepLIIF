@@ -175,27 +175,28 @@ def test_cli_train_single_gpu_netgs(tmp_path, model_info, foldername_suffix):
 
 
 def test_cli_train_single_gpu_withval(tmp_path, model_info, foldername_suffix):
-    if available_gpus > 0 and model_info["model"] not in ['CycleGAN']:
+    if available_gpus > 0 and True in model_info["seg_gen"]:
         torch.cuda.nvtx.range_push("test_cli_train_single_gpu_withval")
         dirs_input = model_info['dir_input_train']
         for i in range(len(dirs_input)):
-            torch.cuda.nvtx.range_push(f"test_cli_train_single_gpu {dirs_input[i]}")
-            dir_save = tmp_path
-            
-            fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
-            num_input = len(fns_input)
-            assert num_input > 0
-    
-            test_param = '--gpu-ids 0 --with-val'
-            cmd = CMD_BASIC.format(model=model_info["model"], dataroot=dirs_input[i], 
-                                   modalities_no=model_info["modalities_no"][i], 
-                                   seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
-            cmd += f' {test_param}'
-            if model_info["model"] in ['DeepLIIFKD']:
-                cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
-            res = subprocess.run(cmd,shell=True)
-            assert res.returncode == 0
-            torch.cuda.nvtx.range_pop()
+            if model_info["seg_gen"][i]:
+                torch.cuda.nvtx.range_push(f"test_cli_train_single_gpu {dirs_input[i]}")
+                dir_save = tmp_path
+                
+                fns_input = [f for f in os.listdir(dirs_input[i] + '/train' + foldername_suffix) if os.path.isfile(os.path.join(dirs_input[i] + '/train' + foldername_suffix, f)) and f.endswith('png')]
+                num_input = len(fns_input)
+                assert num_input > 0
+        
+                test_param = '--gpu-ids 0 --with-val'
+                cmd = CMD_BASIC.format(model=model_info["model"], dataroot=dirs_input[i], 
+                                       modalities_no=model_info["modalities_no"][i], 
+                                       seg_gen=model_info["seg_gen"][i], dir_save=dir_save)
+                cmd += f' {test_param}'
+                if model_info["model"] in ['DeepLIIFKD']:
+                    cmd += CMD_KD.format(model_dir_teacher=model_info['model_dir_teacher'][i])
+                res = subprocess.run(cmd,shell=True)
+                assert res.returncode == 0
+                torch.cuda.nvtx.range_pop()
         torch.cuda.nvtx.range_pop()
     else:
         pytest.skip(f'Detected {available_gpus} (< 1) available GPUs. Skip.')
