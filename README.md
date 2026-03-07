@@ -337,7 +337,7 @@ Query String Parameters:
     segmentation image. Valid values are an integer in the range 0-255, 'none',
     or 'auto'. 'None' will not use the marker image during classification.
     'Auto' will automatically determine a threshold from the marker image.
-    Default is 'auto'.
+    Default is 'none'.
 ```
 
 For example, in Python:
@@ -437,7 +437,7 @@ Query String Parameters:
     segmentation image. Valid values are an integer in the range 0-255, 'none',
     or 'auto'. 'None' will not use the marker image during classification.
     'Auto' will automatically determine a threshold from the marker image.
-    Default is 'auto'. (If marker_img is not supplied, this has no effect.)
+    Default is 'none'. (If marker_img is not supplied, this has no effect.)
 ```
 
 For example, in Python:
