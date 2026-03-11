@@ -92,9 +92,11 @@ class DeepLIIFModel(BaseModel):
 
         if self.seg_gen:
             # DeepLIIF model currently uses one gs arch because there is only one explicit seg mod output
+            # default padding type in define_G: reflect (default padding type in cli/opt is zero - this opt in cli was developed to control padding type in translation generators only)
+            # default upsample strategy in define_G: convtranspose
             for i,model_name in enumerate(self.model_names_gs):
                 setattr(self,f'net{model_name}',networks.define_G(self.opt.input_nc * self.opt.input_no, opt.output_nc, opt.ngf, opt.net_gs[i], opt.norm,
-                                          not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids, opt.padding, opt.upsample))
+                                          not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids))
 
         if self.is_train:  # define a discriminator; conditional GANs need to take both input and output images; Therefore, #channels for D is input_nc + output_nc
             self.model_names_d = [f'D{i+1}' for i in range(self.opt.modalities_no)]
@@ -504,4 +506,3 @@ class DeepLIIFModel(BaseModel):
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
             
-
