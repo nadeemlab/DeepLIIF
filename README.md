@@ -142,14 +142,14 @@ deepliif prepare-training-data --input-dir /path/to/input/images
 ```
 
 ### Validation Dataset
-The validation dataset consists of images of the same format as the training dataset and is totally optional (i.e., DeepLIIF model training command does not require a validation dataset to run). This currently is only implemented for **models with segmentation task**.
+The validation dataset consists of images of the same format as the training dataset and is totally optional (i.e., DeepLIIF model training command does not require a validation dataset to run). This currently is only implemented for **DeepLIIF or DeepLIIFKD models with segmentation task** (in which case the very last tile in the training / validation image is the segmentation tile).
 
 To use the validation dataset during training, it is necessary to first acquire the key quantitative statistics for the model to compare against as the training goes on. In tasks targeting at generating a single number or an a array of numbers, validation metrics can be done by simply calculating the differences between the ground truth numbers and predicted numbers. In our image generation tasks, however, the key metrics we want to monitor are segmentation results: number of positive cells, number of negative cells, etc. These are much more informative and better reflect the quality of the model output than differences between pixel values. The ground truth quantitative numbers of segmentation results can be obtained using the `postprocess` function in `deepliif.models`.
 
 We provide a wrapper function `get_cell_count_metrics` that generates a json file for model validation:
 ```
 from deepliif.stat import get_cell_count_metrics
-dir_img = '...'
+dir_img = '...' # e.g., directory to the validation images
 get_cell_count_metrics(dir_img, dir_save=dir_img, model='DeepLIIF', tile_size=512)
 ```
 
@@ -225,8 +225,10 @@ In addition to the required parameters given above, the following optional param
 * `--eager-mode` Run the original model files (instead of serialized model files).
 * `--seg-intermediate` Save the intermediate segmentation maps created for each modality.
 * `--seg-only` Save only the segmentation files, and do not infer images that are not needed.
+* `--mod-only` Save only the translated modality image; overwrites --seg-only and --seg-intermediate.
 * `--color-dapi` Color the inferred DAPI image.
 * `--color-marker` Color the inferred marker image.
+* `--BtoA` For models trained with unaligned dataset, this flag instructs the code to load generatorB instead of generatorA.
 
 **Whole Slide Image (WSI) Inference:**  
 For translation and segmentation of whole slide images, 
