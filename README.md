@@ -42,7 +42,7 @@ segmentation.*
 
 © This code is made available for non-commercial academic purposes.
 
-![Version](https://img.shields.io/static/v1?label=latest&message=v1.2.4&color=darkgreen)
+![Version](https://img.shields.io/static/v1?label=latest&message=v1.2.5&color=darkgreen)
 [![Total Downloads](https://static.pepy.tech/personalized-badge/deepliif?period=total&units=international_system&left_color=grey&right_color=blue&left_text=total%20downloads)](https://pepy.tech/project/deepliif?&left_text=totalusers)
 
 ![overview_image](./images/overview.png)*Overview of DeepLIIF pipeline and sample input IHCs (different 
@@ -359,7 +359,7 @@ Query String Parameters:
     segmentation image. Valid values are an integer in the range 0-255, 'none',
     or 'auto'. 'None' will not use the marker image during classification.
     'Auto' will automatically determine a threshold from the marker image.
-    Default is 'auto'.
+    Default is 'none'.
 ```
 
 For example, in Python:
@@ -459,7 +459,7 @@ Query String Parameters:
     segmentation image. Valid values are an integer in the range 0-255, 'none',
     or 'auto'. 'None' will not use the marker image during classification.
     'Auto' will automatically determine a threshold from the marker image.
-    Default is 'auto'. (If marker_img is not supplied, this has no effect.)
+    Default is 'none'. (If marker_img is not supplied, this has no effect.)
 ```
 
 For example, in Python:
