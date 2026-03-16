@@ -202,7 +202,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     """
     assert model in ['DeepLIIF','DeepLIIFExt','SDG','CycleGAN','DeepLIIFKD'], f'model class {model} is not implemented'
     if model in ['DeepLIIF','DeepLIIFKD']:
-        seg_no = 1
+        if seg_gen == True:
+            seg_no = 1
+        else:
+            seg_no = 0
     elif model == 'DeepLIIFExt':
         if seg_gen:
             seg_no = modalities_no
@@ -212,6 +215,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         seg_no = 0
         seg_gen = False
     
+    # validation currently is only supported for segmentation results
+    if seg_gen == False:
+        with_val = False
     
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
@@ -294,6 +300,10 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     modalities_names = [name.strip() for name in modalities_names.split(',') if len(name) > 0]
     assert len(modalities_names) == 0 or len(modalities_names) == input_no + modalities_no, f'--modalities-names has {len(modalities_names)} entries ({modalities_names}), expecting 0 or {input_no + modalities_no} entries'
     
+    if len(modalities_names) == 0 and model == 'DeepLIIFKD':
+        # inherit this property from teacher model
+        opt_teacher = get_opt(model_dir_teacher, mode='test')
+        modalities_names = opt_teacher.modalities_names
     
     d_params['input_no'] = input_no
     d_params['modalities_names'] = modalities_names
