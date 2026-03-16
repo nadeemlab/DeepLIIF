@@ -226,6 +226,9 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
         seg_no = 0
         seg_gen = False
     
+    # validation currently is only supported for segmentation results
+    if seg_gen == False:
+        with_val = False
     
     if model == 'CycleGAN':
         dataset_mode = "unaligned"
@@ -845,7 +848,6 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @click.option('--BtoA', is_flag=True, help='for models trained with unaligned dataset, this flag instructs to load generatorB instead of generatorA')
 def test(input_dir, output_dir, tile_size, model_dir, filename_pattern, gpu_ids, eager_mode, epoch,
          seg_intermediate, seg_only, mod_only, color_dapi, color_marker, btoa):
-    
     """Test trained models
     """
     output_dir = output_dir or input_dir
