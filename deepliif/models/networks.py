@@ -188,9 +188,6 @@ def define_G(
         net = UnetGenerator(input_nc, output_nc, 9, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_512_attention':
         net = AttU_Net(img_ch=input_nc,output_ch=output_nc)
-    elif netG.startswith('efficientnet_'):
-        efficientnet_name = netG.split('_')[1]
-        net = EfficientNetGenerator(input_nc, output_nc, efficientnet_name=efficientnet_name, upsample=upsample)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -514,103 +511,6 @@ class ResnetBlock(nn.Module):
         """Forward function (with skip connections)"""
         out = x + self.conv_block(x)  # add skip connections
         return out
-
-
-class EfficientNetGenerator(nn.Module):
-    """Adapted from ResnetGenerator, this EfficientNet variant uses pytorch's EfficientNet model classes to replace resnet blocks.
-       
-       WARINING: experimental stage, option ngf and use_spectral_norm are not tested/supported
-    """
-
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, efficientnet_name='b0', padding_type='zero', 
-                 upsample='convtranspose', use_spectral_norm=False):
-        """Construct a Resnet-based generator
-
-        Parameters:
-            input_nc (int)      -- the number of channels in input images
-            output_nc (int)     -- the number of channels in output images
-            ngf (int)           -- the number of filters in the last conv layer
-            norm_layer          -- normalization layer
-            use_dropout (bool)  -- if use dropout layers
-            n_blocks (int)      -- the number of ResNet blocks
-            padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
-        """
-        assert(efficientnet_name in ['b0','b1','b2','b3','b4','b5','b6','b7'])
-        super(EfficientNetGenerator, self).__init__()
-        
-        d_nc_from_efficientnet = {'b0':1280,
-                                  'b1':1280,
-                                  'b2':1408,
-                                  'b3':1536,
-                                  'b4':1792,
-                                  'b5':2048,
-                                  'b6':2304,
-                                  'b7':2560}
-        
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
-        
-        # method features drops the avgpool and classification layer
-        # for b0 with input (1,3,512,512), this yields an encoded tensor of size (1,1280,16,16)
-        # for b0 with input (1,3,1024,1024), this yields an encoded tensor of size (1,1280,32,32)
-        # which we can then upsample back 
-        # note that stochastic depth prob causes issue for batch size 1 so we just disable it
-        model = eval(f'models.efficientnet_{efficientnet_name}(stochastic_depth_prob=0.0)').features
-        
-        n_downsampling = 3
-        mult = 2 ** n_downsampling
-        model_upsample = []
-        
-        upsample_layer = [nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False),
-                          nn.Conv2d(d_nc_from_efficientnet[efficientnet_name],ngf*mult,kernel_size=3,stride=(1,1),padding=(1,1),bias=use_bias),
-                          norm_layer(ngf*mult),
-                          nn.ReLU(True)]
-        
-        model_upsample += upsample_layer
-                      
-        # regular upsampling process with n_downsampling and mult
-        for i in range(n_downsampling):  # add upsampling layers
-            mult = 2 ** (n_downsampling - i)
-            if upsample == 'resize_conv':
-                upsample_layer = [#nn.Upsample(scale_factor = 2, mode='bilinear',align_corners=True),
-                                  nn.Upsample(scale_factor = 2, mode='nearest'),
-                                  nn.ReflectionPad2d(1),
-                                  SpectralNorm(nn.Conv2d(ngf * mult, int(ngf * mult / 2),
-                                            kernel_size=3, stride=1, padding=0),use_spectral_norm=use_spectral_norm)
-                                            ]
-            elif upsample == 'pixel_shuffle':
-                upsample_layer = [SpectralNorm(nn.Conv2d(ngf * mult, int(ngf * mult * 2),use_spectral_norm=use_spectral_norm), 
-                                            kernel_size=3, padding=1),
-                                  nn.PixelShuffle(2),
-                                  nn.ReLU()]
-            elif upsample == 'convtranspose':
-                upsample_layer = [SpectralNorm(nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
-                                                                 kernel_size=3, stride=2,
-                                                                 padding=1, output_padding=1,
-                                                                 bias=use_bias),
-                                              use_spectral_norm=use_spectral_norm)]
-            else:
-                raise Exception(f'upsample layer type {upsample} not implemented')
-                
-            model_upsample += upsample_layer
-            model_upsample += [norm_layer(int(ngf * mult / 2)),
-                      nn.ReLU(True)]
-        
-        if padding_type == 'reflect':
-            model_upsample += [nn.ReflectionPad2d(3)]
-        else:
-            model_upsample += [nn.ZeroPad2d(3)]
-
-        model_upsample += [SpectralNorm(nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0),use_spectral_norm=use_spectral_norm)]
-        model_upsample += [nn.Tanh()]
-
-        self.model = nn.Sequential(*model, *model_upsample)
-
-    def forward(self, input):
-        """Standard forward"""
-        return self.model(input)
 
 
 class UnetGenerator(nn.Module):
