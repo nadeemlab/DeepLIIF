@@ -126,7 +126,7 @@ Content in each subfolder:
 ### Training Dataset
 For training in general, each image in the training set is in the form of a set of horizontally stitched patches, in the order of **base input modalities, translation modalities, and segmentation modalities** (whenever applicable). 
 
-Specifically for DeepLIIF original model, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched together horizontally).
+Specifically for the DeepLIIF original model, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched together horizontally).
 
 We have provided a simple function in the CLI for preparing DeepLIIF data for training.
 
@@ -144,9 +144,9 @@ deepliif prepare-training-data --input-dir /path/to/input/images
 ### Validation Dataset
 The validation dataset consists of images of the same format as the training dataset and is totally optional (i.e., DeepLIIF model training command does not require a validation dataset to run). This currently is only implemented for **DeepLIIF or DeepLIIFKD models with segmentation task** (in which case the very last tile in the training / validation image is the segmentation tile).
 
-To use the validation dataset during training, it is necessary to first acquire the key quantitative statistics for the model to compare against as the training goes on. In tasks targeting at generating a single number or an a array of numbers, validation metrics can be done by simply calculating the differences between the ground truth numbers and predicted numbers. In our image generation tasks, however, the key metrics we want to monitor are segmentation results: number of positive cells, number of negative cells, etc. These are much more informative and better reflect the quality of the model output than differences between pixel values. The ground truth quantitative numbers of segmentation results can be obtained using the `postprocess` function in `deepliif.models`.
+To use the validation dataset during training, it is necessary to first acquire the key quantitative statistics for the model to compare against as the training progresses. In tasks that target generating a single number or an array of numbers, validation metrics can be done by simply calculating the differences between the ground truth numbers and predicted numbers. In our image generation tasks, however, the key metrics we want to monitor are segmentation results: number of positive cells, number of negative cells, etc. These are much more informative and better reflect the quality of the model output than differences between pixel values. The ground truth quantitative numbers of segmentation results can be obtained using the `postprocess` function in `deepliif.models`.
 
-We provide a wrapper function `get_cell_count_metrics` that generates a json file for model validation:
+We provide a wrapper function `get_cell_count_metrics` that generates a JSON file for model validation:
 ```
 from deepliif.stat import get_cell_count_metrics
 dir_img = '...' # e.g., directory to the validation images
@@ -188,7 +188,7 @@ deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 
 In addition to the original DeepLIIF model, the package now supports more model types. Details can be found [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Model%20Types.md).
 
 ## Serialize Model
-The installed `deepliif` can optionally use serialized model objects to perform inference on the input images. In order to do this, before running the `test` command, the model files need to be serialized using Torchscript:
+The installed `deepliif` package can optionally use serialized model objects to perform inference on the input images. In order to do this, before running the `test` command, the model files need to be serialized using Torchscript:
 ```
 deepliif serialize --model-dir /path/to/input/model/files
                    --output-dir /path/to/output/model/files
@@ -268,8 +268,8 @@ on how to deploy the model with Torchserve and for an example of how to run the 
 
 ## Docker
 We provide a Dockerfile that can be used to run the DeepLIIF models inside a container.
-First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
-After installing the Docker, you need to follow these steps:
+First, you need to install [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
+After installing Docker, you need to follow these steps:
 * Download the pretrained model [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4) and place them in DeepLIIF/model-server/DeepLIIF_Latest_Model.
 * To create a docker image from the docker file:
 ```

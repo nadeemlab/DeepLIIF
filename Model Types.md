@@ -13,7 +13,7 @@ Note that there could be additional configurable options for different model typ
 ## Available Models
 Currently we provide 5 models ready to be used with `deepliif` package. 
 
-Input training data typically is a row of same-shaped square patches stitched together. Using DeepLIIF as an example, the input in the publicated paper is (IHC, Hematoxylin, DAPI, Lap2, Marker, Seg). This can be understood as (base mod, mod 1, mod 2, mod 3, mod 4, seg).
+Input training data typically is a row of same-shaped square patches stitched together. Using DeepLIIF as an example, the input in the published paper is (IHC, Hematoxylin, DAPI, Lap2, Marker, Seg). This can be understood as (base mod, mod 1, mod 2, mod 3, mod 4, seg).
 
 |Model Name|Full Model Name|Tasks|Description|Training Data|Additional Config|
 |----------|---------------|-----|-----------|-------------|-----------------|
@@ -30,15 +30,15 @@ DeepLIIF uses IHC as training input as well as 4 additional modalities (Hematoxy
 
 During inference, only the IHC input is needed.
 
-The original setting employs **ResNet-9block** as the backbone for translation generators and **UNet-512 (9 down layers)** for segmentation generatros. 
+The original setting employs **ResNet-9block** as the backbone for translation generators and **UNet-512 (9 down layers)** for segmentation generators.
 
 #### DeepLIIF with a configurable number of modalities and SDG capabilities
-We recently updated DeepLIIF model class to allow an arbitrary number of modalities (can even be 0). `--modalities-no 0` practically means 0 modality to translate to, and there will only be 1 generator that uses the base input mod (e.g., IHC) for the segmentation task (i.e., the whole DeepLIIF model in this case will only have 1 generator, rather than 4+5=9 generators in the original setting).
+We recently updated DeepLIIF model class to allow an arbitrary number of modalities (which can even be 0). Setting `--modalities-no 0` means no modalities to translate to, and there will only be 1 generator that uses the base input mod (e.g., IHC) for the segmentation task (i.e., the whole DeepLIIF model in this case will only have 1 generator, rather than 4+5=9 generators in the original setting).
 
 Another major update is the merge with SDG as DeepLIIF has a considerable overlap with SDG. This means the DeepLIIF model now accepts `--seg-gen false` (no segmentation task) and the input number can be more than 1 (automatically deteremined using the number of patches in the training image minus the supplied modalities number in the command).
 
 ### 2. DeepLIIFExt
-Mainly based on the original DeepLIIF, this extension model allows to
+Mainly based on the original DeepLIIF, this extension model allows to:
 - learn only the modality translation task (`--seg-gen false`)
 - use modality-wise segmentation ground truth (e.g., if use IHC as the base input, Lap2 and Marker as the additional modalities to learn translation to, then the training image should include 2 segmentation ground truth, 1 for each additional modalities)
 - train any number of modalities (e.g., `--modalities-no 2` for 2 modalities to learn translation task for)
@@ -69,7 +69,7 @@ The input to DeepLIIFKD is the same as that to DeepLIIF.
 ### 4. CycleGAN
 The DeepLIIF model family requires paired images to learn the mapping. This, however, is not always achievable during data collection or might require considerably more efforts. Hence we apply the idea of CycleGAN for unpaired modality translation. 
 
-The core idea is for the model to learn `f(A) = B` and `g(f(A)) = A`, where `A` and `B` denotes data from the input and target domain, and `f(x)` and `g(x)` denotes two mapping functions approximated by neural networks. For example, the input domain can be IHC and the target domain can be KI67. Generator `f(x)` learns how to map IHC to KI67 and generator `g(x)` learns how to map the translated KI67 back to the original IHC. In this case, we only need generator `f(x)` for inference.
+The core idea is for the model to learn `f(A) = B` and `g(f(A)) = A`, where `A` and `B` denote data from the input and target domain, and `f(x)` and `g(x)` denote two mapping functions approximated by neural networks. For example, the input domain can be IHC and the target domain can be Ki-67. Generator `f(x)` learns how to map IHC to Ki-67 and generator `g(x)` learns how to map the translated Ki-67 back to the original IHC. In this case, we only need generator `f(x)` for inference.
 
 Our implementation of CycleGAN supports learning the mapping to multiple domains at once. Essentially, this becomes a multi-task learning: for each target domain `B1`, `B2`, ..., we create a separate generator set `f(x)` and `g(x)`. The losses from each generator set then gets combined for back propagation.
 
