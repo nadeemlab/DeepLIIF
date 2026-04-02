@@ -91,6 +91,8 @@ class Options:
             
             if self.model in ['DeepLIIF','DeepLIIFKD']:
                 self.mod_id_seg, self.input_id = init_input_and_mod_id(self, os.path.dirname(path_file))
+                if hasattr(self,'seg_gen') and self.seg_gen == False:
+                    self.mod_id_seg = None
                 self.input_id = int(self.input_id)
                 print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
             
@@ -99,7 +101,7 @@ class Options:
                     if not hasattr(self,'modalities_names'):
                         self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
                         self.seg_weights = [0.5,0,0,0,0.5]
-                elif not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
+                if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
                     # if self.model == 'DeepLIIFKD':
                     #     # try find the modalities names from the teacher model
                     #     d_params_teacher = read_model_params(os.path.join(self.model_dir_teacher,'train_opt.txt'))
@@ -107,7 +109,7 @@ class Options:
                     #         self.modalities_names = d_params_teacher['modalities_names']
                     # # check again
                     # if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
-                    self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+                    self.modalities_names = [f'input{i+1}' for i in range(self.input_no)] + [f'mod{i+1}' for i in range(self.modalities_no)]
             else:
                 self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
 
@@ -133,7 +135,7 @@ class Options:
             
             # to account for old settings: same as in cli.py train
             if not hasattr(self,'seg_no'):
-              if self.model == 'DeepLIIF':
+              if self.model == 'DeepLIIF': # for newer models where deepliif accept seg_gen=False (2026feb), seg_no should exist so this auto-determination will not be triggered
                   self.seg_no = 1
                   self.seg_gen = True
               elif self.model == 'DeepLIIFExt':
@@ -172,6 +174,10 @@ class Options:
             # weights of the modalities used to calculate the final loss
             self.loss_G_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_G_weights') else self.loss_G_weights
             self.loss_D_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_D_weights') else self.loss_D_weights
+            
+            # upsample
+            if not hasattr(self,'upsample'):
+                self.upsample = 'convtranspose'
 
             
     

@@ -77,17 +77,23 @@ The package is composed of two parts:
 You can list all available commands:
 
 ```
-(venv) $ deepliif --help
+$ deepliif --help
 Usage: deepliif [OPTIONS] COMMAND [ARGS]...
+
+  Commonly used DeepLIIF batch operations
 
 Options:
   --help  Show this message and exit.
 
 Commands:
   prepare-testing-data   Preparing data for testing
+  prepare-training-data  Preparing data for training
   serialize              Serialize DeepLIIF models using Torchscript
   test                   Test trained models
+  test-wsi
   train                  General-purpose training script for multi-task...
+  trainlaunch            A wrapper method that executes deepliif/train.py...
+  visualize
 ```
 
 **Note:** You might need to install a version of PyTorch that is compatible with your CUDA version. 
@@ -99,20 +105,33 @@ You can confirm if your installation will run on the GPU by checking if the foll
 import torch
 torch.cuda.is_available()
 ```
-
-## Training Dataset
-For training, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched
-together horizontally).
-The data need to be arranged in the following order:
+## Dataset for training, validation, and testing
+An example data directory looks as the following:
 ```
-XXX_Dataset 
+<Data folder> 
     ├── train
-    └── val
+    ├── val
+    ├── val_cli
+    └── val_cli_gt
 ```
-We have provided a simple function in the CLI for preparing data for training.
 
-* **To prepare data for training**, you need to have the image dataset for each image (including IHC, Hematoxylin Channel, mpIF DAPI, mpIF Lap2, mpIF marker, and segmentation mask) in the input directory.
-Each of the six images for a single image set must have the same naming format, with only the name of the label for the type of image differing between them.  The label names must be, respectively: IHC, Hematoxylin, DAPI, Lap2, Marker, Seg.
+If you use different subfolder names, you will need to add `--phase {foldername}` in the training or testing commands for the functions to navigate to the correct subfolder.
+
+Content in each subfolder:
+- train: training images used by command `python cli.py train`, see section Training Dataset below
+- val: validation images used by command `python cli.py train --with-val`, see section Validation Dataset below
+- val_cli: input modalities of the validation images used by command `python cli.py test`, see section Testing below
+- val_cli_gt: ground truth of the output modalities from the validation images, used for evaluation purposes
+
+### Training Dataset
+For training in general, each image in the training set is in the form of a set of horizontally stitched patches, in the order of **base input modalities, translation modalities, and segmentation modalities** (whenever applicable). 
+
+Specifically for the DeepLIIF original model, all image sets must be 512x512 and combined together in 3072x512 images (six images of size 512x512 stitched together horizontally).
+
+We have provided a simple function in the CLI for preparing DeepLIIF data for training.
+
+* **To use this method to prepare data for training**, you need to have the image dataset for each image (including IHC, Hematoxylin Channel, mpIF DAPI, mpIF Lap2, mpIF marker, and segmentation mask) in the input directory.
+Each of the six images for a single image set must have the same naming format, with only the name of the label for the type of image differing between them. To reproduce the original DeepLIIF model, the label names must be, respectively: IHC, Hematoxylin, DAPI, Lap2, Marker, Seg.
 The command takes the address of the directory containing image set data and the address of the output dataset directory.
 It first creates the train and validation directories inside the given output dataset directory.
 It then reads all of the images in the input directory and saves the combined image in the train or validation directory, based on the given `validation_ratio`.
@@ -121,6 +140,19 @@ deepliif prepare-training-data --input-dir /path/to/input/images
                                --output-dir /path/to/output/images
                                --validation-ratio 0.2
 ```
+
+### Validation Dataset
+The validation dataset consists of images of the same format as the training dataset and is totally optional (i.e., DeepLIIF model training command does not require a validation dataset to run). This currently is only implemented for **DeepLIIF or DeepLIIFKD models with segmentation task** (in which case the very last tile in the training / validation image is the segmentation tile).
+
+To use the validation dataset during training, it is necessary to first acquire the key quantitative statistics for the model to compare against as the training progresses. In tasks that target generating a single number or an array of numbers, validation metrics can be done by simply calculating the differences between the ground truth numbers and predicted numbers. In our image generation tasks, however, the key metrics we want to monitor are segmentation results: number of positive cells, number of negative cells, etc. These are much more informative and better reflect the quality of the model output than differences between pixel values. The ground truth quantitative numbers of segmentation results can be obtained using the `postprocess` function in `deepliif.models`.
+
+We provide a wrapper function `get_cell_count_metrics` that generates a JSON file for model validation:
+```
+from deepliif.stat import get_cell_count_metrics
+dir_img = '...' # e.g., directory to the validation images
+get_cell_count_metrics(dir_img, dir_save=dir_img, model='DeepLIIF', tile_size=512)
+```
+
 
 ## Training
 To train a model:
@@ -137,48 +169,35 @@ python train.py --dataroot /path/to/input/images
 * To view training losses and results, open the URL http://localhost:8097. For cloud servers replace localhost with your IP.
 * Epoch-wise intermediate training results are in `DeepLIIF/checkpoints/Model_Name/web/index.html`.
 * Trained models will be by default be saved in `DeepLIIF/checkpoints/Model_Name`.
-* Training datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+* Training datasets for the original DeepLIIF model can be downloaded from [Zenodo](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
-**DP**: To train a model you can use DP. DP is single-process. It means that **all the GPUs you want to use must be on the same machine** so that they can be included in the same process - you cannot distribute the training across multiple GPU machines, unless you write your own code to handle inter-node (node = machine) communication.
-To split and manage the workload for multiple GPUs within the same process, DP uses multi-threading. 
-You can find more information on DP [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Multi-GPU%20Training.md).
+### Multi-GPU Training
+You can find more information on multi-gpu training with DeepLIIF code [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Multi-GPU%20Training.md).
 
-To train a model with DP (Example with 2 GPUs (on 1 machine)):
+In short, 
+- Command `deepliif train` triggers **Data Parallel** (DP). DP is single-process, so **all the GPUs you want to use must be on the same machine** in order for them to be included in the same process. In other words, you cannot distribute the training across multiple GPU machines, unless you write your own code to handle inter-node / inter-machine communication.
+- Command `deepliif trainlaunch` triggers **Distributed Data Parallel** (DDP). DDP usually spawns multiple processes and consequently **can be used across machines**. 
+
+Example commands with 2 GPUs:
 ```
 deepliif train --dataroot <data_dir> --batch-size 6 --gpu-ids 0 --gpu-ids 1
-```
-Note that `batch-size` is defined per process. Since DP is a single-process method, the `batch-size` you set is the **effective** batch size.
-
-**DDP**: To train a model you can use DDP. DDP usually spawns multiple processes. 
-**DeepLIIF's code follows the PyTorch recommendation to spawn 1 process per GPU** ([doc](https://github.com/pytorch/examples/blob/master/distributed/ddp/README.md#application-process-topologies)). If you want to assign multiple GPUs to each process, you will need to make modifications to DeepLIIF's code (see [doc](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html#combine-ddp-with-model-parallelism)).
-Despite all the benefits of DDP, one drawback is the extra GPU memory needed for dedicated CUDA buffer for communication. See a short discussion [here](https://discuss.pytorch.org/t/do-dataparallel-and-distributeddataparallel-affect-the-batch-size-and-gpu-memory-consumption/97194/2). In the context of DeepLIIF, this means that there might be situations where you could use a *bigger batch size with DP* as compared to DDP, which may actually train faster than using DDP with a smaller batch size.
-You can find more information on DDP [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Multi-GPU%20Training.md).
-
-To launch training using DDP on a local machine, use `deepliif trainlaunch`. Example with 2 GPUs (on 1 machine):
-```
 deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "--nproc_per_node 2"
 ```
-Note that
-1. `batch-size` is defined per process. Since DDP is a single-process method, the `batch-size` you set is the batch size for each process, and the **effective** batch size will be `batch-size` multiplied by the number of processes you started. In the above example, it will be 3 * 2 = 6.
-2. You still need to provide **all GPU ids to use** to the training command. Internally, in each process DeepLIIF picks the device using `gpu_ids[local_rank]`. If you provide `--gpu-ids 2 --gpu-ids 3`, the process with local rank 0 will use gpu id 2 and that with local rank 1 will use gpu id 3. 
-3. `-t 3 --log_dir <log_dir>` is not required, but is a useful setting in `torchrun` that saves the log from each process to your target log directory. For example:
-```
-deepliif trainlaunch --dataroot <data_dir> --batch-size 3 --gpu-ids 0 --gpu-ids 1 --use-torchrun "-t 3 --log_dir <log_dir> --nproc_per_node 2"
-```
-4. If your PyTorch is older than 1.10, DeepLIIF calls `torch.distributed.launch` in the backend. Otherwise, DeepLIIF calls `torchrun`.
+
+### Model Types
+In addition to the original DeepLIIF model, the package now supports more model types. Details can be found [here](https://github.com/nadeemlab/DeepLIIF/blob/main/Model%20Types.md).
 
 ## Serialize Model
-The installed `deepliif` uses Dask to perform inference on the input IHC images.
-Before running the `test` command, the model files must be serialized using Torchscript.
-To serialize the model files:
+The installed `deepliif` package can optionally use serialized model objects to perform inference on the input images. In order to do this, before running the `test` command, the model files need to be serialized using Torchscript:
 ```
 deepliif serialize --model-dir /path/to/input/model/files
                    --output-dir /path/to/output/model/files
+                   --device gpu
 ```
-* By default, the model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
-* By default, the serialized files will be saved to the same directory as the input model files.
+* By default, for original DeepLIIF, the model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
+* If not specified, the serialized files will be saved to the same directory as the input model files.
 
-## Testing
+## Testing / Inference
 To test the model:
 ```
 deepliif test --input-dir /path/to/input/images
@@ -194,19 +213,22 @@ python test.py --dataroot /path/to/input/images
                --name Model_Name
 ```
 * The latest version of the pretrained models can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
-* Before running test on images, the model files must be serialized as described above.
-* The serialized model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
+* The format of input images to `test.py` is the same as training/validation data, while that to `deepliif test` command is only the input modalities (e.g., only IHC for original DeepLIIF).
+* Use `deepliif test ... --eager-mode` for the raw model files, or serialize the model files as described above to run the serialized ones.
+* For original DeepLIIF, The serialized model files are expected to be located in `DeepLIIF/model-server/DeepLIIF_Latest_Model`.
 * The test results will be saved to the specified output directory, which defaults to the input directory.
 * The tile size must be specified and is used to split the image into tiles for processing.  The tile size is based on the resolution (scan magnification) of the input image, and the recommended values are a tile size of 512 for 40x images, 256 for 20x, and 128 for 10x.  Note that the smaller the tile size, the longer inference will take.
-* Testing datasets can be downloaded [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
+* Testing datasets can be downloaded from [Zenodo](https://zenodo.org/record/4751737#.YKRTS0NKhH4).
 
 **Test Command Options:**  
 In addition to the required parameters given above, the following optional parameters are available for `deepliif test`:
 * `--eager-mode` Run the original model files (instead of serialized model files).
 * `--seg-intermediate` Save the intermediate segmentation maps created for each modality.
 * `--seg-only` Save only the segmentation files, and do not infer images that are not needed.
+* `--mod-only` Save only the translated modality image; overwrites --seg-only and --seg-intermediate.
 * `--color-dapi` Color the inferred DAPI image.
 * `--color-marker` Color the inferred marker image.
+* `--BtoA` For models trained with unaligned dataset, this flag instructs the code to load generatorB instead of generatorA.
 
 **Whole Slide Image (WSI) Inference:**  
 For translation and segmentation of whole slide images, 
@@ -246,8 +268,8 @@ on how to deploy the model with Torchserve and for an example of how to run the 
 
 ## Docker
 We provide a Dockerfile that can be used to run the DeepLIIF models inside a container.
-First, you need to install the [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
-After installing the Docker, you need to follow these steps:
+First, you need to install [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
+After installing Docker, you need to follow these steps:
 * Download the pretrained model [here](https://zenodo.org/record/4751737#.YKRTS0NKhH4) and place them in DeepLIIF/model-server/DeepLIIF_Latest_Model.
 * To create a docker image from the docker file:
 ```
