@@ -400,11 +400,16 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
             if seg_only: # return seg image and the last translated modality
-                res = {
-                    #f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
-                    f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[-1]),
-                    f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
-                }
+                if opt.modalities_no >= 1:
+                    res = {
+                        #f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=(10, 10, 10)),
+                        f'G{opt.modalities_no}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[-1]),
+                        f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    }
+                else:
+                    res = {
+                        f'G{opt.mod_id_seg}': Image.new(mode='RGB', size=(512, 512), color=(0, 0, 0)),
+                    }
             elif mod_only or not opt.seg_gen:
                 res = {f'G{i+1}': Image.new(mode='RGB', size=(512, 512), color=opt.background_colors[i]) for i in range(opt.modalities_no)}
                 
