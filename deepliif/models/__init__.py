@@ -797,7 +797,7 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
     region_size : int
         Maximum size to split the slide for processing.
     version : int
-        Version of cell data to return (3 or 4).
+        Version of cell data to return (3, 4, 5, or 6).
     print_log : bool
         Whether or not to print updates while processing.
     seg_weights : list | tuple
@@ -827,16 +827,22 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
 
         num_regions_x = math.ceil(size_x / region_size)
         num_regions_y = math.ceil(size_y / region_size)
+        num_regions = num_regions_x * num_regions_y
+        print_info('Num regions:', num_regions)
+
         stride_x = math.ceil(size_x / num_regions_x)
         stride_y = math.ceil(size_y / num_regions_y)
         print_info('Strides:', stride_x, stride_y)
 
         start_x, start_y = 0, 0
 
+        count = 0
         while start_y < size_y:
             while start_x < size_x:
                 region_XYWH = (start_x, start_y, min(stride_x, size_x-start_x), min(stride_y, size_y-start_y))
                 print_info('Region:', region_XYWH)
+                count += 1
+                print_info('Region num:', count, '/', num_regions)
 
                 region = reader.read(region_XYWH)
                 print_info(region.shape, region.dtype)
@@ -857,35 +863,55 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                     seg_only=True,
                     seg_weights=seg_weights,
                 )
-                del img
 
                 seg = to_array(images['Seg'])
                 del images['Seg']
-                marker_key = find_marker_key(images)
-                marker = to_array(images[marker_key], True) if marker_key is not None else None
+
+                if version == 5 or version == 6:
+                    marker = to_array(img)
+                else:
+                    marker_key = find_marker_key(images)
+                    marker = to_array(images[marker_key], True) if marker_key is not None else None
+
+                del img
                 del images
+
                 region_data = compute_cell_results(seg, marker, resolution, version=version)
                 del seg
                 del marker
 
                 if start_x != 0 or start_y != 0:
                     for i in range(len(region_data['cells'])):
-                        cell = decode_cell_data_v4(region_data['cells'][i]) if version == 4 else region_data['cells'][i]
+                        if version == 4:
+                            cell = decode_cell_data_v4(region_data['cells'][i])
+                        elif version == 6:
+                            cell = decode_cell_data_v4(region_data['cells'][i], v6=True)
+                        else:
+                            cell = region_data['cells'][i]
+
                         for j in range(2):
                             cell['bbox'][j] = (cell['bbox'][j][0] + start_x, cell['bbox'][j][1] + start_y)
                         cell['centroid'] = (cell['centroid'][0] + start_x, cell['centroid'][1] + start_y)
                         for j in range(len(cell['boundary'])):
                             cell['boundary'][j] = (cell['boundary'][j][0] + start_x, cell['boundary'][j][1] + start_y)
-                        region_data['cells'][i] = encode_cell_data_v4(cell) if version == 4 else cell
+
+                        if version == 4:
+                            region_data['cells'][i] = encode_cell_data_v4(cell)
+                        elif version == 6:
+                            region_data['cells'][i] = encode_cell_data_v4(cell, v6=True)
+                        else:
+                            region_data['cells'][i] = cell
 
                 if data is None:
                     data = region_data
                 else:
                     data['cells'] += region_data['cells']
 
-                if region_data['settings']['default_marker_thresh'] is not None and region_data['settings']['default_marker_thresh'] != 0:
-                    default_marker_thresh += region_data['settings']['default_marker_thresh']
-                    count_marker_thresh += 1
+                if version == 3 or version == 4:
+                    if region_data['settings']['default_marker_thresh'] is not None and region_data['settings']['default_marker_thresh'] != 0:
+                        default_marker_thresh += region_data['settings']['default_marker_thresh']
+                        count_marker_thresh += 1
+
                 if region_data['settings']['default_size_thresh'] != 0:
                     default_size_thresh += region_data['settings']['default_size_thresh']
                     count_size_thresh += 1
@@ -895,11 +921,13 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
             start_x = 0
             start_y += stride_y
 
-    if count_marker_thresh == 0:
-        count_marker_thresh = 1
+    if version == 3 or version == 4:
+        if count_marker_thresh == 0:
+            count_marker_thresh = 1
+        data['settings']['default_marker_thresh'] = round(default_marker_thresh / count_marker_thresh)
+
     if count_size_thresh == 0:
         count_size_thresh = 1
-    data['settings']['default_marker_thresh'] = round(default_marker_thresh / count_marker_thresh)
     data['settings']['default_size_thresh'] = round(default_size_thresh / count_size_thresh)
 
     data['settings']['tile_size'] = tile_size
