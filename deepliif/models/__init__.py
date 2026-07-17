@@ -41,6 +41,7 @@ from deepliif.util.util import tensor_to_pil
 from deepliif.data import transform
 from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
+from deepliif.postprocessing import merge_region_boundary_cells
 from deepliif.options import Options, print_options
 
 from .base_model import BaseModel
@@ -921,6 +922,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
             start_x = 0
             start_y += stride_y
 
+    print_info('Merge region boundary cells starting')
+    merge_region_boundary_cells(data, stride_x, stride_y, print_log)
+    print_info('Merge region boundary cells finished')
+
     if version == 3 or version == 4:
         if count_marker_thresh == 0:
             count_marker_thresh = 1
@@ -930,8 +935,10 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
         count_size_thresh = 1
     data['settings']['default_size_thresh'] = round(default_size_thresh / count_size_thresh)
 
+    data['settings']['image_size'] = (size_x, size_y)
     data['settings']['tile_size'] = tile_size
     data['settings']['region_size'] = region_size
+    data['settings']['region_stride'] = (stride_x, stride_y)
     data['settings']['seg_weights'] = seg_weights
 
     try:
