@@ -15,6 +15,8 @@
     |
     <a href="https://arxiv.org/abs/2405.08169">MICCAI'24</a>
     |
+    <a href="https://arxiv.org/abs/2605.24128">MICCAI'26</a>
+    |
     <a href="https://deepliif.org/">Cloud Deployment</a>
     |
     <a href="https://nadeemlab.github.io/DeepLIIF/">Documentation</a>
@@ -619,4 +621,12 @@ If you find our work useful in your research or if you use parts of this code or
   pages = {427--436},
   year = {2024}
 }
+
+@article{shrivastava2026impartial,
+  title={ImPartial: Multi-channel Whole-Cell Segmentation using Partial Annotations},
+  author={Shrivastava, Gunjan and Nadeem, Saad},
+  journal={International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI)},
+  year={2026}
+}
+
 ```
