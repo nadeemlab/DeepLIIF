@@ -835,17 +835,16 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @cli.command()
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--data-dir', help='path to calibration dataset (also used to qat post training); if not set, use the training data path')
+@click.option('--data-dir', help='path to calibration dataset (also used to qat post training): same as dataroot in the train command, this should point to a root directory of dataset that consists subfolder "train" and "test_cli"; "train" is used for calibration and post training while one image from "test_cli" is used to trace the model; if not set, use the training data path')
 #@click.option('--tile-size', type=int, default=None, help='tile size')
-@click.option('--epoch', default='latest', type=str, help='epoch to load and serialize')
+@click.option('--epoch', default='latest', type=str, help='epoch to load and quantize')
 @click.option('--save-fp16', is_flag=True, help='also save a openvino fp16 model')
 @click.option('--save-fp32', is_flag=True, help='also save a openvino fp32 model')
 @click.option('--qat', is_flag=True, help='use quantization-aware training; current training runs on GPU 0')
 @click.option('--gpu-ids', type=int, multiple=True, help='only for qat: gpu-ids 0 gpu-ids 1 or gpu-ids -1 for CPU')
 @click.option('--fn-example', default=None, type=str, help='the real image example used in openvino.convert_model() for better results; needs to be available under --data-dir; if not, use the first one')
 @click.option('--opt-args', default="{}", type=str, help='dictionary-format opt key-value pairs to overwrite the loaded values from train_opt.txt, for example --opt-args {"display_server":"https://my-server", "display_port":8097, "display_env":"openvino_int8qat"}')
-@click.option('--verbose', default=0, type=int,help='saves results here.')
-def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, gpu_ids, fn_example, opt_args, verbose):
+def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, gpu_ids, fn_example, opt_args):
     """
     Quantize DeepLIIF models using Openvino (INT8).
     Optionally save a fp16 and/or fp32 openvino model copy.
@@ -876,13 +875,18 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
     
     # use a real image for openvino conversion to properly trace the model
     # works better than a dummy one
+    if data_dir is None:
+        opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+        data_dir = opt.dataroot
     if fn_example is None:
-        fns = sorted([fn for fn in os.listdir(data_dir) if fn.endswith(('.png'))])
+        fns = sorted([fn for fn in os.listdir(os.path.join(data_dir,'test_cli')) if fn.endswith(('.png'))])
         fn_example = fns[0]
     print('Real data image used for tracing and comparison:',fn_example)
+    print('Data directory:',data_dir)
     
     if not qat:
         opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
+        opt.epoch = epoch
         opt.use_dp = True
         opt.gpu_ids = []
         opt.num_threads = 0
@@ -923,10 +927,8 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
                     ov.save_model(fp_ir_model, os.path.join(output_dir,f'{net_name}_fp32.xml'), compress_to_fp16=False)
             quantized_model = nncf.quantize(copy.deepcopy(net), calibration_dataset, 
                                     target_device=nncf.TargetDevice.CPU,
-                                    #ignored_scope=ignored_scope,
                                     subset_size=min(len(dataset),1000),
                                     preset=nncf.QuantizationPreset.MIXED,
-                                    #preset='mixed', # Symmetric quantization of weights and asymmetric quantization of activations.
                                     )
             quantized_model = quantized_model.cpu()
             int8_ir_model = ov.convert_model(quantized_model, example_input=real_sample_batch, input=real_sample_batch.shape)
@@ -939,11 +941,12 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         
         # initialize both model and dataset on CPU to run quantizated model to avoid the issue pickling cuda streaming object from nncf.quantize()
         # here we assume that the post training always happen on gpu id 0
-        opt.gpu_ids = [0]
+        gpu_ids = [0] if len(gpu_ids)==0 else [gpu_ids[0]] # only take the first gpu
+        opt.gpu_ids = gpu_ids
         opt.use_dp = True
         opt.use_openvino = False # this flag currently is about whether we need to convert ovdict to tensor
-        opt.lr_g = 1e-4 # original training lr: 0.0002
-        opt.lr_gs = 1e-4 # original training lr: 0.0002
+        opt.lr_g = 1e-5 # original training lr: 0.0002
+        opt.lr_gs = 1e-5 # original training lr: 0.0002
         opt.continue_train = True
         
         # set dir for train and val
@@ -973,9 +976,19 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         
         calibration_dataset = nncf.Dataset(dataset_cpu, transform_fn)
         
+        # specify gpu device for qat
+        # currently we only allow 1 gpu
+        if -1 in gpu_ids:
+            model.device = 'cpu' # used by model.set_input()
+            model.gpu_ids = [] # used by model.save_networks()
+        else:
+            model.device = f'cuda:{gpu_ids[0]}' # used by model.set_input()
+            model.gpu_ids = [gpu_ids[0]] #[0] # used by model.save_networks()
+        
         # generators of interest need to be quantized on cpu first, then move to gpu
         # other nets (e.g., discriminators) can be directly moved to gpu
-        for net_name in model.model_names: 
+        params = []
+        for net_name in model.model_names_g + model.model_names_gs: 
             net = getattr(model,f'net{net_name}')
             net.eval()
             net = disable_batchnorm_tracking_stats(net)
@@ -996,26 +1009,27 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
                                     )
                 net.train()
             
-            setattr(model,f'net{net_name}',net.to('cuda:0'))
-        
+            setattr(model,f'net{net_name}',net.to(model.device))
+            params += list(getattr(model,f'net{net_name}').parameters())
+            
         for loss_name in [k for k in model.__dict__.keys() if k.startswith('criterion')]:
             try:
-                setattr(model, loss_name, getattr(model,loss_name).to('cuda:0'))
+                setattr(model, loss_name, getattr(model,loss_name).to(model.device))
             except:
                 pass # some loss calculators do not have device info, e.g., smoothL1
-        # specify gpu device for qat
-        # currently we can only use 1 gpu
-        if '-1' in gpu_ids:
-            model.device = 'cpu' # used by model.set_input()
-            model.gpu_ids = [] # used by model.save_networks()
-        else:
-            model.device = f'cuda:{gpu_ids[0]}' # used by model.set_input()
-            model.gpu_ids = gpu_ids[0] #[0] # used by model.save_networks()
-        model.save_dir = output_dir # used by model.save_networks()
+            
+        from deepliif.models.networks import get_optimizer
+        try:
+            model.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g, betas=(opt.beta1, 0.999))
+        except:
+            print(f'betas are not used for optimizer torch.optim.{opt.optimizer} in generators')
+            model.optimizer_G = get_optimizer(opt.optimizer)(params, lr=opt.lr_g)
         
-        #model.eval()
+        print('model optimizer_G updated with qat model params')
+    
+        
+        model.save_dir = output_dir # used by model.save_networks()
         model.save_networks('openvinoInt8_beforeQAT')
-        #model.train()
         
         # create a visualizer that display/save images and plots
         visualizer = Visualizer(opt)
@@ -1032,10 +1046,10 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         display_id = 1
         save_by_iter = False
         continue_train = True
-    
+        num_epochs = 10
+        
         # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
-        for epoch in range(10):
-            print('epoch:',epoch)
+        for epoch in range(num_epochs):
             # timer for entire epoch
             epoch_start_time = time.time()
             # timer for data loading per iteration
@@ -1105,7 +1119,7 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
                     visualizer.plot_current_losses(epoch, float(epoch_iter) / len(dataset_gpu), {**losses})
     
             print('End of epoch %d / %d \t Time Taken: %d sec' % (
-                epoch, 10, time.time() - epoch_start_time))
+                epoch, num_epochs, time.time() - epoch_start_time))
             # update learning rates at the end of every epoch.
             model.update_learning_rate()
             

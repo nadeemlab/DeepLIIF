@@ -167,7 +167,8 @@ def load_openvino_models(opt, devices=None, suffix="", env='ov'):
         model = create_model(opt)
         for net_name in model.model_names_g + model.model_names_gs:
             net = nncf.quantize(getattr(model,f'net{net_name}'), calibration_dataset, 
-                                target_device=nncf.TargetDevice.CPU)
+                                target_device=nncf.TargetDevice.CPU,
+                                preset=nncf.QuantizationPreset.MIXED)
             setattr(model,f'net{net_name}',net)
         
         # now that the model layers are correctly built up with openvino's addition
