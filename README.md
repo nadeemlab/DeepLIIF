@@ -206,9 +206,11 @@ deepliif quantize --model-dir /path/to/input/model/files
                   --data-dir /path/to/input/data/files
                   --output-dir /path/to/output/model/files
 ```
-NNCF's quantization requires a **calibration dataset** to estimate quantization layer parameters (up to 1000 images will be used). If `--data-dir` is not provided, we use the model's training data directory recorded in the training options file.
+NNCF's quantization requires a **calibration dataset** to estimate quantization layer parameters (up to 1000 images will be used). If `--data-dir` is not provided, we use the model's training data directory recorded in the training options file. Similar to the `--dataroot` option in `deepliif train`, here `--data-dir` also expects a root data directory with subfolders:
+- train: used as the calibration dataset (and post-training dataset in QAT case, introduced below)
+- test_cli: a subfolder with at least one image; one of the images, or a selected one (`--fn-example <filename>`), is used to trace the model using openvino's `conver_model()` method.
 
-The quantized model typically exhibits degraded output quality compared to the original model. In our experiment with DeepLIIF model, int8 quantization leads to a slight decrease in final segmentation accuracy. You may try to restore the model performance using Quantization-Aware Training (QAT), which in NNCF's implementation is a [post-training technique](https://github.com/openvinotoolkit/nncf/blob/develop/docs/usage/training_time_compression/quantization_aware_training/Usage.md). The QAT in deepliif assumes **post-training runs on GPU**, though it targets a quantized model that is optimized for CPU inference.
+The quantized model typically exhibits degraded output quality compared to the original model. In our experiment with DeepLIIF model, int8 quantization leads to a slight decrease in final segmentation accuracy. You may try to restore the model performance using Quantization-Aware Training (QAT), which in NNCF's implementation is a [post-training technique](https://github.com/openvinotoolkit/nncf/blob/develop/docs/usage/training_time_compression/quantization_aware_training/Usage.md). The QAT in deepliif assumes **post-training runs on a single GPU or CPU**, though it targets a quantized model that is optimized for CPU inference.
 ```
 deepliif quantize --model-dir /path/to/input/model/files 
                   --data-dir /path/to/input/data/files
@@ -217,14 +219,17 @@ deepliif quantize --model-dir /path/to/input/model/files
                   --gpu-ids 0
                   
 ```
-Note that QAT has a set of hard-coded hyperparameters for post-training, including:
-- gpu id fixed to 0 (1-gpu training)
-- learning rate for both translation generators and segmentation generators is 1e-4 (original default training lr: 0.0002)
+Note that QAT has a set of hard-coded hyper-parameters for post-training, including:
+- training with selected 1 gpu (`--gpu-ids <gpu-id>`) or cpu (`--gpu-ids -1`); multi-gpu training is not supported
+- learning rate for both translation generators and segmentation generators is 1e-5 (original default training lr: 0.0002)
 - data loader's number of threads is 0 to avoid issue with nncf's pickle operation
 - the post-training gets 10 epochs, and checkpoints are saved every 2 epochs
 - batch size is 1
+- the quantization scheme is "MIXED" (symmetric weight quantization and asymmetric activation quantization)
 
 **Quantize Command Options**
+* `--epoch` The epoch to load and quantize.
+* `--fn-example` Use specified image to trace the openvino model.
 * `--save-fp16` Save openvino's fp16 model file as well.
 * `--save-fp32` Save openvino's fp32 model file as well.
 * `--opt-args` If you will use a different visdom server for **QAT**, pass `--opt-args '{"display_server":"<my-server>", "display_port":<port>}'` to override the settings loaded from the model training options file.
@@ -259,7 +264,7 @@ python test.py --dataroot /path/to/input/images
 In addition to the required parameters given above, the following optional parameters are available for `deepliif test`:
 * `--eager-mode` Run the original model files (instead of serialized model files).
 * `--openvino-mode` Use this flag to load OpenVINO quantized models (overrides `--eager-mode`).
-* `--openvino-suffix` The suffix of OpenVINO `xml` model files. If trained with `deepliif quantize` command, the suffix is either `int8` or `int8qat`.
+* `--openvino-suffix` The suffix of OpenVINO `xml` model files. If trained with `deepliif quantize` command, the suffix is one of the following: `fp32`, `fp16`, `int8` or `int8qat`.
 * `--seg-intermediate` Save the intermediate segmentation maps created for each modality.
 * `--seg-only` Save only the segmentation files, and do not infer images that are not needed.
 * `--mod-only` Save only the translated modality image; overwrites --seg-only and --seg-intermediate.
