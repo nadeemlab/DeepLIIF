@@ -134,10 +134,37 @@ def tensor2im(input_image, imtype=np.uint8):
         image_numpy = input_image
     return image_numpy.astype(imtype)
 
+def numpy2im(input_array, imtype=np.uint8):
+    """
+    Converts a NumPy array into a numpy image array.
+    
+    Parameters:
+        input_array (np.ndarray) -- the input numpy array
+        imtype (type)            -- the desired type of the converted numpy array
+    """
+    if not isinstance(input_array, np.ndarray):
+        return input_array
+    
+    image_numpy = input_array
+    
+    if image_numpy.ndim == 4:  # if batch, take first image
+        image_numpy = image_numpy[0]
+    
+    if image_numpy.shape[0] == 1:  # grayscale to RGB
+        image_numpy = np.tile(image_numpy, (3, 1, 1))
+    
+    image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0
+    
+    return image_numpy.astype(imtype)
+
 
 def tensor_to_pil(t):
     return Image.fromarray(tensor2im(t))
 
+
+def numpy_to_pil(t):
+    return Image.fromarray(numpy2im(t))
+  
 
 def calculate_ssim(img1, img2):
     return ssim(img1, img2, data_range=img2.max() - img2.min())
@@ -205,34 +232,42 @@ class HardwareStatus():
         self.timer.cancel()
 
 
-def get_mod_id_seg(dir_model):
+def get_mod_id_seg(dir_model, openvino_mode=False):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
-    fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
-    
+    print('getting mod id seg from',dir_model)
+    fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn and fn.startswith('latest_')]
     if len(fns) == 0: # typically this means the directory only contains serialized models
         fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pt') and fn.startswith('G')]
-        model_names = [fn[1:-3] for fn in fns] # 1[:-3] drop ".pt" and the starting G
+        if len(fns) == 0: # openvino mode
+            fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.xml') and fn.startswith('G')]
+            model_names = [fn[1:-4].split('_')[0] for fn in fns]
+        else:
+            model_names = [fn[1:-3] for fn in fns] # 1[:-3] drop ".pt" and the starting G
     else:
         model_names = [fn[:-4].split('_')[2][1:] for fn in fns] # [1:] drop "G"
     
     if len(fns) == 0:
-        raise Exception('Cannot find any model file ending with .pt or .pth in directory',dir_model)
+        raise Exception('Cannot find any model file ending with .pt or .pth or .xml in directory',dir_model)
     
     model_name_seg = max(model_names, key=len)
     return model_name_seg[0]
 
 def get_input_id(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
-    fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn]
+    fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn and fn.startswith('latest_')]
     
     if len(fns) == 0: # typically this means the directory only contains serialized models
         fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pt') and fn.startswith('G')]
-        model_names_seg = [fn[2:-3] for fn in fns] # [2:] drop "GS"/"G5"
+        if len(fns) == 0: # openvino mode
+            fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.xml') and fn.startswith('G')]
+            model_names_seg = [fn[2:-4].split('_')[0] for fn in fns]
+        else:
+            model_names_seg = [fn[2:-3] for fn in fns] # [2:] drop "GS"/"G5"
     else:
         model_names_seg = [fn[:-4].split('_')[2][2:] for fn in fns] # [2:] drop "GS"/"G5"
     
     if len(fns) == 0:
-        raise Exception('Cannot find any model file ending with .pt or .pth in directory',dir_model)
+        raise Exception('Cannot find any model file ending with .pt or .pth or .xml in directory',dir_model)
       
     if '0' in model_names_seg:
         return '0'

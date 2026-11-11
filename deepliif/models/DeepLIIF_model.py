@@ -4,6 +4,7 @@ from . import networks
 from .networks import get_optimizer
 import os
 from ..util.util import get_input_id, init_input_and_mod_id
+from ..util.openvino import ovdict_to_tensor
 
 class DeepLIIFModel(BaseModel):
     """ This class implements the DeepLIIF model, for learning a mapping from input images to modalities given paired data."""
@@ -17,6 +18,8 @@ class DeepLIIFModel(BaseModel):
         BaseModel.__init__(self, opt)
         if not hasattr(opt,'net_gs'):
             opt.net_gs = 'unet_512'
+        
+        self.use_openvino = opt.use_openvino if hasattr(opt,'use_openvino') else False
         
         self.seg_gen = opt.seg_gen
         self.seg_weights = opt.seg_weights
@@ -156,7 +159,6 @@ class DeepLIIFModel(BaseModel):
 
         :param input (dict): include the input image and the output modalities
         """
-
         self.real_A = input['A']
         if isinstance(self.real_A, list): # from previous SDG setup where multiple input modalities are allowed
             As = [A.to(self.device) for A in self.real_A]
@@ -171,6 +173,7 @@ class DeepLIIFModel(BaseModel):
             setattr(self,f'real_B_{self.mod_id_seg}',self.real_B_array[self.opt.modalities_no].to(self.device)) # the last one is seg
         
         self.image_paths = input['A_paths']
+    
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -180,7 +183,11 @@ class DeepLIIFModel(BaseModel):
         # self.fake_B_4 = self.netG4(self.real_A)   # mpIF Ki67 image generator
         
         for i in range(self.opt.modalities_no):
-            setattr(self,f'fake_B_{i+1}',getattr(self,f'netG{i+1}')(self.real_A))
+            if self.use_openvino:
+                setattr(self,f'fake_B_{i+1}',ovdict_to_tensor(getattr(self,f'netG{i+1}')(self.real_A)))
+            else:
+                setattr(self,f'fake_B_{i+1}',getattr(self,f'netG{i+1}')(self.real_A))
+                
 
         # self.fake_B_5_1 = self.netG51(self.real_A)      # Segmentation mask generator from IHC input image
         # self.fake_B_5_2 = self.netG52(self.fake_B_1)    # Segmentation mask generator from Hematoxylin input image
@@ -196,9 +203,15 @@ class DeepLIIFModel(BaseModel):
         if self.seg_gen:
             for i,model_name in enumerate(self.model_names_gs):
                 if i == 0:
-                    setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(self.real_A))
+                    if self.use_openvino:
+                        setattr(self,f'fake_B_{self.mod_id_seg}_{i}',ovdict_to_tensor(getattr(self,f'net{model_name}')(self.real_A)))
+                    else:
+                        setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(self.real_A))
                 else:
-                    setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(getattr(self,f'fake_B_{i}')))
+                    if self.use_openvino:
+                        setattr(self,f'fake_B_{self.mod_id_seg}_{i}',ovdict_to_tensor(getattr(self,f'net{model_name}')(getattr(self,f'fake_B_{i}'))))
+                    else:
+                        setattr(self,f'fake_B_{self.mod_id_seg}_{i}',getattr(self,f'net{model_name}')(getattr(self,f'fake_B_{i}')))
                 
             setattr(self,f'fake_B_{self.mod_id_seg}',torch.stack([torch.mul(getattr(self,f'fake_B_{self.mod_id_seg}_{i}'), self.seg_weights[i]) for i in range(self.opt.modalities_no+1)]).sum(dim=0))
 

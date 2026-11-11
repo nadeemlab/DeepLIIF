@@ -37,7 +37,8 @@ import numpy as np
 from dask import delayed, compute
 
 from deepliif.util import *
-from deepliif.util.util import tensor_to_pil
+from deepliif.util.util import tensor_to_pil, numpy_to_pil
+from deepliif.util.openvino import ovdict_to_numpy, disable_inplace
 from deepliif.data import transform
 from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
@@ -49,7 +50,7 @@ from .base_model import BaseModel
 # import for init purpose, not used in this script
 from .DeepLIIF_model import DeepLIIFModel
 from .DeepLIIFExt_model import DeepLIIFExtModel
-
+import torch.nn as nn
 
 @lru_cache
 def get_opt(model_dir, mode='test'):
@@ -68,7 +69,7 @@ def get_opt(model_dir, mode='test'):
         opt.gpu_ids = list(range(torch.cuda.device_count()))
     return opt
 
-
+        
 def find_model_using_name(model_name):
     """Import the module "models/[model_name]_model.py".
 
@@ -121,7 +122,79 @@ def load_torchscript_model(model_pt_path, device):
     net.eval()
     return net
 
-
+def load_openvino_models(opt, devices=None, suffix="", env='ov'):
+    """
+    Load OpenVino models.
+    
+    suffix: for model files loaded in openvino env, suffix is the model file suffix 
+            (f'{net_name}_{suffix}.xml'); for model files loaded in pytorch env, 
+            suffix is the epoch name to load the checkpoint file
+    env: the environment to load model in, default is "ov"; also support "pytorch",
+         as openvino's quantized and/or qat models can be saved as pytorch format,
+         though without converting & being loaded in to ov format the model can't 
+         benefit much from ov's acceleration
+    """
+    print('load_ov_models filename suffix:',suffix)
+    
+    if env == 'ov':
+        print('Loading openvino (quantized or not) models in openvino env')
+        import openvino as ov
+        core = ov.Core()
+        nets = {}
+        for net_name in ['GS0']:#['G1','GS0','GS1']:
+            print("Loading openvino model:",f'{net_name}_{suffix}.xml')
+            model = core.read_model(model=os.path.join(opt.checkpoints_dir, opt.name, f'{net_name}_{suffix}.xml'))
+            compiled_model = core.compile_model(model=model, device_name="CPU")
+            nets[net_name] = compiled_model
+        return nets
+    else:
+        # this is how to load openvino's qat model in pytorch
+        # doesn't accelerate though
+        print('Loading openvino quantized models in pytorch')
+        import nncf
+        
+        # create a dummy calibration dataset for openvino to trace the graph
+        def transform_fn(data_item):
+            return data_item   # already a tensor ready for the model
+        
+        calibration_dataset = nncf.Dataset([torch.randn(1, 3, 512, 512) for _ in range(5)], transform_fn)
+        
+        model = create_model(opt)
+        for net_name in model.model_names_g + model.model_names_gs:
+            net = nncf.quantize(getattr(model,f'net{net_name}'), calibration_dataset, 
+                                target_device=nncf.TargetDevice.CPU,
+                                preset=nncf.QuantizationPreset.MIXED)
+            setattr(model,f'net{net_name}',net)
+        
+        # now that the model layers are correctly built up with openvino's addition
+        # we can load the checkpoint
+        opt.epoch = suffix
+        model.setup(opt)
+        
+        nets = {}
+        if devices:
+            model_names = list(devices.keys())
+        else:
+            model_names = model.model_names
+        
+        for name in model_names:#model.model_names:
+            if isinstance(name, str):
+                if '_' in name:
+                    net = getattr(model, 'net' + name.split('_')[0])[int(name.split('_')[-1]) - 1]
+                else:
+                    net = getattr(model, 'net' + name)
+        
+                if opt.phase != 'train':
+                    net.eval()
+                    net = disable_batchnorm_tracking_stats(net)
+                
+                # SDG models when loaded are still DP.. not sure why
+                if isinstance(net, torch.nn.DataParallel):
+                    net = net.module
+                
+                if devices:
+                    nets[name].to(devices[name])
+        return nets
 
 def load_eager_models(opt, devices=None):
     # create a model given model and other options
@@ -153,11 +226,11 @@ def load_eager_models(opt, devices=None):
             nets[name] = net
             if devices:
                 nets[name].to(devices[name])
-            
+
     return nets
 
 @lru_cache
-def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
+def init_nets(model_dir, eager_mode=False, opt=None, phase='test', openvino_mode=False, openvino_suffix=""):
     """
     Init DeepLIIF networks so that every net in
     the same group is deployed on the same GPU
@@ -211,6 +284,9 @@ def init_nets(model_dir, eager_mode=False, opt=None, phase='test'):
     else:
         devices = {n: torch.device('cpu') for n in itertools.chain.from_iterable(net_groups)}
 
+    if openvino_mode:
+        return load_openvino_models(opt, devices, suffix=openvino_suffix)
+
     if eager_mode:
         return load_eager_models(opt, devices)
 
@@ -228,7 +304,7 @@ def compute_overlap(img_size, tile_size):
     return tile_size // 4
 
 
-def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False, seg_weights=None, use_dask=True, output_tensor=False):
+def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False, seg_weights=None, openvino_mode=False, openvino_suffix="", use_dask=True, output_tensor=False):
     """
     eager_mode: not used in this function; put in place to be consistent with run_dask
            so that run_wrapper() could call either this function or run_dask with
@@ -257,7 +333,7 @@ def run_torchserve(img, model_path=None, nets=None, eager_mode=False, opt=None, 
 
 
 def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False,
-             seg_weights=None, use_dask=True, output_tensor=False):
+             seg_weights=None, openvino_mode=False, openvino_suffix="", use_dask=True, output_tensor=False):
     """
     Provide either the model path or the networks object.
     
@@ -266,7 +342,7 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
     assert model_path is not None or nets is not None, 'Provide either the model path or the networks object.'
     if nets is None:
         model_dir = os.getenv('DEEPLIIF_MODEL_DIR', model_path)
-        nets = init_nets(model_dir, eager_mode, opt)
+        nets = init_nets(model_dir, eager_mode, opt, openvino_mode=openvino_mode, openvino_suffix=openvino_suffix)
     
     if use_dask: # check if use_dask should be overwritten
         use_dask = True if opt.norm != 'spectral' else False
@@ -280,16 +356,25 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
         else:
             ts = transform(img.resize((opt.scale_size, opt.scale_size)))
     
+    from openvino import CompiledModel
+    if isinstance(list(nets.values())[0], CompiledModel):
+        use_openvino = True
+        use_dask = False
+    else:
+        use_openvino = False
     
     if use_dask:
         @delayed
         def forward(input, model):
-            with torch.no_grad():
+            with torch.inference_mode():
                 return model(input.to(next(model.parameters()).device))
     else: # some train settings like spectral norm somehow in inference mode is not compatible with dask
         def forward(input, model):
-            with torch.no_grad():
-                return model(input.to(next(model.parameters()).device))
+            with torch.inference_mode():
+                if use_openvino:
+                    return model(input) # in this case both input and model are on cpu
+                else:
+                    return model(input.to(next(model.parameters()).device))
     
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         
@@ -318,15 +403,18 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             
             if seg_only:
                 seg_map = {k: v for k, v in seg_map.items() if weights[v] != 0}
-            
+
         lazy_gens = {k: forward(ts, nets[k]) for k in seg_map}
         if 'Marker' in opt.modalities_names:
             mod_id_marker = opt.modalities_names.index("Marker")
             if f'G{mod_id_marker}' not in seg_map:
                 lazy_gens[f'G{mod_id_marker}'] = forward(ts, nets[f'G{mod_id_marker}'])
         
-        gens = compute(lazy_gens)[0]
-        
+        if len(lazy_gens) > 0:
+            gens = compute(lazy_gens)[0]
+        else:
+            gens = {}
+
         if opt.seg_gen and not mod_only:
             lazy_segs = {v: forward(gens[k], nets[v]) for k, v in seg_map.items()}
             # run seg generator for the base input
@@ -335,8 +423,14 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
             segs = compute(lazy_segs)[0]
         
             model_name_first = list(nets.keys())[0]
-            device = next(nets[model_name_first].parameters()).device # take the device of the first net and move all outputs there for seg aggregation
-            seg = torch.stack([torch.mul(segs[k].to(device), weights[k]) for k in segs.keys()]).sum(dim=0)
+            if use_openvino:
+                device = 'cpu' # openvino compiled model doesn't have .parameters()
+                #seg = torch.stack([torch.mul(ovdict_to_numpy(segs[k]), weights[k]) for k in segs.keys()]).sum(dim=0)
+                seg = np.sum([segs[k][0] * weights[k] for k in segs.keys()], axis=0)
+            else:
+                device = next(nets[model_name_first].parameters()).device # take the device of the first net and move all outputs there for seg aggregation
+                seg = torch.stack([torch.mul(segs[k].to(device), weights[k]) for k in segs.keys()]).sum(dim=0)
+
         
         if output_tensor:
             if mod_only or not opt.seg_gen:
@@ -355,10 +449,15 @@ def run_dask(img, model_path=None, nets=None, eager_mode=False, opt=None, seg_on
                 res = {f'G{opt.modalities_no}': tensor_to_pil(gens[f'G{opt.modalities_no}'].to(torch.device('cpu')))} if f'G{opt.modalities_no}' in gens else {}
                 res[f'G{opt.mod_id_seg}'] = tensor_to_pil(seg.to(torch.device('cpu')))
             else:
-                res = {k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in gens.items()}
-                res.update({k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in segs.items()})
-                res[f'G{opt.mod_id_seg}'] = tensor_to_pil(seg.to(torch.device('cpu')))
-    
+                if use_openvino:
+                    res = {k: numpy_to_pil(v[0]) for k, v in gens.items()}
+                    res.update({k: numpy_to_pil(v[0]) for k, v in segs.items()})
+                    res[f'G{opt.mod_id_seg}'] = numpy_to_pil(seg)
+                else:
+                    res = {k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in gens.items()}
+                    res.update({k: tensor_to_pil(v.to(torch.device('cpu'))) for k, v in segs.items()})
+                    res[f'G{opt.mod_id_seg}'] = tensor_to_pil(seg.to(torch.device('cpu')))
+
         return res
     elif opt.model in ['DeepLIIFExt','SDG','CycleGAN']:
         if opt.model == 'CycleGAN':
@@ -397,7 +496,7 @@ def is_empty(tile):
         return True if image_variance_gray(tile) < thresh else False
 
 
-def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False, seg_weights=None, use_dask=True, output_tensor=False):
+def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=None, seg_only=False, mod_only=False, seg_weights=None, openvino_mode=False, openvino_suffix="", use_dask=False, output_tensor=False):
     if opt.model in ['DeepLIIF','DeepLIIFKD']:
         if is_empty(tile):
             if seg_only: # return seg image and the last translated modality
@@ -443,7 +542,7 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
                 del res['G0']
             return res
         else:
-            return run_fn(tile, model_path, None, eager_mode, opt, seg_only, mod_only, seg_weights)
+            return run_fn(tile, model_path, None, eager_mode, opt, seg_only, mod_only, seg_weights, openvino_mode, openvino_suffix)
     elif opt.model in ['DeepLIIFExt', 'SDG']:
         if is_empty(tile):
             res = {'G_' + str(i): Image.new(mode='RGB', size=(512, 512)) for i in range(1, opt.modalities_no + 1)}
@@ -465,7 +564,7 @@ def run_wrapper(tile, run_fn, model_path=None, nets=None, eager_mode=False, opt=
 def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
               eager_mode=False, color_dapi=False, color_marker=False, opt=None,
               return_seg_intermediate=False, seg_only=False, mod_only=False,
-              seg_weights=None, opt_args={}):
+              seg_weights=None, openvino_mode=False, openvino_suffix="", opt_args={}):
     """
     opt_args: a dictionary of key and values to add/overwrite to opt
     """
@@ -496,7 +595,7 @@ def inference(img, tile_size, overlap_size, model_path, use_torchserve=False,
 
     tiler = InferenceTiler(orig, tile_size, overlap_size)
     for tile in tiler:
-        tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only, mod_only, seg_weights))
+        tiler.stitch(run_wrapper(tile, run_fn, model_path, None, eager_mode, opt, seg_only, mod_only, seg_weights, openvino_mode, openvino_suffix))
         
     results = tiler.results()
     
@@ -613,7 +712,8 @@ def postprocess(orig, images, tile_size, model, seg_thresh=120, size_thresh='def
 
 def infer_modalities(img, tile_size, model_dir, eager_mode=False,
                      color_dapi=False, color_marker=False, opt=None,
-                     return_seg_intermediate=False, seg_only=False, mod_only=False, seg_weights=None):
+                     return_seg_intermediate=False, seg_only=False, mod_only=False, 
+                     seg_weights=None, openvino_mode=False, openvino_suffix='', opt_args={}):
     """
     This function is used to infer modalities for the given image using a trained model.
     :param img: The input image.
@@ -626,6 +726,9 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         opt.use_dp = False
         #print_options(opt)
     
+    for k,v in opt_args.items():
+        setattr(opt,k,v)
+        
     # for those with multiple input modalities, find the correct size to calculate overlap_size
     input_no = opt.input_no if hasattr(opt, 'input_no') else 1
     img_size = (img.size[0] / input_no, img.size[1]) # (width, height)
@@ -644,6 +747,8 @@ def infer_modalities(img, tile_size, model_dir, eager_mode=False,
         seg_only=seg_only,
         mod_only=mod_only,
         seg_weights=seg_weights,
+        openvino_mode=openvino_mode,
+        openvino_suffix=openvino_suffix
     )
 
     if not hasattr(opt,'seg_gen') or (hasattr(opt,'seg_gen') and opt.seg_gen): # the first condition accounts for old settings of deepliif; the second refers to deepliifext models
@@ -783,7 +888,8 @@ def get_wsi_resolution(filename):
         return None, None
 
 
-def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False, seg_weights=None):
+def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, version=3, print_log=False, 
+                        seg_weights=None, openvino_mode=False, openvino_suffix='', opt_args={}):
     """
     Perform inference on a slide and get the results individual cell data.
 
@@ -863,6 +969,9 @@ def infer_cells_for_wsi(filename, model_dir, tile_size, region_size=20000, versi
                     return_seg_intermediate=False,
                     seg_only=True,
                     seg_weights=seg_weights,
+                    openvino_mode=openvino_mode,
+                    openvino_suffix=openvino_suffix,
+                    opt_args=opt_args
                 )
 
                 seg = to_array(images['Seg'])

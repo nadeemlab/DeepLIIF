@@ -128,6 +128,9 @@ class CustomDatasetDataLoader(object):
             if self.max_dataset_size and i * self.batch_size >= self.max_dataset_size:
                 break
             yield data
+    
+    def get_batch_size(self):
+        return self.batch_size
 
 
 def transform(img):

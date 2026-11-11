@@ -110,6 +110,9 @@ class Options:
                     # # check again
                     # if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
                     self.modalities_names = [f'input{i+1}' for i in range(self.input_no)] + [f'mod{i+1}' for i in range(self.modalities_no)]
+                
+                if not hasattr(self,'use_openvino'):
+                    self.use_openvino = False
             else:
                 self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
 
