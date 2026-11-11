@@ -38,7 +38,7 @@ from dask import delayed, compute
 
 from deepliif.util import *
 from deepliif.util.util import tensor_to_pil, numpy_to_pil
-from deepliif.util.openvino import ovdict_to_numpy
+from deepliif.util.openvino import ovdict_to_numpy, disable_inplace
 from deepliif.data import transform
 from deepliif.postprocessing import compute_final_results, compute_cell_results, to_array
 from deepliif.postprocessing import encode_cell_data_v4, decode_cell_data_v4
@@ -69,11 +69,6 @@ def get_opt(model_dir, mode='test'):
         opt.gpu_ids = list(range(torch.cuda.device_count()))
     return opt
 
-def disable_inplace(module):
-    for child in module.children():
-        if isinstance(child, nn.ReLU):
-            child.inplace = False
-        disable_inplace(child)
         
 def find_model_using_name(model_name):
     """Import the module "models/[model_name]_model.py".

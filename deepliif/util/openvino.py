@@ -23,9 +23,20 @@ def transform_fn(data_item):
 
 def ovdict_to_numpy(ovdict):
     """
-    Converts OpenVINO OVDict predictions into PyTorch tensor.
+    Converts OpenVINO OVDict predictions into Numpy.
     In our case, each ovdict contains just one key so we do not
     have to worry about the output tensor format.
     """
     assert len(ovdict) == 1, f'The OVDict object contains {len(ovdict)} keys. This function only handles 1-key OVDict.'
     return ovdict[0]
+
+
+def ovdict_to_tensor(ovdict):
+    """
+    Converts OpenVINO OVDict predictions into PyTorch tensor.
+    In our case, each ovdict contains just one key so we do not
+    have to worry about the output tensor format.
+    """
+    assert len(ovdict) == 1, f'The OVDict object contains {len(ovdict)} keys. This function only handles 1-key OVDict.'
+    for key, value in ovdict.items():
+        return torch.from_numpy(np.array(value))

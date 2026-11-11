@@ -4,6 +4,7 @@ from . import networks
 from .networks import get_optimizer
 import os
 from ..util.util import get_input_id, init_input_and_mod_id
+from ..util.openvino import ovdict_to_tensor
 
 class DeepLIIFModel(BaseModel):
     """ This class implements the DeepLIIF model, for learning a mapping from input images to modalities given paired data."""
@@ -176,15 +177,6 @@ class DeepLIIFModel(BaseModel):
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        def ovdict_to_tensor(ovdict):
-            """
-            Converts OpenVINO OVDict predictions into PyTorch tensor.
-            In our case, each ovdict contains just one key so we do not
-            have to worry about the output tensor format.
-            """
-            assert len(ovdict) == 1, f'The OVDict object contains {len(ovdict)} keys. This function only handles 1-key OVDict.'
-            for key, value in ovdict.items():
-                return torch.from_numpy(np.array(value))
         # self.fake_B_1 = self.netG1(self.real_A)   # Hematoxylin image generator
         # self.fake_B_2 = self.netG2(self.real_A)   # mpIF DAPI image generator
         # self.fake_B_3 = self.netG3(self.real_A)   # mpIF Lap2 image generator
