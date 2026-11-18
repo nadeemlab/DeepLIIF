@@ -835,7 +835,7 @@ def serialize(model_dir, output_dir, device, epoch, verbose):
 @cli.command()
 @click.option('--model-dir', default='./model-server/DeepLIIF_Latest_Model', help='reads models from here')
 @click.option('--output-dir', help='saves results here.')
-@click.option('--data-dir', help='path to calibration dataset (also used to qat post training): same as dataroot in the train command, this should point to a root directory of dataset that consists subfolder "train" and "test_cli"; "train" is used for calibration and post training while one image from "test_cli" is used to trace the model; if not set, use the training data path')
+@click.option('--data-dir', help='path to calibration dataset (also used to qat post training): same as dataroot in the train command, this should point to a root directory of dataset that consists subfolder "train", and either "test_cli" or "val_cli"; "train" is used for calibration and post training while one image from "test_cli" or "val_cli" is used to trace the model; if not set, use the training data path')
 #@click.option('--tile-size', type=int, default=None, help='tile size')
 @click.option('--epoch', default='latest', type=str, help='epoch to load and quantize')
 @click.option('--save-fp16', is_flag=True, help='also save a openvino fp16 model')
@@ -879,7 +879,11 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
         data_dir = opt.dataroot
     if fn_example is None:
-        fns = sorted([fn for fn in os.listdir(os.path.join(data_dir,'test_cli')) if fn.endswith(('.png'))])
+        dir_example = os.path.join(data_dir,'test_cli')
+        if not os.path.isdir(dir_example):
+            dir_example = os.path.join(data_dir,'val_cli')
+            assert os.path.isdir(dir_example), f"neither test_cli nor val_cli subfolder exists under data dirctory {dir_example}"
+        fns = sorted([fn for fn in os.listdir(dir_example) if fn.endswith(('.png'))])
         fn_example = fns[0]
     print('Real data image used for tracing and comparison:',fn_example)
     print('Data directory:',data_dir)
@@ -887,11 +891,15 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
     if not qat:
         opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='test')
         opt.epoch = epoch
+        opt.checkpoints_dir = model_dir
+        opt.name = ''
         opt.use_dp = True
         opt.gpu_ids = []
         opt.num_threads = 0
         for k,v in opt_args.items():
             setattr(opt,k,v)
+        
+        print_options(opt, save=True)
         
         # create a model given model and other options
         model = create_model(opt)
@@ -905,7 +913,7 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         calibration_dataset = nncf.Dataset(dataset, transform_fn)
         print('calibration dataset created')
         
-        img_path = os.path.join(opt.dataroot, 'test_cli',fn_example)
+        img_path = os.path.join(dir_example,fn_example)
         img = Image.open(img_path).convert("RGB")
         img_ts = transform(img)
         real_sample_batch = img_ts
@@ -938,6 +946,8 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         # load and update opt for qat
         opt = Options(path_file=os.path.join(model_dir,'train_opt.txt'), mode='train')
         opt.epoch = epoch
+        opt.checkpoints_dir = model_dir
+        opt.name = ''
         
         # initialize both model and dataset on CPU to run quantizated model to avoid the issue pickling cuda streaming object from nncf.quantize()
         # here we assume that the post training always happen on gpu id 0
@@ -962,9 +972,9 @@ def quantize(model_dir, output_dir, data_dir, epoch, save_fp16, save_fp32, qat, 
         dataset_gpu = create_dataset(opt)
         opt.gpu_ids = []
         dataset_cpu = create_dataset(opt) # used for calibration during quantization
-        print_options(opt)
+        print_options(opt, save=True)
         
-        img_path = os.path.join(opt.dataroot, 'test_cli',fn_example)
+        img_path = os.path.join(dir_example,fn_example)
         img = Image.open(img_path).convert("RGB")
         img_ts = transform(img)
         real_sample_batch = img_ts

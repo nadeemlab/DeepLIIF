@@ -232,7 +232,7 @@ class HardwareStatus():
         self.timer.cancel()
 
 
-def get_mod_id_seg(dir_model, openvino_mode=False):
+def get_mod_id_seg(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     print('getting mod id seg from',dir_model)
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn and fn.startswith('latest_')]
@@ -255,7 +255,6 @@ def get_mod_id_seg(dir_model, openvino_mode=False):
 def get_input_id(dir_model):
     # assume we already know there are seg models - this check is intended to be done prior to calling this function
     fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pth') and 'net_G' in fn and fn.startswith('latest_')]
-    
     if len(fns) == 0: # typically this means the directory only contains serialized models
         fns = [fn for fn in os.listdir(dir_model) if fn.endswith('.pt') and fn.startswith('G')]
         if len(fns) == 0: # openvino mode
