@@ -141,7 +141,12 @@ def load_openvino_models(opt, devices=None, suffix="", env='ov'):
         import openvino as ov
         core = ov.Core()
         nets = {}
-        for net_name in ['GS0']:#['G1','GS0','GS1']:
+        if devices:
+            model_names = list(devices.keys())
+        else:
+            raise Exception('load_openvino_models() currently requires valid "devices" input')
+            
+        for net_name in model_names:
             print("Loading openvino model:",f'{net_name}_{suffix}.xml')
             model = core.read_model(model=os.path.join(opt.checkpoints_dir, opt.name, f'{net_name}_{suffix}.xml'))
             compiled_model = core.compile_model(model=model, device_name="CPU")
