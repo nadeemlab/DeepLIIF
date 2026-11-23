@@ -7,7 +7,7 @@ They are EXACTLY THE SAME.
 import time
 from deepliif.options.train_options import TrainOptions
 from deepliif.data import create_dataset
-from deepliif.models import create_model, postprocess
+from deepliif.models import create_model, postprocess, get_opt
 from deepliif.options import read_model_params, Options, print_options
 from deepliif.util import infer_background_colors
 from deepliif.util.visualizer import Visualizer
@@ -392,6 +392,7 @@ def train(dataroot, name, gpu_ids, checkpoints_dir, input_nc, output_nc, ngf, nd
     model = create_model(opt)
     # regular setup: load and print networks; create schedulers
     model.setup(opt)
+
 
     # create a visualizer that display/save images and plots
     visualizer = Visualizer(opt)

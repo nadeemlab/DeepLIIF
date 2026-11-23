@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import os
-from ..util.util import mkdirs, init_input_and_mod_id
+from ..util.util import mkdirs, init_input_and_mod_id, get_mod_id_seg, get_input_id
 import re
 
 def read_model_params(file_addr):
@@ -51,11 +51,83 @@ class Options:
                 else:
                     setattr(self,k,v)
             except:
-                setattr(self,k,v)            
-
+                setattr(self,k,v)
+        
         self.optimizer = 'adam' if not hasattr(self,'optimizer') else self.optimizer
         
+        # moved settings below up here to apply to both train and test options
+        # because continue_train on old models will require this too
         
+        # to account for old settings before modalities_no was introduced
+        if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
+            self.modalities_no = self.targets_no - 1
+            del self.targets_no
+        
+        if path_file is not None:
+            if self.model in ['DeepLIIF','DeepLIIFKD']:
+                if not hasattr(self,'mod_id_seg'):
+                    self.mod_id_seg = get_mod_id_seg(os.path.dirname(path_file))
+                if not hasattr(self,'input_id'):
+                    self.input_id = get_input_id(os.path.dirname(path_file))
+                #self.mod_id_seg, self.input_id = init_input_and_mod_id(self, os.path.dirname(path_file))
+                if hasattr(self,'seg_gen') and self.seg_gen == False:
+                    self.mod_id_seg = None
+                self.input_id = int(self.input_id)
+                print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
+            
+                print('Determining modalities names...')
+                if self.modalities_no == 4:
+                    if not hasattr(self,'modalities_names'):
+                        self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
+                        self.seg_weights = [0.5,0,0,0,0.5]
+                if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
+                    self.modalities_names = [f'input{i+1}' for i in range(self.input_no)] + [f'mod{i+1}' for i in range(self.modalities_no)]
+                
+                if not hasattr(self,'use_openvino'):
+                    self.use_openvino = False
+            else:
+                self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
+
+        print('modalities names:', self.modalities_names)
+        
+        # to account for old settings: same as in cli.py train
+        if not hasattr(self,'seg_no'):
+          if self.model == 'DeepLIIF': # for newer models where deepliif accept seg_gen=False (2026feb), seg_no should exist so this auto-determination will not be triggered
+              self.seg_no = 1
+              self.seg_gen = True
+          elif self.model == 'DeepLIIFExt':
+              if self.seg_gen:
+                  self.seg_no = self.modalities_no
+              else:
+                  self.seg_no = 0
+          elif self.model == 'SDG':
+              self.seg_no = 0
+              self.seg_gen = False
+          else:
+              raise Exception(f'seg_gen cannot be automatically determined for {opt.model}')
+        
+        # to account for old settings: prior to SDG, our models only have 1 input image
+        if not hasattr(self,'input_no'):
+            self.input_no = 1
+        
+        # weights of the modalities used to generate segmentation mask
+        if not hasattr(self,'seg_weights'):
+            if self.model == 'DeepLIIF':
+                # self.seg_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+                self.seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
+                # self.seg_weights = [0.25, 0.25, 0.25, 0.0, 0.25]
+            else:
+                self.seg_weights = [1 / self.modalities_no] * self.modalities_no
+        
+        # weights of the modalities used to calculate the final loss
+        self.loss_G_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_G_weights') else self.loss_G_weights
+        self.loss_D_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_D_weights') else self.loss_D_weights
+        
+        # upsample
+        if not hasattr(self,'upsample'):
+            self.upsample = 'convtranspose'
+
+
         if mode == 'train':
             self.is_train = True
             if hasattr(self,'net_g') and not hasattr(self,'netG'):
@@ -65,6 +137,14 @@ class Options:
             self.n_layers_D = 4
             self.lambda_L1 = 100
             self.lambda_feat = 100
+            
+            # account for old settings, which matters in continue_train (and quantize qat which uses continue_train)
+            if hasattr(self,'gan_mode') and not hasattr(self,'gan_mode_s'):
+                self.gan_mode_s = self.gan_mode
+            if hasattr(self,'lr'):
+                for opt_name in ['lr_d','lr_ds','lr_g','lr_gs']:
+                    if not hasattr(self,opt_name):
+                        self.lr_d = self.lr
             
         else:
             self.phase = 'test'
@@ -84,37 +164,7 @@ class Options:
                 # and can be configured in the inference function
                 self.BtoA = False if not hasattr(self,'BtoA') else self.BtoA 
             
-            # to account for old settings before modalities_no was introduced
-            if not hasattr(self,'modalities_no') and hasattr(self,'targets_no'):
-                self.modalities_no = self.targets_no - 1
-                del self.targets_no
-            
-            if self.model in ['DeepLIIF','DeepLIIFKD']:
-                self.mod_id_seg, self.input_id = init_input_and_mod_id(self, os.path.dirname(path_file))
-                if hasattr(self,'seg_gen') and self.seg_gen == False:
-                    self.mod_id_seg = None
-                self.input_id = int(self.input_id)
-                print('mod id seg:', self.mod_id_seg, '; input id:', self.input_id)
-            
-                print('Determining modalities names for test-mode model...')
-                if self.modalities_no == 4:
-                    if not hasattr(self,'modalities_names'):
-                        self.modalities_names = ['IHC','Hema','DAPI','Lap2','Marker']
-                        self.seg_weights = [0.5,0,0,0,0.5]
-                if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
-                    # if self.model == 'DeepLIIFKD':
-                    #     # try find the modalities names from the teacher model
-                    #     d_params_teacher = read_model_params(os.path.join(self.model_dir_teacher,'train_opt.txt'))
-                    #     if 'modalities_names' in d_params_teacher:
-                    #         self.modalities_names = d_params_teacher['modalities_names']
-                    # # check again
-                    # if not hasattr(self,'modalities_names') or len(self.modalities_names)==0:
-                    self.modalities_names = [f'input{i+1}' for i in range(self.input_no)] + [f'mod{i+1}' for i in range(self.modalities_no)]
-            else:
-                self.modalities_names = [f'mod{i}' for i in range(self.modalities_no+1)]
-
-            print('modalities names:', self.modalities_names)
-            
+                        
             if not hasattr(self, 'background_colors'):
                 if self.model in ['DeepLIIF','DeepLIIFKD']:
                     self.background_colors = [(201, 211, 208),(10, 10, 10), (0, 0, 0), (10, 10, 10)]
@@ -133,26 +183,6 @@ class Options:
             if isinstance(self.gpu_ids,int):
                 self.gpu_ids = (self.gpu_ids,)
             
-            # to account for old settings: same as in cli.py train
-            if not hasattr(self,'seg_no'):
-              if self.model == 'DeepLIIF': # for newer models where deepliif accept seg_gen=False (2026feb), seg_no should exist so this auto-determination will not be triggered
-                  self.seg_no = 1
-                  self.seg_gen = True
-              elif self.model == 'DeepLIIFExt':
-                  if self.seg_gen:
-                      self.seg_no = self.modalities_no
-                  else:
-                      self.seg_no = 0
-              elif self.model == 'SDG':
-                  self.seg_no = 0
-                  self.seg_gen = False
-              else:
-                  raise Exception(f'seg_gen cannot be automatically determined for {opt.model}')
-            
-            # to account for old settings: prior to SDG, our models only have 1 input image
-            if not hasattr(self,'input_no'):
-                self.input_no = 1
-            
             # to account for old settings: before adding scale_size
             if not hasattr(self, 'scale_size'):
                 if self.model in ['DeepLIIF','SDG']:
@@ -162,23 +192,6 @@ class Options:
                 else:
                   raise Exception(f'scale_size cannot be automatically determined for {opt.model}')
             
-            # weights of the modalities used to generate segmentation mask
-            if not hasattr(self,'seg_weights'):
-                if self.model == 'DeepLIIF':
-                    # self.seg_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
-                    self.seg_weights = [0.25, 0.15, 0.25, 0.1, 0.25]
-                    # self.seg_weights = [0.25, 0.25, 0.25, 0.0, 0.25]
-                else:
-                    self.seg_weights = [1 / self.modalities_no] * self.modalities_no
-            
-            # weights of the modalities used to calculate the final loss
-            self.loss_G_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_G_weights') else self.loss_G_weights
-            self.loss_D_weights = [1 / self.modalities_no] * self.modalities_no if not hasattr(self,'loss_D_weights') else self.loss_D_weights
-            
-            # upsample
-            if not hasattr(self,'upsample'):
-                self.upsample = 'convtranspose'
-
             
     
     def _get_kwargs(self):

@@ -32,6 +32,7 @@ class AlignedDataset(BaseDataset):
         self.load_size = opt.load_size
         self.crop_size = opt.crop_size
         self.model = opt.model
+        self.opt = opt
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -116,3 +117,6 @@ class AlignedDataset(BaseDataset):
     def __len__(self):
         """Return the total number of images in the dataset."""
         return len(self.AB_paths)
+    
+    def get_batch_size(self):
+        return self.opt.batch_size
